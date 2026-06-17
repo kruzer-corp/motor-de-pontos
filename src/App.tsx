@@ -28,6 +28,7 @@ import Conteudo from "./pages/Conteudo";
 import LoginConfig from "./pages/LoginConfig";
 import IndicacaoVenda from "./pages/IndicacaoVenda";
 import DashboardResultados from "./pages/DashboardResultados";
+import ProdutoMapa from "./pages/ProdutoMapa";
 import Niveis from "./pages/Niveis";
 import Canais from "./pages/Canais";
 import Afiliados from "./pages/Afiliados";
@@ -68,6 +69,7 @@ export default function App() {
         <Route path="login-config" element={<LoginConfig />} />
         <Route path="indicacoes" element={<IndicacaoVenda />} />
         <Route path="dashboard-resultados" element={<DashboardResultados />} />
+        <Route path="produto-mapa" element={<ProdutoMapa />} />
         <Route path="niveis" element={<Niveis />} />
         <Route path="canais" element={<Canais />} />
         <Route path="afiliados" element={<Afiliados />} />
