@@ -1,14 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@kruzer-corp/ds";
+import { Navigate } from "react-router-dom";
 
+// Tier management lives in Membros → Tier / Níveis (/membros/tier).
+// This route redirects there to avoid duplicating the feature.
 export default function Niveis() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Níveis</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-muted-foreground">Configure a progressão de tiers e as regras de elegibilidade para cada nível.</p>
-      </CardContent>
-    </Card>
-  );
+  return <Navigate to="/membros/tier" replace />;
 }

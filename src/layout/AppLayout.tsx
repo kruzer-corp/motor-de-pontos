@@ -167,9 +167,9 @@ const MENU: MenuItem[] = [
 
   { to: "/niveis",    label: "Níveis",                  icon: ShieldCheck },
   { to: "/canais",    label: "Canais",                  icon: Boxes },
-  { to: "/afiliados", label: "Afiliados",               icon: Briefcase, layer: "custom" },
-  { to: "/pedidos",   label: "Pedidos especificados",   icon: ClipboardList, layer: "custom" },
-  { to: "/carteiras", label: "Multi-moeda / Carteiras", icon: Wallet },
+  { to: "/afiliados", label: "Afiliados",             icon: Briefcase, layer: "module" },
+  { to: "/pedidos",   label: "Pedidos especificados", icon: ClipboardList, layer: "custom" },
+  { to: "/carteiras", label: "Múltiplas moedas",      icon: Wallet },
 
   // ── ENGAJAMENTO ───────────────────────────────────────────────────
   { section: "Engajamento" },

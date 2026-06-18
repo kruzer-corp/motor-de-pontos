@@ -7,7 +7,7 @@ export default function Carteiras() {
       <div className="flex items-center gap-3">
         <Wallet className="size-5 text-muted-foreground" />
         <div>
-          <h2 className="text-lg font-semibold">Multi-moeda / Carteiras</h2>
+          <h2 className="text-lg font-semibold">Múltiplas moedas</h2>
           <p className="text-sm text-muted-foreground">
             Gestão de múltiplas moedas e carteiras de pontos por membro.
           </p>
