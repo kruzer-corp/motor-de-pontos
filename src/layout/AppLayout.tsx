@@ -4,7 +4,6 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-  Badge,
   Button,
   DropdownMenu,
   DropdownMenuContent,
@@ -37,6 +36,10 @@ import {
   Newspaper,
   Layers,
   Puzzle,
+  Palette,
+  Webhook,
+  Wallet,
+  SlidersHorizontal,
 } from "lucide-react";
 
 // ── Tenants ───────────────────────────────────────────────────────────
@@ -51,55 +54,40 @@ type Tenant = {
 };
 
 const TENANTS: Tenant[] = [
-  {
-    id: "fastpro",
-    name: "FAST PRO",
-    mode: "custom",
-    description: "Configuração Fast PRO",
-  },
-  {
-    id: "whitelabel",
-    name: "Novo Tenant",
-    mode: "product",
-    description: "Produto white-label Kruzer",
-  },
+  { id: "fastpro",    name: "FAST PRO",    mode: "custom",  description: "Configuração Fast PRO" },
+  { id: "whitelabel", name: "Novo Tenant", mode: "product", description: "Produto white-label Kruzer" },
 ];
 
 const MODE_CONFIG: Record<TenantMode, {
-  tenantDot: string;
-  tenantPill: string;
-  tenantPillText: string;
-  headerBg: string;
-  headerBorder: string;
-  sidebarAccent: string;
-  topbarTitle: string;
-  topbarSub: string;
-  modeBadge: string;
-  modeBadgeText: string;
+  tenantPill: string; tenantPillText: string;
+  sidebarBorder: string; sidebarHeaderBg: string;
+  topbarBg: string; topbarBorder: string;
+  topbarTitle: string; topbarSub: string;
+  modeBadge: string; modeBadgeText: string;
 }> = {
   custom: {
-    tenantDot: "bg-violet-500",
-    tenantPill: "bg-violet-50 border border-violet-200 text-violet-700",
-    tenantPillText: "Custom",
-    headerBg: "bg-card",
-    headerBorder: "border-border",
-    sidebarAccent: "border-violet-200",
-    topbarTitle: "Painel FAST PRO",
-    topbarSub: "Configuração personalizada",
-    modeBadge: "bg-violet-100 text-violet-700",
-    modeBadgeText: "Fast PRO",
+    tenantPill:       "bg-violet-50 border border-violet-200 text-violet-700",
+    tenantPillText:   "Custom",
+    sidebarBorder:    "border-violet-300",
+    sidebarHeaderBg:  "bg-violet-50",
+    topbarBg:         "bg-violet-700",
+    topbarBorder:     "border-violet-800",
+    topbarTitle:      "Painel FAST PRO",
+    topbarSub:        "Configuração personalizada",
+    modeBadge:        "bg-violet-500 text-white",
+    modeBadgeText:    "Fast PRO",
   },
   product: {
-    tenantDot: "bg-sky-500",
-    tenantPill: "bg-sky-50 border border-sky-200 text-sky-700",
-    tenantPillText: "Produto",
-    headerBg: "bg-card",
-    headerBorder: "border-border",
-    sidebarAccent: "border-sky-200",
-    topbarTitle: "Painel do Programa",
-    topbarSub: "Produto white-label Kruzer",
-    modeBadge: "bg-sky-100 text-sky-700",
-    modeBadgeText: "White-label",
+    tenantPill:       "bg-sky-50 border border-sky-200 text-sky-700",
+    tenantPillText:   "Produto",
+    sidebarBorder:    "border-sky-300",
+    sidebarHeaderBg:  "bg-sky-50",
+    topbarBg:         "bg-card",
+    topbarBorder:     "border-border",
+    topbarTitle:      "Painel do Programa",
+    topbarSub:        "Produto white-label Kruzer",
+    modeBadge:        "bg-sky-100 text-sky-700",
+    modeBadgeText:    "White-label",
   },
 };
 
@@ -114,8 +102,7 @@ export const LAYER_CONFIG: Record<Layer, { label: string; dot: string; pill: str
   br:     { label: "BR",       dot: "bg-emerald-500", pill: "bg-emerald-50 text-emerald-700 border-emerald-200" },
 };
 
-// Layers hidden in white-label / product mode
-const HIDDEN_IN_PRODUCT: Layer[] = ["custom", "br"];
+const HIDDEN_IN_PRODUCT: Layer[] = ["custom"];
 
 function LayerDot({ layer }: { layer?: Layer }) {
   if (!layer || layer === "core") return null;
@@ -129,111 +116,138 @@ function LayerDot({ layer }: { layer?: Layer }) {
 
 // ── Menu types ────────────────────────────────────────────────────────
 
-type LucideIcon = React.ComponentType<{ className?: string }>;
-type SubItem = { to: string; label: string; layer?: Layer };
-type FlatMenuItem = { to: string; label: string; icon: LucideIcon; layer?: Layer };
+type LucideIcon    = React.ComponentType<{ className?: string }>;
+type SubItem       = { to: string; label: string; layer?: Layer };
+type FlatMenuItem  = { to: string; label: string; icon: LucideIcon; layer?: Layer };
 type GroupMenuItem = { label: string; icon: LucideIcon; badge?: string; layer?: Layer; group: SubItem[] };
-type MenuItem = FlatMenuItem | GroupMenuItem;
+type SectionHeader = { section: string };
+type MenuItem      = FlatMenuItem | GroupMenuItem | SectionHeader;
 
-function isGroup(item: MenuItem): item is GroupMenuItem {
-  return "group" in item;
-}
+function isSection(item: MenuItem): item is SectionHeader { return "section" in item; }
+function isGroup(item: MenuItem): item is GroupMenuItem   { return "group" in item; }
 
-// ── Menu definition ───────────────────────────────────────────────────
+// ── Menu ─────────────────────────────────────────────────────────────
 
 const MENU: MenuItem[] = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/config", label: "Configuração", icon: Settings },
-  { to: "/usuarios", label: "Usuários & Papéis", icon: User },
+  // ── PROGRAMA ──────────────────────────────────────────────────────
+  { section: "Programa" },
+
+  { to: "/",                    label: "Dashboard",       icon: LayoutDashboard },
+  { to: "/dashboard-resultados",label: "Resultados",      icon: BarChart2 },
+
   {
-    label: "Membros",
-    icon: Users,
-    badge: "HUB",
+    label: "Membros", icon: Users, badge: "HUB",
     group: [
-      { to: "/membros", label: "Lista" },
-      { to: "/membros/tier", label: "Tier" },
-      { to: "/membros/segmentos", label: "Segmentos", layer: "module" },
-      { to: "/membros/ajuste", label: "Ajuste manual" },
-      { to: "/membros/extrato", label: "Extrato de pontos" },
-      { to: "/minha-conta", label: "Minha Conta" },
+      { to: "/membros",           label: "Lista" },
+      { to: "/membros/tier",      label: "Tier / Níveis" },
+      { to: "/membros/segmentos", label: "Segmentos",        layer: "module" },
+      { to: "/membros/extrato",   label: "Extrato de pontos" },
+      { to: "/minha-conta",       label: "Minha Conta" },
     ],
   },
+
   {
-    label: "Catálogo",
-    icon: Package,
+    label: "Campanhas", icon: Sparkles,
     group: [
-      { to: "/catalogo", label: "Produtos" },
-      { to: "/catalogo/grupos", label: "Grupos" },
-      { to: "/catalogo/atualizacao", label: "Atualização 3P", layer: "module" },
-    ],
-  },
-  {
-    label: "Campanhas",
-    icon: Sparkles,
-    group: [
-      { to: "/campanhas", label: "Regras" },
+      { to: "/campanhas",      label: "Regras" },
       { to: "/campanhas/nova", label: "Nova campanha" },
     ],
   },
+
+  { to: "/membros/ajuste", label: "Ajuste manual", icon: SlidersHorizontal },
+
   {
-    label: "Recompensas",
-    icon: Gift,
+    label: "Recompensas", icon: Gift,
     group: [
-      { to: "/recompensas", label: "Pedidos" },
-      { to: "/recompensas/catalogo", label: "Catálogo de resgate" },
+      { to: "/recompensas",            label: "Pedidos" },
+      { to: "/recompensas/catalogo",   label: "Catálogo de resgate" },
       { to: "/recompensas/documental", label: "Fluxo documental", layer: "custom" },
     ],
   },
-  { to: "/conformidade", label: "Conformidade", icon: ScrollText, layer: "br" },
+
+  { to: "/niveis",    label: "Níveis",                  icon: ShieldCheck },
+  { to: "/canais",    label: "Canais",                  icon: Boxes },
+  { to: "/afiliados", label: "Afiliados",               icon: Briefcase, layer: "custom" },
+  { to: "/pedidos",   label: "Pedidos especificados",   icon: ClipboardList, layer: "custom" },
+  { to: "/carteiras", label: "Multi-moeda / Carteiras", icon: Wallet },
+
+  // ── ENGAJAMENTO ───────────────────────────────────────────────────
+  { section: "Engajamento" },
+
+  { to: "/ranking",    label: "Ranking",            icon: Trophy,    layer: "module" },
+  { to: "/indicacoes", label: "Indicações de Venda",icon: UserCheck, layer: "module" },
+
   {
-    label: "Comunicações",
-    icon: Bell,
+    label: "Comunicações", icon: Bell,
     group: [
-      { to: "/comunicacoes", label: "Configuração" },
-      { to: "/comunicados", label: "Histórico" },
+      { to: "/comunicacoes", label: "Eventos transacionais" },
+      { to: "/comunicados",  label: "Histórico" },
     ],
   },
-  { to: "/pedidos", label: "Pedidos", icon: ClipboardList },
-  { to: "/dashboard-resultados", label: "Dashboard Resultados", icon: BarChart2 },
-  { to: "/indicacoes", label: "Indicações de Venda", icon: UserCheck, layer: "module" },
+
+  { to: "/conteudo",    label: "Conteúdo editorial", icon: Newspaper, layer: "module" },
+  { to: "/conformidade",label: "Conformidade",        icon: ScrollText },
+  { to: "/webhooks",    label: "Webhooks / Eventos",  icon: Webhook },
+
+  // ── CONFIGURAÇÃO ──────────────────────────────────────────────────
+  { section: "Configuração" },
+
+  { to: "/usuarios", label: "Usuários & Papéis", icon: User },
+
   {
-    label: "Conteúdo",
-    icon: Newspaper,
+    label: "Theming", icon: Palette,
     group: [
-      { to: "/homepage", label: "Homepage", layer: "custom" },
-      { to: "/banners", label: "Banners", layer: "custom" },
-      { to: "/conteudo", label: "Editorial", layer: "module" },
-      { to: "/login-config", label: "Login" },
+      { to: "/homepage",    label: "Homepage" },
+      { to: "/banners",     label: "Banners" },
+      { to: "/login-config",label: "Login" },
     ],
   },
-  { to: "/ranking", label: "Ranking", icon: Trophy, layer: "module" },
-  { to: "/niveis", label: "Níveis", icon: ShieldCheck },
-  { to: "/canais", label: "Canais", icon: Boxes },
-  { to: "/afiliados", label: "Afiliados", icon: Briefcase, layer: "module" },
+
   {
-    label: "Auditoria",
-    icon: History,
-    group: [{ to: "/logs", label: "Logs manuais" }],
+    label: "Catálogo", icon: Package,
+    group: [
+      { to: "/catalogo",            label: "Produtos" },
+      { to: "/catalogo/grupos",     label: "Grupos" },
+      { to: "/catalogo/atualizacao",label: "Atualização 3P", layer: "module" },
+    ],
   },
+
+  { to: "/logs",  label: "Logs de auditoria",  icon: History },
+  { to: "/config",label: "Configuração geral", icon: Settings },
+
+  // ── META ──────────────────────────────────────────────────────────
+  { section: "" },
   { to: "/produto-mapa", label: "Mapa do Produto", icon: Layers },
 ];
 
-// Filter menu for product mode (hide custom + br items)
 function filterMenu(menu: MenuItem[], mode: TenantMode): MenuItem[] {
   if (mode === "custom") return menu;
   return menu
-    .filter((item) => !HIDDEN_IN_PRODUCT.includes((item as FlatMenuItem).layer as Layer))
+    .filter((item) => {
+      if (isSection(item)) return true;
+      const flat = item as FlatMenuItem;
+      return !HIDDEN_IN_PRODUCT.includes(flat.layer as Layer);
+    })
     .map((item) => {
       if (!isGroup(item)) return item;
-      const filteredGroup = item.group.filter(
-        (sub) => !HIDDEN_IN_PRODUCT.includes(sub.layer as Layer)
-      );
-      return filteredGroup.length > 0 ? { ...item, group: filteredGroup } : null;
+      const filtered = item.group.filter((s) => !HIDDEN_IN_PRODUCT.includes(s.layer as Layer));
+      return filtered.length > 0 ? { ...item, group: filtered } : null;
     })
     .filter(Boolean) as MenuItem[];
 }
 
 // ── Nav components ────────────────────────────────────────────────────
+
+function SectionLabel({ label }: { label: string }) {
+  if (!label) return <div className="mt-3" />;
+  return (
+    <div className="mt-4 mb-1 px-3">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+        {label}
+      </span>
+    </div>
+  );
+}
 
 function FlatItem({ item, collapsed }: { item: FlatMenuItem; collapsed: boolean }) {
   const Icon = item.icon;
@@ -243,19 +257,12 @@ function FlatItem({ item, collapsed }: { item: FlatMenuItem; collapsed: boolean 
       end={item.to === "/"}
       className={({ isActive }) =>
         `flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors ${
-          isActive
-            ? "bg-primary/10 text-primary font-medium"
-            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+          isActive ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
         } ${collapsed ? "justify-center px-0" : ""}`
       }
     >
       <Icon className="size-4 shrink-0" />
-      {!collapsed && (
-        <>
-          <span className="flex-1">{item.label}</span>
-          <LayerDot layer={item.layer} />
-        </>
-      )}
+      {!collapsed && <><span className="flex-1">{item.label}</span><LayerDot layer={item.layer} /></>}
     </NavLink>
   );
 }
@@ -281,9 +288,7 @@ function GroupItem({ item, collapsed }: { item: GroupMenuItem; collapsed: boolea
       <CollapsibleTrigger asChild>
         <button
           className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors ${
-            isActive && !open
-              ? "bg-primary/10 text-primary"
-              : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+            isActive && !open ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
           }`}
         >
           <Icon className="size-4 shrink-0" />
@@ -303,9 +308,9 @@ function GroupItem({ item, collapsed }: { item: GroupMenuItem; collapsed: boolea
             <NavLink
               key={sub.to}
               to={sub.to}
-              className={({ isActive: subActive }) =>
+              className={({ isActive: sa }) =>
                 `flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors ${
-                  subActive ? "text-primary font-medium" : "text-muted-foreground hover:text-foreground"
+                  sa ? "text-primary font-medium" : "text-muted-foreground hover:text-foreground"
                 }`
               }
             >
@@ -323,21 +328,21 @@ function GroupItem({ item, collapsed }: { item: GroupMenuItem; collapsed: boolea
 
 export default function AppLayout() {
   const [tenant, setTenant] = useState<Tenant>(TENANTS[0]);
-  const mode = tenant.mode;
-  const cfg = MODE_CONFIG[mode];
-  const visibleMenu = filterMenu(MENU, mode);
-
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const widthClass = sidebarCollapsed ? "w-16" : "w-72";
+
+  const mode = tenant.mode;
+  const cfg  = MODE_CONFIG[mode];
+  const visibleMenu = filterMenu(MENU, mode);
+  const widthClass    = sidebarCollapsed ? "w-16" : "w-72";
   const contentMargin = sidebarCollapsed ? "ml-16" : "ml-72";
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <aside
-        className={`fixed inset-y-0 left-0 border-r bg-card shadow-sm z-40 flex flex-col transition-all duration-300 overflow-hidden ${widthClass} ${cfg.sidebarAccent}`}
+        className={`fixed inset-y-0 left-0 border-r bg-card shadow-sm z-40 flex flex-col transition-all duration-300 overflow-hidden ${widthClass} ${cfg.sidebarBorder}`}
       >
         {/* Header */}
-        <div className={`flex h-16 shrink-0 items-center border-b px-3 gap-2 ${cfg.sidebarAccent} ${sidebarCollapsed ? "justify-center" : ""}`}>
+        <div className={`flex h-16 shrink-0 items-center border-b px-3 gap-2 ${cfg.sidebarHeaderBg} ${cfg.sidebarBorder} ${sidebarCollapsed ? "justify-center" : ""}`}>
           {!sidebarCollapsed && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -345,7 +350,7 @@ export default function AppLayout() {
                   <Building2 className="size-4 shrink-0 text-muted-foreground" />
                   <div className="min-w-0 flex-1">
                     <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Kruzer</div>
-                    <div className="truncate text-sm font-semibold text-foreground">{tenant.name}</div>
+                    <div className="truncate text-sm font-semibold">{tenant.name}</div>
                   </div>
                   <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${cfg.tenantPill}`}>
                     {cfg.tenantPillText}
@@ -355,17 +360,13 @@ export default function AppLayout() {
               </DropdownMenuTrigger>
 
               <DropdownMenuContent align="start" className="w-64 p-1.5 space-y-1">
-                {/* Custom tenant */}
                 <div className="px-2 pt-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Configuração Fast PRO
                 </div>
                 {TENANTS.filter((t) => t.mode === "custom").map((t) => (
                   <DropdownMenuItem
-                    key={t.id}
-                    onSelect={() => setTenant(t)}
-                    className={`rounded-xl flex items-center gap-3 px-3 py-2.5 cursor-pointer ${
-                      tenant.id === t.id ? "bg-violet-50" : ""
-                    }`}
+                    key={t.id} onSelect={() => setTenant(t)}
+                    className={`rounded-xl flex items-center gap-3 px-3 py-2.5 cursor-pointer ${tenant.id === t.id ? "bg-violet-50" : ""}`}
                   >
                     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-violet-100">
                       <span className="text-sm font-bold text-violet-700">F</span>
@@ -374,25 +375,19 @@ export default function AppLayout() {
                       <div className={`text-sm font-semibold ${tenant.id === t.id ? "text-violet-700" : ""}`}>{t.name}</div>
                       <div className="text-xs text-muted-foreground">{t.description}</div>
                     </div>
-                    <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-700">
-                      Custom
-                    </span>
+                    <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-700">Custom</span>
                   </DropdownMenuItem>
                 ))}
 
                 <DropdownMenuSeparator />
 
-                {/* Product tenant */}
                 <div className="px-2 pt-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Produto white-label
                 </div>
                 {TENANTS.filter((t) => t.mode === "product").map((t) => (
                   <DropdownMenuItem
-                    key={t.id}
-                    onSelect={() => setTenant(t)}
-                    className={`rounded-xl flex items-center gap-3 px-3 py-2.5 cursor-pointer ${
-                      tenant.id === t.id ? "bg-sky-50" : ""
-                    }`}
+                    key={t.id} onSelect={() => setTenant(t)}
+                    className={`rounded-xl flex items-center gap-3 px-3 py-2.5 cursor-pointer ${tenant.id === t.id ? "bg-sky-50" : ""}`}
                   >
                     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-100">
                       <Puzzle className="size-3.5 text-sky-600" />
@@ -401,54 +396,42 @@ export default function AppLayout() {
                       <div className={`text-sm font-semibold ${tenant.id === t.id ? "text-sky-700" : ""}`}>{t.name}</div>
                       <div className="text-xs text-muted-foreground">{t.description}</div>
                     </div>
-                    <span className="rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-700">
-                      Produto
-                    </span>
+                    <span className="rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-700">Produto</span>
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          <Button
-            size="icon"
-            variant="ghost"
-            className="shrink-0 size-8"
-            onClick={() => setSidebarCollapsed((p) => !p)}
-          >
+          <Button size="icon" variant="ghost" className="shrink-0 size-8" onClick={() => setSidebarCollapsed((p) => !p)}>
             <PanelLeft className="size-4" />
           </Button>
         </div>
 
-        {/* Mode banner */}
+        {/* Layer legend */}
         {!sidebarCollapsed && (
-          <div className={`flex items-center justify-between gap-2 border-b px-3 py-2 ${cfg.sidebarAccent}`}>
-            <div className="flex flex-wrap items-center gap-2">
-              {(Object.entries(LAYER_CONFIG) as [Layer, typeof LAYER_CONFIG[Layer]][])
-                .filter(([key]) => mode === "custom" || !HIDDEN_IN_PRODUCT.includes(key))
-                .map(([key, lcfg]) => (
-                  <div key={key} className="flex items-center gap-1">
-                    <span className={`h-1.5 w-1.5 rounded-full ${lcfg.dot}`} />
-                    <span className="text-[10px] text-muted-foreground">{lcfg.label}</span>
-                  </div>
-                ))}
-            </div>
-            {mode === "product" && (
-              <span className="rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-600 shrink-0">
-                {HIDDEN_IN_PRODUCT.length * 3 + 2} itens ocultos
-              </span>
-            )}
+          <div className={`flex items-center gap-3 border-b px-3 py-2 ${cfg.sidebarHeaderBg} ${cfg.sidebarBorder}`}>
+            {(Object.entries(LAYER_CONFIG) as [Layer, typeof LAYER_CONFIG[Layer]][])
+              .filter(([key]) => mode === "custom" || !HIDDEN_IN_PRODUCT.includes(key))
+              .map(([key, lcfg]) => (
+                <div key={key} className="flex items-center gap-1">
+                  <span className={`h-1.5 w-1.5 rounded-full ${lcfg.dot}`} />
+                  <span className="text-[10px] text-muted-foreground">{lcfg.label}</span>
+                </div>
+              ))}
           </div>
         )}
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto space-y-0.5 px-2 py-3">
-          {visibleMenu.map((item) =>
-            isGroup(item) ? (
-              <GroupItem key={item.label} item={item} collapsed={sidebarCollapsed} />
-            ) : (
-              <FlatItem key={(item as FlatMenuItem).to} item={item as FlatMenuItem} collapsed={sidebarCollapsed} />
-            )
-          )}
+        <nav className="flex-1 overflow-y-auto space-y-0.5 px-2 py-2">
+          {visibleMenu.map((item, i) => {
+            if (isSection(item)) {
+              return !sidebarCollapsed
+                ? <SectionLabel key={`s-${i}`} label={item.section} />
+                : <div key={`s-${i}`} className="my-2 mx-3 h-px bg-border" />;
+            }
+            if (isGroup(item)) return <GroupItem key={item.label} item={item} collapsed={sidebarCollapsed} />;
+            return <FlatItem key={(item as FlatMenuItem).to} item={item as FlatMenuItem} collapsed={sidebarCollapsed} />;
+          })}
         </nav>
 
         {!sidebarCollapsed && (
@@ -460,29 +443,33 @@ export default function AppLayout() {
 
       {/* Main */}
       <main className={`${contentMargin} min-h-screen transition-all duration-300`}>
-        {/* Topbar */}
-        <div className={`flex h-16 items-center justify-between border-b px-6 ${cfg.headerBg} ${cfg.headerBorder}`}>
+        <div className={`flex h-16 items-center justify-between border-b px-6 ${cfg.topbarBg} ${cfg.topbarBorder}`}>
           <div>
-            <div className="text-xs text-muted-foreground uppercase tracking-wide">
+            <div className={`text-xs uppercase tracking-wide ${mode === "custom" ? "text-violet-200" : "text-muted-foreground"}`}>
               {cfg.topbarSub}
             </div>
-            <div className="text-base font-semibold">{cfg.topbarTitle}</div>
+            <div className={`text-base font-semibold ${mode === "custom" ? "text-white" : ""}`}>
+              {cfg.topbarTitle}
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${cfg.modeBadge}`}>
-              {cfg.modeBadgeText}
-            </span>
-            <Badge variant="secondary">Online</Badge>
-            <Button size="sm">Novo item</Button>
-          </div>
+          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${cfg.modeBadge}`}>
+            {cfg.modeBadgeText}
+          </span>
         </div>
 
-        {/* Mode notice — shown only in product mode */}
         {mode === "product" && (
-          <div className="flex items-center gap-3 border-b border-sky-100 bg-sky-50 px-6 py-2.5 text-sm text-sky-700">
-            <Puzzle className="size-4 shrink-0" />
-            <span>
-              Visualizando como <strong>produto white-label</strong> — features Custom Fast PRO e módulo BR estão ocultos.
+          <div className="flex items-center justify-between gap-3 border-b border-sky-200 bg-sky-100 px-6 py-3">
+            <div className="flex items-center gap-3">
+              <Puzzle className="size-5 shrink-0 text-sky-600" />
+              <div>
+                <div className="text-sm font-semibold text-sky-800">Modo produto white-label</div>
+                <div className="text-xs text-sky-700">
+                  Afiliados, Pedidos especificados e Fluxo documental (Fast PRO custom) estão ocultos.
+                </div>
+              </div>
+            </div>
+            <span className="shrink-0 rounded-full bg-sky-200 px-3 py-1 text-xs font-bold text-sky-700">
+              3 features ocultas
             </span>
           </div>
         )}

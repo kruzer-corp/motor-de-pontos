@@ -29,6 +29,8 @@ import LoginConfig from "./pages/LoginConfig";
 import IndicacaoVenda from "./pages/IndicacaoVenda";
 import DashboardResultados from "./pages/DashboardResultados";
 import ProdutoMapa from "./pages/ProdutoMapa";
+import Webhooks from "./pages/Webhooks";
+import Carteiras from "./pages/Carteiras";
 import Niveis from "./pages/Niveis";
 import Canais from "./pages/Canais";
 import Afiliados from "./pages/Afiliados";
@@ -51,6 +53,7 @@ export default function App() {
         <Route path="catalogo" element={<Catalogo />} />
         <Route path="catalogo/grupos" element={<CatalogoGrupos />} />
         <Route path="catalogo/:id" element={<CatalogoDetalhe />} />
+        <Route path="catalogo/atualizacao" element={<CatalogoAtualizacao />} />
         <Route path="campanhas" element={<Campanhas />} />
         <Route path="campanhas/nova" element={<CampanhasNova />} />
         <Route path="campanhas/:id" element={<CampanhasDetail />} />
@@ -60,7 +63,6 @@ export default function App() {
         <Route path="conformidade" element={<Conformidade />} />
         <Route path="comunicacoes" element={<Comunicacoes />} />
         <Route path="minha-conta" element={<MinhaConta />} />
-        <Route path="catalogo/atualizacao" element={<CatalogoAtualizacao />} />
         <Route path="comunicados" element={<Comunicados />} />
         <Route path="pedidos" element={<Pedidos />} />
         <Route path="homepage" element={<Homepage />} />
@@ -70,6 +72,8 @@ export default function App() {
         <Route path="indicacoes" element={<IndicacaoVenda />} />
         <Route path="dashboard-resultados" element={<DashboardResultados />} />
         <Route path="produto-mapa" element={<ProdutoMapa />} />
+        <Route path="webhooks" element={<Webhooks />} />
+        <Route path="carteiras" element={<Carteiras />} />
         <Route path="niveis" element={<Niveis />} />
         <Route path="canais" element={<Canais />} />
         <Route path="afiliados" element={<Afiliados />} />
