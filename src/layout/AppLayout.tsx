@@ -1,122 +1,53 @@
-import { useState } from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { cn, TooltipProvider } from "@kruzer/ds";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-  Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@kruzer-corp/ds";
-import {
-  LayoutDashboard,
-  Users,
-  User,
-  ShieldCheck,
-  Gift,
-  Sparkles,
-  Boxes,
-  Settings,
-  Briefcase,
-  ChevronDown,
-  PanelLeft,
-  ChevronsUpDown,
-  Building2,
-  Package,
-  Trophy,
-  History,
-  ScrollText,
-  Bell,
-  ClipboardList,
-  BarChart2,
-  UserCheck,
-  Newspaper,
-  Layers,
-  Puzzle,
-  Palette,
-  Webhook,
-  Wallet,
+  LayoutDashboard, Users, User, ShieldCheck, Gift, Sparkles, Boxes,
+  ChevronDown, ChevronsLeft, ChevronsRight, ArrowLeftRight,
+  Package, Trophy, History, ScrollText, Bell,
+  UserCheck, Newspaper, Puzzle, Palette, Webhook, Wallet,
   SlidersHorizontal,
 } from "lucide-react";
 
-// ── Tenants ───────────────────────────────────────────────────────────
+// ── Tenants ───────────────────────────────────────────────────────────────────
 
 type TenantMode = "custom" | "product";
-
-type Tenant = {
-  id: string;
-  name: string;
-  mode: TenantMode;
-  description: string;
-};
+type Tenant = { id: string; name: string; mode: TenantMode; description: string };
 
 const TENANTS: Tenant[] = [
-  { id: "fastpro",    name: "FAST PRO",    mode: "custom",  description: "Configuração Fast PRO" },
-  { id: "whitelabel", name: "Novo Tenant", mode: "product", description: "Produto white-label Kruzer" },
+  { id: "fastpro",    name: "FastShop PRO",  mode: "custom",  description: "Features exclusivas FastShop PRO" },
+  { id: "whitelabel", name: "Motor de Pontos", mode: "product", description: "Produto white-label Kruzer" },
 ];
 
-const MODE_CONFIG: Record<TenantMode, {
-  tenantPill: string; tenantPillText: string;
-  sidebarBorder: string; sidebarHeaderBg: string;
-  topbarBg: string; topbarBorder: string;
-  topbarTitle: string; topbarSub: string;
-  modeBadge: string; modeBadgeText: string;
-}> = {
-  custom: {
-    tenantPill:       "bg-violet-50 border border-violet-200 text-violet-700",
-    tenantPillText:   "Custom",
-    sidebarBorder:    "border-violet-300",
-    sidebarHeaderBg:  "bg-violet-50",
-    topbarBg:         "bg-violet-700",
-    topbarBorder:     "border-violet-800",
-    topbarTitle:      "Painel FAST PRO",
-    topbarSub:        "Configuração personalizada",
-    modeBadge:        "bg-violet-500 text-white",
-    modeBadgeText:    "Fast PRO",
-  },
-  product: {
-    tenantPill:       "bg-sky-50 border border-sky-200 text-sky-700",
-    tenantPillText:   "Produto",
-    sidebarBorder:    "border-sky-300",
-    sidebarHeaderBg:  "bg-sky-50",
-    topbarBg:         "bg-card",
-    topbarBorder:     "border-border",
-    topbarTitle:      "Painel do Programa",
-    topbarSub:        "Produto white-label Kruzer",
-    modeBadge:        "bg-sky-100 text-sky-700",
-    modeBadgeText:    "White-label",
-  },
+// Nome exibido no header e sidebar conforme o modo
+const BRAND_NAME: Record<TenantMode, string> = {
+  custom:  "FastShop PRO",
+  product: "Motor de Pontos",
 };
 
-// ── Layer system ──────────────────────────────────────────────────────
+const MODE_LABEL: Record<TenantMode, string> = {
+  custom:  "Ver como Produto",
+  product: "Ver como FastShop PRO",
+};
+
+// ── Layer system ──────────────────────────────────────────────────────────────
 
 type Layer = "core" | "module" | "custom" | "br";
 
 export const LAYER_CONFIG: Record<Layer, { label: string; dot: string; pill: string }> = {
-  core:   { label: "Produto",  dot: "bg-sky-500",     pill: "bg-sky-50 text-sky-600 border-sky-200" },
-  module: { label: "Módulo",   dot: "bg-amber-400",   pill: "bg-amber-50 text-amber-700 border-amber-200" },
+  core:   { label: "Produto",  dot: "bg-sky-500",     pill: "bg-sky-50 text-sky-600 border-sky-200"          },
+  module: { label: "Módulo",   dot: "bg-amber-400",   pill: "bg-amber-50 text-amber-700 border-amber-200"    },
   custom: { label: "Custom",   dot: "bg-violet-500",  pill: "bg-violet-50 text-violet-700 border-violet-200" },
   br:     { label: "BR",       dot: "bg-emerald-500", pill: "bg-emerald-50 text-emerald-700 border-emerald-200" },
 };
 
 const HIDDEN_IN_PRODUCT: Layer[] = ["custom"];
 
-function LayerDot({ layer }: { layer?: Layer }) {
-  if (!layer || layer === "core") return null;
-  return (
-    <span
-      className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${LAYER_CONFIG[layer].dot}`}
-      title={LAYER_CONFIG[layer].label}
-    />
-  );
-}
+function LayerDot(_: { layer?: Layer }) { return null; }
 
-// ── Menu types ────────────────────────────────────────────────────────
+// ── Menu types ────────────────────────────────────────────────────────────────
 
-type LucideIcon    = React.ComponentType<{ className?: string }>;
+type LucideIcon    = React.ComponentType<{ className?: string; strokeWidth?: number }>;
 type SubItem       = { to: string; label: string; layer?: Layer };
 type FlatMenuItem  = { to: string; label: string; icon: LucideIcon; layer?: Layer };
 type GroupMenuItem = { label: string; icon: LucideIcon; badge?: string; layer?: Layer; group: SubItem[] };
@@ -126,26 +57,31 @@ type MenuItem      = FlatMenuItem | GroupMenuItem | SectionHeader;
 function isSection(item: MenuItem): item is SectionHeader { return "section" in item; }
 function isGroup(item: MenuItem): item is GroupMenuItem   { return "group" in item; }
 
-// ── Menu ─────────────────────────────────────────────────────────────
-
 const MENU: MenuItem[] = [
-  // ── PROGRAMA ──────────────────────────────────────────────────────
-  { section: "Programa" },
 
-  { to: "/",                    label: "Dashboard",       icon: LayoutDashboard },
-  { to: "/dashboard-resultados",label: "Resultados",      icon: BarChart2 },
-
+  // ── ANÁLISE ────────────────────────────────────────────────────────────────
+  { section: "Análise" },
   {
-    label: "Membros", icon: Users, badge: "HUB",
+    label: "Dashboard", icon: LayoutDashboard,
     group: [
-      { to: "/membros",           label: "Lista" },
-      { to: "/membros/tier",      label: "Tier / Níveis" },
-      { to: "/membros/segmentos", label: "Segmentos",        layer: "module" },
-      { to: "/membros/extrato",   label: "Extrato de pontos" },
-      { to: "/minha-conta",       label: "Minha Conta" },
+      { to: "/",                     label: "Visão geral" },
+      { to: "/dashboard-resultados", label: "Resultados" },
     ],
   },
+  { to: "/ranking", label: "Ranking", icon: Trophy, layer: "module" },
 
+  // ── OPERAÇÃO ───────────────────────────────────────────────────────────────
+  { section: "Operação" },
+  {
+    label: "Membros", icon: Users,
+    group: [
+      { to: "/membros",           label: "Lista" },
+      { to: "/afiliados",         label: "Afiliados",        layer: "custom" },
+      { to: "/membros/segmentos", label: "Segmentos",        layer: "module" },
+      { to: "/membros/extrato",   label: "Extrato de pontos" },
+    ],
+  },
+  { to: "/membros/ajuste", label: "Ajuste manual", icon: SlidersHorizontal },
   {
     label: "Campanhas", icon: Sparkles,
     group: [
@@ -153,30 +89,7 @@ const MENU: MenuItem[] = [
       { to: "/campanhas/nova", label: "Nova campanha" },
     ],
   },
-
-  { to: "/membros/ajuste", label: "Ajuste manual", icon: SlidersHorizontal },
-
-  {
-    label: "Recompensas", icon: Gift,
-    group: [
-      { to: "/recompensas",            label: "Pedidos" },
-      { to: "/recompensas/catalogo",   label: "Catálogo de resgate" },
-      { to: "/recompensas/documental", label: "Fluxo documental", layer: "custom" },
-    ],
-  },
-
-  { to: "/niveis",    label: "Níveis",                  icon: ShieldCheck },
-  { to: "/canais",    label: "Canais",                  icon: Boxes },
-  { to: "/afiliados", label: "Afiliados",             icon: Briefcase, layer: "module" },
-  { to: "/pedidos",   label: "Pedidos especificados", icon: ClipboardList, layer: "custom" },
-  { to: "/carteiras", label: "Múltiplas moedas",      icon: Wallet },
-
-  // ── ENGAJAMENTO ───────────────────────────────────────────────────
-  { section: "Engajamento" },
-
-  { to: "/ranking",    label: "Ranking",            icon: Trophy,    layer: "module" },
-  { to: "/indicacoes", label: "Indicações de Venda",icon: UserCheck, layer: "module" },
-
+  { to: "/indicacoes", label: "Indicações de Venda", icon: UserCheck, layer: "module" },
   {
     label: "Comunicações", icon: Bell,
     group: [
@@ -184,49 +97,53 @@ const MENU: MenuItem[] = [
       { to: "/comunicados",  label: "Histórico" },
     ],
   },
+  { to: "/conteudo", label: "Conteúdo editorial", icon: Newspaper, layer: "module" },
+  {
+    label: "Resgates", icon: Gift,
+    group: [
+      { to: "/recompensas",            label: "Pedidos" },
+      { to: "/pedidos",                label: "Pedidos especificados", layer: "custom" },
+      { to: "/recompensas/catalogo",   label: "Catálogo de resgate" },
+      { to: "/recompensas/documental", label: "Fluxo documental", layer: "custom" },
+    ],
+  },
 
-  { to: "/conteudo",    label: "Conteúdo editorial", icon: Newspaper, layer: "module" },
-  { to: "/conformidade",label: "Conformidade",        icon: ScrollText },
-  { to: "/webhooks",    label: "Webhooks / Eventos",  icon: Webhook },
-
-  // ── CONFIGURAÇÃO ──────────────────────────────────────────────────
+  // ── CONFIGURAÇÃO ───────────────────────────────────────────────────────────
   { section: "Configuração" },
-
-  { to: "/usuarios", label: "Usuários & Papéis", icon: User },
-
+  { to: "/usuarios",     label: "Usuários & Papéis",    icon: User },
+  { to: "/membros/tier", label: "Tier / Níveis",        icon: ShieldCheck },
+  { to: "/canais",       label: "Canais",               icon: Boxes },
+  { to: "/carteiras",    label: "Múltiplas moedas",     icon: Wallet },
+  { to: "/webhooks",     label: "Webhooks / Eventos",   icon: Webhook },
   {
     label: "Theming", icon: Palette,
     group: [
-      { to: "/homepage",    label: "Homepage" },
-      { to: "/banners",     label: "Banners" },
-      { to: "/login-config",label: "Login" },
+      { to: "/homepage",     label: "Homepage" },
+      { to: "/banners",      label: "Banners" },
+      { to: "/login-config", label: "Login" },
     ],
   },
-
   {
     label: "Catálogo", icon: Package,
     group: [
-      { to: "/catalogo",            label: "Produtos" },
-      { to: "/catalogo/grupos",     label: "Grupos" },
-      { to: "/catalogo/atualizacao",label: "Atualização 3P", layer: "module" },
+      { to: "/catalogo",             label: "Produtos" },
+      { to: "/catalogo/grupos",      label: "Grupos" },
+      { to: "/catalogo/atualizacao", label: "Atualização 3P", layer: "module" },
     ],
   },
+  { to: "/logs",         label: "Logs de auditoria", icon: History },
+  { to: "/conformidade", label: "Conformidade",       icon: ScrollText },
 
-  { to: "/logs",  label: "Logs de auditoria",  icon: History },
-  { to: "/config",label: "Configuração geral", icon: Settings },
-
-  // ── META ──────────────────────────────────────────────────────────
-  { section: "" },
-  { to: "/produto-mapa", label: "Mapa do Produto", icon: Layers },
 ];
+
+// Itens de configuração — fora do sidebar principal, acessíveis pelo painel lateral
 
 function filterMenu(menu: MenuItem[], mode: TenantMode): MenuItem[] {
   if (mode === "custom") return menu;
   return menu
     .filter((item) => {
       if (isSection(item)) return true;
-      const flat = item as FlatMenuItem;
-      return !HIDDEN_IN_PRODUCT.includes(flat.layer as Layer);
+      return !HIDDEN_IN_PRODUCT.includes((item as FlatMenuItem).layer as Layer);
     })
     .map((item) => {
       if (!isGroup(item)) return item;
@@ -236,248 +153,363 @@ function filterMenu(menu: MenuItem[], mode: TenantMode): MenuItem[] {
     .filter(Boolean) as MenuItem[];
 }
 
-// ── Nav components ────────────────────────────────────────────────────
+// ── Nav item (OMS style) ──────────────────────────────────────────────────────
 
-function SectionLabel({ label }: { label: string }) {
-  if (!label) return <div className="mt-3" />;
+type NavItemProps = { item: FlatMenuItem | GroupMenuItem; expanded: boolean; level?: number; onNavigate?: () => void };
+
+function NavItem({ item, expanded, level = 1, onNavigate }: NavItemProps) {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const isSub = level > 1;
+  const isGroup_ = isGroup(item);
+
+  const active = !isGroup_ && (
+    (item as FlatMenuItem).to === "/" ? pathname === "/" : pathname === (item as FlatMenuItem).to || pathname.startsWith((item as FlatMenuItem).to + "/")
+  );
+  const childActive = isGroup_ && (item as GroupMenuItem).group.some(
+    (s) => pathname === s.to || pathname.startsWith(s.to + "/")
+  );
+
+  const [openSub, setOpenSub] = useState(childActive);
+  const Icon = item.icon;
+
+  const handleClick = () => {
+    if (isGroup_) { setOpenSub((p) => !p); return; }
+    navigate((item as FlatMenuItem).to);
+  };
+
+  const isActive = active || (childActive && !expanded);
+
   return (
-    <div className="mt-4 mb-1 px-3">
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-        {label}
-      </span>
+    <div className="flex flex-col">
+      <NavLink
+        to={!isGroup_ ? (item as FlatMenuItem).to : "#"}
+        end={!isGroup_ && (item as FlatMenuItem).to === "/"}
+        onClick={isGroup_ ? (e) => { e.preventDefault(); handleClick(); } : onNavigate}
+        className={cn(
+          "flex cursor-pointer select-none items-center rounded-md py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+          expanded ? "gap-2.5 px-3" : "mx-auto h-8 w-8 justify-center",
+          isActive && "bg-muted font-medium text-foreground",
+        )}
+        style={{ fontSize: 13, ...(expanded ? {} : { paddingLeft: 0, paddingRight: 0 }) }}
+      >
+        {Icon && (
+          <Icon
+            strokeWidth={1.75}
+            className={cn("shrink-0", isSub ? "h-3.5 w-3.5 text-foreground" : "h-4 w-4")}
+          />
+        )}
+        {expanded && (
+          <>
+            <span className="flex-1 truncate whitespace-nowrap">{item.label}</span>
+            {(item as GroupMenuItem).badge && (
+              <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                {(item as GroupMenuItem).badge}
+              </span>
+            )}
+            <LayerDot layer={(item as FlatMenuItem).layer} />
+            {isGroup_ && (
+              <ChevronDown
+                className="ml-auto h-3.5 w-3.5 shrink-0 transition-transform"
+                style={{ transform: openSub ? "rotate(180deg)" : undefined }}
+              />
+            )}
+          </>
+        )}
+      </NavLink>
+
+      {isGroup_ && (
+        <div
+          className="flex flex-col gap-1"
+          style={{
+            marginLeft: 22,
+            paddingLeft: 8,
+            borderLeft: "1px solid hsl(var(--border))",
+            marginTop: expanded && openSub ? 4 : 0,
+            maxHeight: expanded && openSub ? 2000 : 0,
+            overflow: "hidden",
+            transition: "max-height 200ms",
+          }}
+        >
+          {(item as GroupMenuItem).group.map((sub) => {
+            const subActive = pathname === sub.to || pathname.startsWith(sub.to + "/");
+            return (
+              <NavLink
+                key={sub.to}
+                to={sub.to}
+                onClick={onNavigate}
+                className={cn(
+                  "flex cursor-pointer select-none items-center gap-2.5 rounded-md py-1.5 px-3 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                  subActive && "bg-muted font-medium text-foreground",
+                )}
+                style={{ fontSize: 13 }}
+              >
+                <span className="flex-1 truncate">{sub.label}</span>
+                <LayerDot layer={sub.layer} />
+              </NavLink>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
 
-function FlatItem({ item, collapsed }: { item: FlatMenuItem; collapsed: boolean }) {
-  const Icon = item.icon;
-  return (
-    <NavLink
-      to={item.to}
-      end={item.to === "/"}
-      className={({ isActive }) =>
-        `flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors ${
-          isActive ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-        } ${collapsed ? "justify-center px-0" : ""}`
-      }
-    >
-      <Icon className="size-4 shrink-0" />
-      {!collapsed && <><span className="flex-1">{item.label}</span><LayerDot layer={item.layer} /></>}
-    </NavLink>
-  );
-}
+// ── Nav group section (OMS style) ─────────────────────────────────────────────
 
-function GroupItem({ item, collapsed }: { item: GroupMenuItem; collapsed: boolean }) {
-  const location = useLocation();
-  const Icon = item.icon;
-  const isActive = item.group.some(
-    (sub) => location.pathname === sub.to || location.pathname.startsWith(sub.to + "/")
-  );
-  const [open, setOpen] = useState(isActive);
+type Section = { header: string; items: (FlatMenuItem | GroupMenuItem)[] };
 
-  if (collapsed) {
+function NavSection({ section, expanded, index }: { section: Section; expanded: boolean; index: number }) {
+  const [open, setOpen] = useState(true);
+
+  if (!expanded) {
     return (
-      <div className={`flex justify-center rounded-xl px-3 py-2 ${isActive ? "text-primary" : "text-muted-foreground"}`}>
-        <Icon className="size-4" />
+      <div className={cn("flex flex-col gap-1 pb-2", index === 0 ? "pt-3" : "pt-2 mt-3 border-t border-border")}>
+        {section.items.map((item) => (
+          <NavItem key={isGroup(item) ? item.label : (item as FlatMenuItem).to} item={item} expanded={false} />
+        ))}
       </div>
     );
   }
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger asChild>
+    <div
+      className={cn("flex flex-col", index === 0 ? "pt-2" : "pt-2 mt-3")}
+      style={{ paddingLeft: 8, paddingRight: 8 }}
+    >
+      {section.header ? (
         <button
-          className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors ${
-            isActive && !open ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-          }`}
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="flex cursor-pointer select-none items-center rounded-md px-3 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
-          <Icon className="size-4 shrink-0" />
-          <span className="flex-1 text-left font-medium">{item.label}</span>
-          {item.badge && (
-            <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
-              {item.badge}
-            </span>
-          )}
-          <LayerDot layer={item.layer} />
-          <ChevronDown className={`size-3.5 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+          <span className="flex-1 truncate text-left font-medium uppercase" style={{ fontSize: 11, letterSpacing: "0.06em" }}>
+            {section.header}
+          </span>
+          <ChevronDown
+            className="ml-auto h-3.5 w-3.5 shrink-0 transition-transform"
+            style={{ transform: open ? "rotate(180deg)" : undefined }}
+          />
         </button>
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="ml-7 mt-1 space-y-0.5 border-l border-border pl-3">
-          {item.group.map((sub) => (
-            <NavLink
-              key={sub.to}
-              to={sub.to}
-              className={({ isActive: sa }) =>
-                `flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors ${
-                  sa ? "text-primary font-medium" : "text-muted-foreground hover:text-foreground"
-                }`
-              }
-            >
-              <span className="flex-1">{sub.label}</span>
-              <LayerDot layer={sub.layer} />
-            </NavLink>
-          ))}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+      ) : null}
+
+      <div
+        className="flex flex-col gap-1"
+        style={{
+          paddingLeft: section.header ? 8 : 0,
+          marginTop: !section.header || open ? 4 : 0,
+          maxHeight: !section.header || open ? 2000 : 0,
+          overflow: "hidden",
+          transition: "max-height 200ms",
+        }}
+      >
+        {section.items.map((item) => (
+          <NavItem key={isGroup(item) ? item.label : (item as FlatMenuItem).to} item={item} expanded={expanded} />
+        ))}
+      </div>
+    </div>
   );
 }
 
-// ── Layout ────────────────────────────────────────────────────────────
+// ── App Sidebar (OMS style) ───────────────────────────────────────────────────
 
-export default function AppLayout() {
-  const [tenant, setTenant] = useState<Tenant>(TENANTS[0]);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+const HOVER_DELAY = 200;
 
-  const mode = tenant.mode;
-  const cfg  = MODE_CONFIG[mode];
-  const visibleMenu = filterMenu(MENU, mode);
-  const widthClass    = sidebarCollapsed ? "w-16" : "w-72";
-  const contentMargin = sidebarCollapsed ? "ml-16" : "ml-72";
+type AppSidebarProps = {
+  visibleMenu: MenuItem[];
+  collapsed: boolean;
+  setCollapsed: (v: boolean) => void;
+  onHoverChange: (h: boolean) => void;
+};
+
+function AppSidebar({ visibleMenu, collapsed, setCollapsed, onHoverChange }: AppSidebarProps) {
+  const [hover, setHover]         = useState(false);
+  const [pinned, setPinned]       = useState(true);
+  const { pathname } = useLocation();
+  const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const expanded = !collapsed || hover;
+
+  const handleMouseEnter = useCallback(() => {
+    if (!hover && collapsed) {
+      hoverTimeout.current = setTimeout(() => { setHover(true); onHoverChange(true); hoverTimeout.current = null; }, HOVER_DELAY);
+    }
+  }, [hover, collapsed]);
+
+  const handleMouseLeave = useCallback(() => {
+    if (hoverTimeout.current) { clearTimeout(hoverTimeout.current); hoverTimeout.current = null; }
+    setHover(false);
+    onHoverChange(false);
+  }, [onHoverChange]);
+
+  const prevPath = useRef(pathname);
+  useEffect(() => {
+    if (prevPath.current !== pathname) {
+      prevPath.current = pathname;
+      if (!pinned) setCollapsed(true);
+    }
+  }, [pathname, pinned]);
+
+  // Split menu into sections
+  const sections: Section[] = [];
+  let current: Section = { header: "", items: [] };
+  for (const item of visibleMenu) {
+    if (isSection(item)) {
+      if (current.items.length > 0 || sections.length > 0) sections.push(current);
+      current = { header: item.section, items: [] };
+    } else {
+      current.items.push(item as FlatMenuItem | GroupMenuItem);
+    }
+  }
+  if (current.items.length > 0) sections.push(current);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <aside
-        className={`fixed inset-y-0 left-0 border-r bg-card shadow-sm z-40 flex flex-col transition-all duration-300 overflow-hidden ${widthClass} ${cfg.sidebarBorder}`}
+    <nav
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      className="group flex h-full flex-col border-r border-border transition-[width] duration-200"
+      style={{
+        backgroundColor: "#F4F4F8",
+        transitionTimingFunction: "cubic-bezier(0.2,0,0,1)",
+        width: expanded ? 256 : 48,
+        position: collapsed ? "absolute" : "relative",
+        ...(collapsed
+          ? { top: 0, bottom: 0, left: 0, zIndex: 40, boxShadow: hover ? "rgba(0,0,0,0.1) -4px 9px 25px -6px" : "none" }
+          : { minWidth: 256 }),
+      }}
+    >
+      {/* Anchor edge button */}
+      <button
+        type="button"
+        aria-label={collapsed ? "Ancorar menu" : "Soltar menu"}
+        onClick={() => { const next = !collapsed; setCollapsed(next); setPinned(!next); }}
+        className="absolute z-20 flex h-6 w-6 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted hover:text-foreground"
+        style={{ right: -12, top: 12 }}
       >
-        {/* Header */}
-        <div className={`flex h-16 shrink-0 items-center border-b px-3 gap-2 ${cfg.sidebarHeaderBg} ${cfg.sidebarBorder} ${sidebarCollapsed ? "justify-center" : ""}`}>
-          {!sidebarCollapsed && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex flex-1 min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-muted/50 transition-colors text-left">
-                  <Building2 className="size-4 shrink-0 text-muted-foreground" />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Kruzer</div>
-                    <div className="truncate text-sm font-semibold">{tenant.name}</div>
-                  </div>
-                  <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${cfg.tenantPill}`}>
-                    {cfg.tenantPillText}
-                  </span>
-                  <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground" />
-                </button>
-              </DropdownMenuTrigger>
+        {collapsed
+          ? <ChevronsRight className="h-3.5 w-3.5" strokeWidth={2} />
+          : <ChevronsLeft  className="h-3.5 w-3.5" strokeWidth={2} />
+        }
+      </button>
 
-              <DropdownMenuContent align="start" className="w-64 p-1.5 space-y-1">
-                <div className="px-2 pt-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Configuração Fast PRO
-                </div>
-                {TENANTS.filter((t) => t.mode === "custom").map((t) => (
-                  <DropdownMenuItem
-                    key={t.id} onSelect={() => setTenant(t)}
-                    className={`rounded-xl flex items-center gap-3 px-3 py-2.5 cursor-pointer ${tenant.id === t.id ? "bg-violet-50" : ""}`}
-                  >
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-violet-100">
-                      <span className="text-sm font-bold text-violet-700">F</span>
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className={`text-sm font-semibold ${tenant.id === t.id ? "text-violet-700" : ""}`}>{t.name}</div>
-                      <div className="text-xs text-muted-foreground">{t.description}</div>
-                    </div>
-                    <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-700">Custom</span>
-                  </DropdownMenuItem>
-                ))}
+      {/* Nav groups */}
+      <div className="flex grow flex-col overflow-y-auto overflow-x-hidden" style={{ scrollbarWidth: "none" }}>
+        {sections.map((section, si) => (
+          <NavSection key={`${section.header}-${si}`} section={section} expanded={expanded} index={si} />
+        ))}
+      </div>
 
-                <DropdownMenuSeparator />
+      {/* Kruzer brand footer — mesma estrutura do OMS */}
+      <div
+        className={cn("flex shrink-0 items-center overflow-hidden border-t border-border", expanded ? "justify-start" : "justify-center")}
+        style={{ height: 46, minHeight: 46, ...(expanded ? { paddingLeft: 21, paddingRight: 16 } : {}) }}
+      >
+        <img
+          src={expanded ? "/assets/logo-kruzer-expanded.svg" : "/assets/logo-kruzer-collapsed.svg"}
+          alt="Kruzer"
+          style={{ height: 20, width: expanded ? "auto" : 20 }}
+        />
+      </div>
 
-                <div className="px-2 pt-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Produto white-label
-                </div>
-                {TENANTS.filter((t) => t.mode === "product").map((t) => (
-                  <DropdownMenuItem
-                    key={t.id} onSelect={() => setTenant(t)}
-                    className={`rounded-xl flex items-center gap-3 px-3 py-2.5 cursor-pointer ${tenant.id === t.id ? "bg-sky-50" : ""}`}
-                  >
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-100">
-                      <Puzzle className="size-3.5 text-sky-600" />
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className={`text-sm font-semibold ${tenant.id === t.id ? "text-sky-700" : ""}`}>{t.name}</div>
-                      <div className="text-xs text-muted-foreground">{t.description}</div>
-                    </div>
-                    <span className="rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-700">Produto</span>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          <Button size="icon" variant="ghost" className="shrink-0 size-8" onClick={() => setSidebarCollapsed((p) => !p)}>
-            <PanelLeft className="size-4" />
-          </Button>
-        </div>
+    </nav>
+  );
+}
 
-        {/* Layer legend */}
-        {!sidebarCollapsed && (
-          <div className={`flex items-center gap-3 border-b px-3 py-2 ${cfg.sidebarHeaderBg} ${cfg.sidebarBorder}`}>
-            {(Object.entries(LAYER_CONFIG) as [Layer, typeof LAYER_CONFIG[Layer]][])
-              .filter(([key]) => mode === "custom" || !HIDDEN_IN_PRODUCT.includes(key))
-              .map(([key, lcfg]) => (
-                <div key={key} className="flex items-center gap-1">
-                  <span className={`h-1.5 w-1.5 rounded-full ${lcfg.dot}`} />
-                  <span className="text-[10px] text-muted-foreground">{lcfg.label}</span>
-                </div>
-              ))}
-          </div>
-        )}
+// ── Platform Header ───────────────────────────────────────────────────────────
 
-        {/* Nav */}
-        <nav className="flex-1 overflow-y-auto space-y-0.5 px-2 py-2">
-          {visibleMenu.map((item, i) => {
-            if (isSection(item)) {
-              return !sidebarCollapsed
-                ? <SectionLabel key={`s-${i}`} label={item.section} />
-                : <div key={`s-${i}`} className="my-2 mx-3 h-px bg-border" />;
-            }
-            if (isGroup(item)) return <GroupItem key={item.label} item={item} collapsed={sidebarCollapsed} />;
-            return <FlatItem key={(item as FlatMenuItem).to} item={item as FlatMenuItem} collapsed={sidebarCollapsed} />;
-          })}
-        </nav>
-
-        {!sidebarCollapsed && (
-          <div className="shrink-0 border-t border-border px-4 py-3 text-xs text-muted-foreground">
-            Painel de administração
-          </div>
-        )}
-      </aside>
-
-      {/* Main */}
-      <main className={`${contentMargin} min-h-screen transition-all duration-300`}>
-        <div className={`flex h-16 items-center justify-between border-b px-6 ${cfg.topbarBg} ${cfg.topbarBorder}`}>
-          <div>
-            <div className={`text-xs uppercase tracking-wide ${mode === "custom" ? "text-violet-200" : "text-muted-foreground"}`}>
-              {cfg.topbarSub}
-            </div>
-            <div className={`text-base font-semibold ${mode === "custom" ? "text-white" : ""}`}>
-              {cfg.topbarTitle}
-            </div>
-          </div>
-          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${cfg.modeBadge}`}>
-            {cfg.modeBadgeText}
+function PlatformHeader({ mode, collapsed, hover }: { mode: TenantMode; collapsed: boolean; hover: boolean }) {
+  const expanded = !collapsed || hover;
+  return (
+    <header
+      className="flex shrink-0 items-center bg-card"
+      style={{ height: 48, zIndex: 10 }}
+    >
+      {/* Logo-box — acompanha a largura do sidebar (igual ao OMS) */}
+      <div
+        className="flex h-full shrink-0 items-center overflow-hidden border-r border-border transition-[width] duration-200"
+        style={{
+          width: expanded ? 256 : 48,
+          backgroundColor: "#F4F4F8",
+          transitionTimingFunction: "cubic-bezier(0.2,0,0,1)",
+          justifyContent: expanded ? "flex-start" : "center",
+          paddingLeft: expanded ? 16 : 0,
+        }}
+      >
+        {expanded && (
+          <span className="truncate text-sm font-bold tracking-tight text-foreground">
+            {BRAND_NAME[mode]}
           </span>
-        </div>
-
-        {mode === "product" && (
-          <div className="flex items-center justify-between gap-3 border-b border-sky-200 bg-sky-100 px-6 py-3">
-            <div className="flex items-center gap-3">
-              <Puzzle className="size-5 shrink-0 text-sky-600" />
-              <div>
-                <div className="text-sm font-semibold text-sky-800">Modo produto white-label</div>
-                <div className="text-xs text-sky-700">
-                  Afiliados, Pedidos especificados e Fluxo documental (Fast PRO custom) estão ocultos.
-                </div>
-              </div>
-            </div>
-            <span className="shrink-0 rounded-full bg-sky-200 px-3 py-1 text-xs font-bold text-sky-700">
-              3 features ocultas
-            </span>
-          </div>
         )}
+      </div>
 
-        <div className="p-6">
-          <Outlet />
-        </div>
-      </main>
+      {/* Resto do header TEM border-bottom */}
+      <div className="flex h-full flex-1 items-center border-b border-border" />
+    </header>
+  );
+}
+
+// ── App Layout ────────────────────────────────────────────────────────────────
+
+export default function AppLayout() {
+  const [tenant, setTenant]       = useState<Tenant>(TENANTS[0]);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarHover,     setSidebarHover]     = useState(false);
+  const mode        = tenant.mode;
+  const visibleMenu = filterMenu(MENU, mode);
+
+  function toggleTenant() {
+    const next = mode === "custom"
+      ? TENANTS.find((t) => t.mode === "product")!
+      : TENANTS.find((t) => t.mode === "custom")!;
+    setTenant(next);
+  }
+
+  return (
+    <TooltipProvider>
+    <div className="flex h-svh flex-col bg-background">
+      <PlatformHeader mode={mode} collapsed={sidebarCollapsed} hover={sidebarHover} />
+
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
+        <AppSidebar
+          visibleMenu={visibleMenu}
+          collapsed={sidebarCollapsed}
+          setCollapsed={setSidebarCollapsed}
+          onHoverChange={setSidebarHover}
+        />
+
+        <main
+          className="flex flex-1 flex-col overflow-auto"
+          style={{ marginLeft: sidebarCollapsed ? 48 : 0 }}
+        >
+          {mode === "product" && (
+            <div className="flex items-center justify-between gap-3 border-b border-sky-200 bg-sky-50 px-6 py-2.5">
+              <div className="flex items-center gap-2.5">
+                <Puzzle className="size-4 shrink-0 text-sky-500" />
+                <span className="text-sm text-sky-800">
+                  <span className="font-semibold">Modo produto white-label</span>
+                  {" — "}Afiliados, Pedidos especificados e Fluxo documental estão ocultos.
+                </span>
+              </div>
+              <span className="shrink-0 rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-bold text-sky-700">
+                3 features ocultas
+              </span>
+            </div>
+          )}
+          <div className="flex-1 p-6">
+            <Outlet />
+          </div>
+        </main>
+      </div>
+
+      {/* Floating CTA — fora do grid, canto inferior direito */}
+      <button
+        onClick={toggleTenant}
+        className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-xs font-medium text-muted-foreground shadow-lg transition-all hover:bg-muted hover:text-foreground hover:shadow-xl"
+      >
+        <ArrowLeftRight className="size-3 shrink-0" />
+        {MODE_LABEL[mode]}
+      </button>
     </div>
+    </TooltipProvider>
   );
 }

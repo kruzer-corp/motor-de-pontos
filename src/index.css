@@ -1,5 +1,64 @@
 @import "tailwindcss";
-@import "@kruzer-corp/ds/styles.css";
+@import "@kruzer/ds/styles.css";
+
+/*
+  Motor de Pontos — overrides do @kruzer/ds
+  O DS usa ds:border-r no wrapper do sidebar fora do escopo .ds-root, então
+  currentColor (navy) fica como fallback. Sobrescreve aqui para o token correto.
+*/
+
+/*
+  Fix: altura do cabeçalho das tabelas DS (ds:h-8 = 32px → padrão OMS h-11 = 44px)
+  e padding das linhas (py-3.5 já está no TableRow via className, mas garante fallback).
+*/
+thead th { height: 2.75rem !important; }   /* h-11 — força sobre ds:h-8 do DS */
+
+/*
+  Fix global: ds:border* usa currentColor fora do .ds-root.
+  Replica o que .ds-root faz: seta border-color padrão para o token semântico.
+  CSS não-layered tem prioridade sobre @layer base do DS, sem quebrar
+  border-color explícitas (border-violet-200, etc.) que sobrescrevem isso.
+*/
+*, ::after, ::before {
+  border-color: hsl(var(--border));
+}
+
+/* Sidebar clara (o DS default é navy escuro) */
+:root {
+  --sidebar-background:          231 20% 97%;
+  --sidebar-foreground:          232.94 19.54% 17.06%;
+  --sidebar-border:              231 20% 91%;
+  --sidebar-accent:              231 20% 93%;
+  --sidebar-accent-foreground:   232.94 19.54% 17.06%;
+  --sidebar-primary:             227.77 61.57% 50%;
+  --sidebar-primary-foreground:  0 0% 100%;
+  --sidebar-ring:                227.77 61.57% 50%;
+}
+
+@theme inline {
+  --color-background:        hsl(var(--background));
+  --color-foreground:        hsl(var(--foreground));
+  --color-card:              hsl(var(--card));
+  --color-card-foreground:   hsl(var(--card-foreground));
+  --color-popover:           hsl(var(--popover));
+  --color-popover-foreground:hsl(var(--popover-foreground));
+  --color-primary:           hsl(var(--primary));
+  --color-primary-foreground:hsl(var(--primary-foreground));
+  --color-secondary:         hsl(var(--secondary));
+  --color-secondary-foreground:hsl(var(--secondary-foreground));
+  --color-muted:             hsl(var(--muted));
+  --color-muted-foreground:  hsl(var(--muted-foreground));
+  --color-accent:            hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive:       hsl(var(--destructive));
+  --color-border:            hsl(var(--border));
+  --color-input:             hsl(var(--input));
+  --color-ring:              hsl(var(--ring));
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
 
 * {
   box-sizing: border-box;

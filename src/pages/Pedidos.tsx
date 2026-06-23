@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, CardHeader, CardTitle, Input, Button, Badge, Avatar, AvatarFallback } from "@kruzer-corp/ds";
+import { Card, CardHeader, CardTitle, Input, Button, Badge, Avatar, AvatarFallback } from "@kruzer/ds";
 import { Search, SlidersHorizontal, Download } from "lucide-react";
 
 type OrderStatus = "Concluído" | "Em Processamento" | "Aprovado" | "Em Análise" | "Rejeitado" | "Cancelado";
@@ -155,7 +155,7 @@ const ALL_COLUMNS = [
   { key: "member", label: "Membro", always: true },
   { key: "tier", label: "Tier" },
   { key: "segment", label: "Segmento" },
-  { key: "reward", label: "Recompensa", always: true },
+  { key: "reward", label: "Resgate", always: true },
   { key: "category", label: "Categoria" },
   { key: "channel", label: "Canal" },
   { key: "ganCode", label: "Código GAN" },

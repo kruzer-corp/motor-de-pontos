@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@kruzer-corp/ds";
+import { Card, CardContent, CardHeader, CardTitle } from "@kruzer/ds";
 
 export default function Canais() {
   return (

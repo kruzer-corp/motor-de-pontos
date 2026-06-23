@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, CardHeader, CardTitle, CardContent, Button, Badge } from "@kruzer-corp/ds";
+import { Card, CardHeader, CardTitle, CardContent, Button, Badge } from "@kruzer/ds";
 import { RefreshCw, CheckCheck, AlertTriangle, Upload, Package } from "lucide-react";
 
 type FeedStatus = "sincronizado" | "pendente" | "erro" | "sincronizando";

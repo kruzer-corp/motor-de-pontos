@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, Button, Badge, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@kruzer-corp/ds";
+import { Card, Button, Badge, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@kruzer/ds";
 import { ShoppingCart, Package, Search, CheckCheck } from "lucide-react";
 
 type CatalogProduct = {

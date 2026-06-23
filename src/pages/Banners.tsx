@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, CardHeader, CardTitle, Button, Badge, Switch, Input } from "@kruzer-corp/ds";
+import { Card, CardHeader, CardTitle, Button, Badge, Switch, Input } from "@kruzer/ds";
 import { Image, Plus, Pencil, Trash2, GripVertical, ExternalLink } from "lucide-react";
 
 type BannerStatus = "ativo" | "agendado" | "expirado" | "rascunho";

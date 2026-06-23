@@ -8,7 +8,7 @@ import {
   TabsContent,
   Avatar,
   AvatarFallback,
-} from "@kruzer-corp/ds";
+} from "@kruzer/ds";
 import { FileCheck, FileCheck2, Upload, AlertTriangle, CheckCheck } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, CardHeader, CardTitle, Button, Input, Avatar, AvatarFallback, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@kruzer-corp/ds";
+import { Card, CardHeader, CardTitle, Button, Input, Avatar, AvatarFallback, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@kruzer/ds";
 import { UserCheck, Plus, Search, CheckCheck } from "lucide-react";
 
 type IndicStatus = "pendente" | "convertida" | "expirada" | "cancelada";

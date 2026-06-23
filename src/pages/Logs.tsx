@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, CardHeader, CardTitle, Input, Badge, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@kruzer-corp/ds";
+import { Card, CardHeader, CardTitle, Input, Badge, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@kruzer/ds";
 import { Search, Filter } from "lucide-react";
 
 type LogEntry = {

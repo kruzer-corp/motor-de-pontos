@@ -10,7 +10,7 @@ import {
   TabsList,
   TabsTrigger,
   TabsContent,
-} from "@kruzer-corp/ds";
+} from "@kruzer/ds";
 import { CheckCheck, ExternalLink, ScrollText, FileSignature } from "lucide-react";
 
 // ── Mock document text ──────────────────────────────────────────────

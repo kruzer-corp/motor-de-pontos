@@ -1,4 +1,4 @@
-import { Card, CardHeader, CardTitle, CardContent } from "@kruzer-corp/ds";
+import { Card, CardHeader, CardTitle, CardContent } from "@kruzer/ds";
 import { Wallet, Construction } from "lucide-react";
 
 export default function Carteiras() {

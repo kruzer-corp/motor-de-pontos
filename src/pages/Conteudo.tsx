@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, CardHeader, CardTitle, Button, Badge, Input } from "@kruzer-corp/ds";
+import { Card, CardHeader, CardTitle, Button, Badge, Input } from "@kruzer/ds";
 import { Newspaper, Plus, Pencil, Eye, Search, Archive } from "lucide-react";
 
 type ContentStatus = "publicado" | "rascunho" | "agendado" | "arquivado";

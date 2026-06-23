@@ -3,6 +3,7 @@ import AppLayout from "./layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Usuarios from "./pages/Usuarios";
 import Membros from "./pages/Membros";
+import MembrosV2 from "./pages/MembrosV2";
 import MembrosTier from "./pages/MembrosTier";
 import MembrosSegmentos from "./pages/MembrosSegmentos";
 import MembrosAjuste from "./pages/MembrosAjuste";
@@ -46,6 +47,7 @@ export default function App() {
         <Route path="config" element={<Config />} />
         <Route path="usuarios" element={<Usuarios />} />
         <Route path="membros" element={<Membros />} />
+        <Route path="membros-v2" element={<MembrosV2 />} />
         <Route path="membros/tier" element={<MembrosTier />} />
         <Route path="membros/segmentos" element={<MembrosSegmentos />} />
         <Route path="membros/ajuste" element={<MembrosAjuste />} />

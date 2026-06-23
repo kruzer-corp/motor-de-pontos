@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, CardHeader, CardTitle, CardContent, Button, Switch, Badge } from "@kruzer-corp/ds";
+import { Card, CardHeader, CardTitle, CardContent, Button, Switch, Badge } from "@kruzer/ds";
 import { PanelTop, GripVertical, Pencil, Eye } from "lucide-react";
 
 type SectionType = "hero" | "banners" | "featured" | "ranking" | "editorial" | "cta" | "faq";

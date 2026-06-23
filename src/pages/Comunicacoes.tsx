@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, CardHeader, CardTitle, Button, Badge, Switch } from "@kruzer-corp/ds";
+import { Card, CardHeader, CardTitle, Button, Badge, Switch } from "@kruzer/ds";
 import { Bell, Mail, MessageSquare, Send, MailCheck } from "lucide-react";
 
 type Channel = "email" | "sms" | "push";

@@ -10,8 +10,8 @@ import {
   TabsList,
   TabsTrigger,
   TabsContent,
-} from "@kruzer-corp/ds";
-import { Archive, RotateCcw } from "lucide-react";
+} from "@kruzer/ds";
+import { Archive, RotateCcw, Sparkles } from "lucide-react";
 
 type CampaignStatus = "Ativa" | "Pausa" | "Rascunho" | "Encerrada" | "Arquivada";
 
@@ -80,42 +80,56 @@ export default function Campanhas() {
 
         {/* ── Active campaigns ── */}
         <TabsContent value="ativas" className="mt-4">
-          <div className="grid gap-4 lg:grid-cols-2">
-            {active.map((camp) => (
-              <Card key={camp.id} className="overflow-hidden">
-                <div className={`h-2 ${camp.color}`} />
-                <CardHeader className="flex items-start justify-between gap-4">
-                  <div>
-                    <CardTitle>{camp.title}</CardTitle>
-                    <p className="text-sm text-muted-foreground">{camp.description}</p>
-                    {camp.endDate && (
-                      <p className="text-xs text-muted-foreground mt-1">Encerrada em {camp.endDate}</p>
-                    )}
-                  </div>
-                  <Badge className={STATUS_COLOR[camp.status]}>{camp.status}</Badge>
-                </CardHeader>
-                <div className="flex items-center justify-between border-t border-border px-6 py-3 gap-2">
-                  <div className="text-xs text-muted-foreground font-mono">{camp.id}</div>
-                  <div className="flex gap-2">
-                    {camp.status === "Encerrada" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-xs h-7"
-                        onClick={() => archive(camp.id)}
-                      >
-                        <Archive className="size-3 mr-1" />
-                        Arquivar
+          {active.length === 0 ? (
+            <div className="rounded-3xl border-2 border-dashed border-border py-16 text-center space-y-3">
+              <Sparkles className="mx-auto size-10 text-muted-foreground/30" />
+              <div className="text-sm font-medium">Nenhuma campanha ainda</div>
+              <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                Crie sua primeira campanha escolhendo um modelo pronto — leva menos de 5 minutos.
+              </p>
+              <Button asChild size="sm" className="mt-2">
+                <Link to="/campanhas/nova">
+                  <Sparkles className="size-3.5 mr-1.5" />
+                  Criar primeira campanha
+                </Link>
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {active.map((camp) => (
+                <Card key={camp.id} className="overflow-hidden">
+                  <div className={`h-2 ${camp.color}`} />
+                  <CardHeader className="flex items-start justify-between gap-4">
+                    <div>
+                      <CardTitle>{camp.title}</CardTitle>
+                      <p className="text-sm text-muted-foreground">{camp.description}</p>
+                      {camp.endDate && (
+                        <p className="text-xs text-muted-foreground mt-1">Encerrada em {camp.endDate}</p>
+                      )}
+                    </div>
+                    <Badge className={STATUS_COLOR[camp.status]}>{camp.status}</Badge>
+                  </CardHeader>
+                  <div className="flex items-center justify-between border-t border-border px-6 py-3 gap-2">
+                    <div className="text-xs text-muted-foreground font-mono">{camp.id}</div>
+                    <div className="flex gap-2">
+                      {camp.status === "Encerrada" && (
+                        <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => archive(camp.id)}>
+                          <Archive className="size-3 mr-1" />Arquivar
+                        </Button>
+                      )}
+                      <Button variant="outline" size="sm" className="text-xs h-7"
+                        onClick={() => setCampaigns((prev) => [...prev, { ...camp, id: `${camp.id}-cópia`, title: `${camp.title} (cópia)`, status: "Rascunho" as CampaignStatus, endDate: undefined }])}>
+                        Duplicar
                       </Button>
-                    )}
-                    <Button asChild variant="outline" size="sm" className="h-7 text-xs">
-                      <Link to={`/campanhas/${camp.id}`}>Ver detalhes</Link>
-                    </Button>
+                      <Button asChild variant="outline" size="sm" className="h-7 text-xs">
+                        <Link to={`/campanhas/${camp.id}`}>Ver detalhes</Link>
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              </Card>
-            ))}
-          </div>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         {/* ── Archived campaigns ── */}

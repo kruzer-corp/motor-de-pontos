@@ -19,7 +19,7 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
-} from "@kruzer-corp/ds";
+} from "@kruzer/ds";
 import { Pencil, Download, CheckCheck, X, FileText, User } from "lucide-react";
 
 // ── Mock member selector ─────────────────────────────────────────────
@@ -219,7 +219,7 @@ function MeusResgates() {
           <thead className="border-t border-border bg-muted/20">
             <tr className="text-left text-muted-foreground">
               <th className="px-6 py-3 font-medium">Pedido</th>
-              <th className="px-6 py-3 font-medium">Recompensa</th>
+              <th className="px-6 py-3 font-medium">Resgate</th>
               <th className="px-6 py-3 font-medium">Status</th>
               <th className="px-6 py-3 font-medium text-right">Pontos</th>
               <th className="px-6 py-3 font-medium">Data</th>

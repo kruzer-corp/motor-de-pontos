@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Card, Input, Badge, Button } from "@kruzer-corp/ds";
+import { Card, Input, Badge, Button } from "@kruzer/ds";
 import { Package, ChevronDown, ChevronRight, Search } from "lucide-react";
 
 type Product = { id: string; name: string; points: number; stock: number; active: boolean };

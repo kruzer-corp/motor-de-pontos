@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Card, CardHeader, CardTitle, CardContent, Badge, Button, Switch } from "@kruzer-corp/ds";
+import { Card, CardHeader, CardTitle, CardContent, Badge, Button, Switch } from "@kruzer/ds";
 import { ArrowLeft, Package, Pencil } from "lucide-react";
 
 type ProductData = {

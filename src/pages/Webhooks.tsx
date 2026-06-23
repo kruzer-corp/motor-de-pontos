@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Switch } from "@kruzer-corp/ds";
+import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Switch } from "@kruzer/ds";
 import { Webhook, Plus, Copy, RefreshCw } from "lucide-react";
 
 type EventStatus = "ativo" | "inativo";

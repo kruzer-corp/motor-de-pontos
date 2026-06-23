@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, Button, Badge, Switch } from "@kruzer-corp/ds";
+import { Card, Button, Badge, Switch } from "@kruzer/ds";
 import { Users, Plus, Pencil } from "lucide-react";
 
 type CriteriaOp = "gte" | "lte" | "eq" | "in";

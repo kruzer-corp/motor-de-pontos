@@ -1,4 +1,4 @@
-import { Button, Card, CardContent, CardHeader, CardTitle } from "@kruzer-corp/ds";
+import { Button, Card, CardContent, CardHeader, CardTitle } from "@kruzer/ds";
 
 export default function Home() {
   return (
@@ -10,7 +10,7 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground mb-4">
-              Projeto inicializado do zero com React, TypeScript, Tailwind e @kruzer-corp/ds.
+              Projeto inicializado do zero com React, TypeScript, Tailwind e @kruzer/ds.
             </p>
             <Button>Começar</Button>
           </CardContent>

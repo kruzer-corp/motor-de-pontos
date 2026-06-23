@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, Input } from "@kruzer-corp/ds";
+import { Card, Input } from "@kruzer/ds";
 import { ArrowUpCircle, ArrowDownCircle, ChevronDown, ChevronRight, Search } from "lucide-react";
 
 type LineItem = { description: string; type: "credit" | "debit"; points: number };

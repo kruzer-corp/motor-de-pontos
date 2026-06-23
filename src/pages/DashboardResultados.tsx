@@ -19,7 +19,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
-} from "@kruzer-corp/ds";
+} from "@kruzer/ds";
 import { TrendingUp, BarChart2 } from "lucide-react";
 
 // ── Data ─────────────────────────────────────────────────────────────

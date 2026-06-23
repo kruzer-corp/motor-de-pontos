@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Card, CardHeader, CardTitle, Button, Badge, Avatar, AvatarFallback } from "@kruzer-corp/ds";
+import { Card, CardHeader, CardTitle, Button, Badge, Avatar, AvatarFallback } from "@kruzer/ds";
 import { ArrowRight, CheckCheck, X, ChevronRight, FileCheck, ShoppingCart } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -192,7 +192,7 @@ export default function Recompensas() {
               <tr className="text-left text-muted-foreground">
                 <th className="px-5 py-3 font-medium">Pedido</th>
                 <th className="px-5 py-3 font-medium">Membro</th>
-                <th className="px-5 py-3 font-medium">Recompensa</th>
+                <th className="px-5 py-3 font-medium">Resgate</th>
                 <th className="px-5 py-3 font-medium">Status</th>
                 <th className="px-5 py-3 font-medium text-right">Pontos</th>
                 <th className="px-5 py-3 font-medium">Solicitado</th>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Card, CardHeader, CardTitle, CardContent, Badge, Button } from "@kruzer-corp/ds";
+import { Card, CardHeader, CardTitle, CardContent, Badge, Button } from "@kruzer/ds";
 import { ArrowLeft, CheckCircle2, XCircle } from "lucide-react";
 
 // ── 7 dimensões de uma regra (conforme discovery, seção 2) ─────────────

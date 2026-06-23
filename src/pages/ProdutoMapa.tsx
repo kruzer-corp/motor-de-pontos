@@ -1,4 +1,4 @@
-import { Card, CardTitle } from "@kruzer-corp/ds";
+import { Card, CardTitle } from "@kruzer/ds";
 import { LAYER_CONFIG } from "../layout/AppLayout";
 
 type FeatureEntry = {

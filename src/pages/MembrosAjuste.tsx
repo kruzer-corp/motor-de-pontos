@@ -13,7 +13,7 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
-} from "@kruzer-corp/ds";
+} from "@kruzer/ds";
 import { CheckCircle2, AlertCircle } from "lucide-react";
 
 const MEMBERS = [

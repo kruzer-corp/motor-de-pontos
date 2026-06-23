@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, CardContent, Button, Badge } from "@kruzer-corp/ds";
+import { Card, CardContent, Button, Badge } from "@kruzer/ds";
 import { ShieldCheck, ChevronDown, ChevronRight, Pencil } from "lucide-react";
 
 type Tier = {

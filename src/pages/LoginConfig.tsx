@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, CardHeader, CardTitle, CardContent, Button, Input, Switch } from "@kruzer-corp/ds";
+import { Card, CardHeader, CardTitle, CardContent, Button, Input, Switch } from "@kruzer/ds";
 import { LogIn, ExternalLink, Eye, CheckCheck } from "lucide-react";
 
 export default function LoginConfig() {
