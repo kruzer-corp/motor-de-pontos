@@ -4,8 +4,8 @@ import { cn, TooltipProvider } from "@kruzer/ds";
 import {
   LayoutDashboard, Users, User, ShieldCheck, Gift, Sparkles, Boxes,
   ChevronDown, ChevronsLeft, ChevronsRight, ArrowLeftRight,
-  Package, Trophy, History, ScrollText, Bell,
-  UserCheck, Newspaper, Puzzle, Palette, Webhook, Wallet,
+  Package, Trophy, History, Settings, Share2,
+  Puzzle, Palette, Webhook, Wallet,
   SlidersHorizontal,
 } from "lucide-react";
 
@@ -64,7 +64,7 @@ const MENU: MenuItem[] = [
   {
     label: "Dashboard", icon: LayoutDashboard,
     group: [
-      { to: "/",                     label: "Visão geral" },
+      { to: "/dashboard",            label: "Visão geral" },
       { to: "/dashboard-resultados", label: "Resultados" },
     ],
   },
@@ -73,66 +73,54 @@ const MENU: MenuItem[] = [
   // ── OPERAÇÃO ───────────────────────────────────────────────────────────────
   { section: "Operação" },
   {
-    label: "Membros", icon: Users,
-    group: [
-      { to: "/membros",           label: "Lista" },
-      { to: "/afiliados",         label: "Afiliados",        layer: "custom" },
-      { to: "/membros/segmentos", label: "Segmentos",        layer: "module" },
-      { to: "/membros/extrato",   label: "Extrato de pontos" },
-    ],
-  },
-  { to: "/membros/ajuste", label: "Ajuste manual", icon: SlidersHorizontal },
-  {
     label: "Campanhas", icon: Sparkles,
     group: [
       { to: "/campanhas",      label: "Regras" },
       { to: "/campanhas/nova", label: "Nova campanha" },
     ],
   },
-  { to: "/indicacoes", label: "Indicações de Venda", icon: UserCheck, layer: "module" },
   {
-    label: "Comunicações", icon: Bell,
+    label: "Membros", icon: Users,
     group: [
-      { to: "/comunicacoes", label: "Eventos transacionais" },
-      { to: "/comunicados",  label: "Histórico" },
+      { to: "/membros",           label: "Lista" },
+      { to: "/membros/segmentos", label: "Segmentos",        layer: "module" },
+      { to: "/membros/extrato",   label: "Extrato de pontos" },
     ],
   },
-  { to: "/conteudo", label: "Conteúdo editorial", icon: Newspaper, layer: "module" },
-  {
-    label: "Resgates", icon: Gift,
-    group: [
-      { to: "/recompensas",            label: "Pedidos" },
-      { to: "/pedidos",                label: "Pedidos especificados", layer: "custom" },
-      { to: "/recompensas/catalogo",   label: "Catálogo de resgate" },
-      { to: "/recompensas/documental", label: "Fluxo documental", layer: "custom" },
-    ],
-  },
+  { to: "/membros/ajuste", label: "Ajuste manual", icon: SlidersHorizontal },
+  { to: "/pedidos",    label: "Pedidos",               icon: Gift   },
+  { to: "/indicacoes", label: "Indicações de membros", icon: Share2 },
+  { to: "/carteiras", label: "Múltiplas moedas", icon: Wallet },
 
   // ── CONFIGURAÇÃO ───────────────────────────────────────────────────────────
   { section: "Configuração" },
+  { to: "/mecanica",     label: "Mecânica do programa", icon: Settings },
   { to: "/usuarios",     label: "Usuários & Papéis",    icon: User },
   { to: "/membros/tier", label: "Tier / Níveis",        icon: ShieldCheck },
-  { to: "/canais",       label: "Canais",               icon: Boxes },
-  { to: "/carteiras",    label: "Múltiplas moedas",     icon: Wallet },
-  { to: "/webhooks",     label: "Webhooks / Eventos",   icon: Webhook },
-  {
-    label: "Theming", icon: Palette,
-    group: [
-      { to: "/homepage",     label: "Homepage" },
-      { to: "/banners",      label: "Banners" },
-      { to: "/login-config", label: "Login" },
-    ],
-  },
   {
     label: "Catálogo", icon: Package,
     group: [
-      { to: "/catalogo",             label: "Produtos" },
+      { to: "/catalogo",             label: "Produtos incentivados" },
+      { to: "/recompensas/catalogo", label: "Catálogo de resgate" },
       { to: "/catalogo/grupos",      label: "Grupos" },
       { to: "/catalogo/atualizacao", label: "Atualização 3P", layer: "module" },
     ],
   },
-  { to: "/logs",         label: "Logs de auditoria", icon: History },
-  { to: "/conformidade", label: "Conformidade",       icon: ScrollText },
+  { to: "/canais",   label: "Canais",             icon: Boxes },
+
+  { to: "/webhooks", label: "Webhooks / Eventos", icon: Webhook },
+  {
+    label: "Conteúdo & Aparência", icon: Palette,
+    group: [
+      { to: "/homepage",     label: "Homepage" },
+      { to: "/banners",      label: "Banners" },
+      { to: "/login-config", label: "Login" },
+      { to: "/conteudo",     label: "Conteúdo editorial", layer: "module" },
+      { to: "/comunicacoes", label: "Eventos transacionais" },
+      { to: "/comunicados",  label: "Histórico de comunicações" },
+    ],
+  },
+  { to: "/logs", label: "Logs de auditoria", icon: History },
 
 ];
 
@@ -442,8 +430,8 @@ function PlatformHeader({ mode, collapsed, hover }: { mode: TenantMode; collapse
         )}
       </div>
 
-      {/* Resto do header TEM border-bottom */}
-      <div className="flex h-full flex-1 items-center border-b border-border" />
+      {/* Breadcrumb portal target — PageHeader portala aqui */}
+      <div id="main-nav" className="flex h-full flex-1 items-center border-b border-border px-6" />
     </header>
   );
 }
@@ -487,11 +475,11 @@ export default function AppLayout() {
                 <Puzzle className="size-4 shrink-0 text-sky-500" />
                 <span className="text-sm text-sky-800">
                   <span className="font-semibold">Modo produto white-label</span>
-                  {" — "}Afiliados, Pedidos especificados e Fluxo documental estão ocultos.
+                  {" — "}Pedidos especificados e Fluxo documental estão ocultos.
                 </span>
               </div>
               <span className="shrink-0 rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-bold text-sky-700">
-                3 features ocultas
+                2 features ocultas
               </span>
             </div>
           )}

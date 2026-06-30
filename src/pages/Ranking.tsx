@@ -33,6 +33,7 @@ export default function Ranking() {
     <div className="space-y-6">
       <PageHeader
         title="Ranking"
+        path={[{ label: "Análise" }]}
         description={`Período: ${CONFIG["Período"]}`}
       />
 

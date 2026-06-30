@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sitemap — Motor de Pontos</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --muted: #63698A; --border: #E3E3ED;
+      --bg: #F4F4F8; --card: #FFFFFF; --navy: #232534;
+
+      --analise: #3151CE; --analise-bg: #EEF2FF;
+      --op:      #059669; --op-bg:      #ECFDF5;
+      --config:  #7C3AED; --config-bg:  #F5F3FF;
+
+      --fp:  #6D28D9; --fp-bg:  #EDE9FE;   /* FastPRO */
+      --wl:  #0369A1; --wl-bg:  #E0F2FE;   /* White-label */
+      --mod: #B45309; --mod-bg: #FEF9C3;   /* Módulo */
+      --both: #374151; --both-bg: #F9FAFB; /* Ambos */
+    }
+
+    body { font-family: "Inter", system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--navy); font-size: 13px; line-height: 1.5; }
+
+    /* ── Page header ── */
+    .page-header { background: var(--card); border-bottom: 1px solid var(--border); padding: 28px 48px 24px; }
+    .page-header h1 { font-size: 22px; font-weight: 700; letter-spacing: -.3px; font-family: "DM Sans", system-ui, sans-serif; }
+    .page-header p  { color: var(--muted); margin-top: 4px; font-size: 13px; }
+
+    .wrap { padding: 32px 48px 60px; display: flex; flex-direction: column; gap: 28px; }
+
+    /* ── Mode legend bar ── */
+    .mode-bar {
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 16px;
+    }
+    .mode-bar strong { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+    .legend-chip { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+    .chip { padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 700; letter-spacing: .3px; }
+    .chip-fp   { background: var(--fp-bg);   color: var(--fp); }
+    .chip-wl   { background: var(--wl-bg);   color: var(--wl); }
+    .chip-both { background: var(--both-bg); color: var(--both); border: 1px solid var(--border); }
+    .chip-mod  { background: var(--mod-bg);  color: var(--mod); }
+
+    /* ── Stats ── */
+    .stats { display: flex; gap: 12px; flex-wrap: wrap; }
+    .stat { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 18px; min-width: 120px; }
+    .stat-val { font-size: 22px; font-weight: 700; }
+    .stat-lbl { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+    /* ── Dual column layout ── */
+    .dual {
+      display: grid;
+      grid-template-columns: 200px 1fr 1fr;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      background: var(--card);
+    }
+
+    /* Section label (left column) */
+    .section-label {
+      display: flex; flex-direction: column; justify-content: flex-start; align-items: flex-start;
+      padding: 20px 16px;
+      border-right: 1px solid var(--border);
+      gap: 6px;
+    }
+    .section-label.analise { background: var(--analise-bg); }
+    .section-label.op      { background: var(--op-bg); }
+    .section-label.config  { background: var(--config-bg); }
+    .section-icon { font-size: 20px; }
+    .section-name { font-size: 13px; font-weight: 700; }
+    .section-desc { font-size: 10px; color: var(--muted); line-height: 1.4; }
+
+    /* Mode column header */
+    .col-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .col-header-label { font-size: 13px; font-weight: 700; }
+    .col-header-sub   { font-size: 11px; color: var(--muted); }
+    .col-count { margin-left: auto; font-size: 10px; background: var(--bg); padding: 2px 7px; border-radius: 9999px; border: 1px solid var(--border); color: var(--muted); }
+
+    /* Column content */
+    .col-pages { padding: 12px; display: flex; flex-direction: column; gap: 8px; border-right: 1px solid var(--border); }
+    .col-pages:last-child { border-right: none; }
+
+    /* Row separator between sections */
+    .section-sep {
+      grid-column: 1 / -1;
+      border-top: 2px solid var(--border);
+    }
+
+    /* ── Page item ── */
+    .pg {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 11px;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .pg-top    { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
+    .pg-name   { font-weight: 600; font-size: 12px; }
+    .pg-route  { font-family: monospace; font-size: 10px; color: var(--muted); background: rgba(0,0,0,.05); padding: 1px 5px; border-radius: 3px; white-space: nowrap; }
+    .pg-desc   { font-size: 11px; color: var(--muted); line-height: 1.4; }
+    .pg-chips  { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 2px; }
+    .pg-chip   { font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 4px; letter-spacing: .2px; }
+
+    /* Sub items */
+    .pg-subs { margin-top: 4px; padding-left: 10px; border-left: 2px solid var(--border); display: flex; flex-direction: column; gap: 3px; }
+    .sub { display: flex; align-items: baseline; gap: 6px; }
+    .sub-name  { font-size: 11px; font-weight: 500; }
+    .sub-route { font-family: monospace; font-size: 9px; color: var(--muted); background: rgba(0,0,0,.04); padding: 0 4px; border-radius: 3px; }
+    .sub-chip  { font-size: 8px; font-weight: 700; padding: 0 4px; border-radius: 3px; }
+
+    /* Absent marker */
+    .absent {
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      padding: 9px 11px;
+      opacity: .45;
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; color: var(--muted);
+    }
+    .absent-icon { font-size: 13px; }
+
+    @media (max-width: 900px) {
+      .page-header, .wrap { padding-left: 16px; padding-right: 16px; }
+      .dual { grid-template-columns: 1fr; }
+      .section-label { border-right: none; border-bottom: 1px solid var(--border); }
+      .col-pages { border-right: none; border-bottom: 1px solid var(--border); }
+    }
+  </style>
+</head>
+<body>
+
+<header class="page-header">
+  <h1>Sitemap — Motor de Pontos</h1>
+  <p>Visão comparativa entre FastShop PRO (Custom) e Produto White-label · 35 rotas mapeadas</p>
+</header>
+
+<div class="wrap">
+
+  <!-- Mode legend -->
+  <div class="mode-bar">
+    <strong>Disponibilidade:</strong>
+    <div class="legend-chip"><span class="chip chip-both">Ambos</span> Disponível nos dois modos</div>
+    <div class="legend-chip"><span class="chip chip-fp">FastPRO</span> Exclusivo FastShop PRO</div>
+    <div class="legend-chip"><span class="chip chip-wl">White-label</span> Core do produto</div>
+    <div class="legend-chip"><span class="chip chip-mod">Módulo</span> Add-on opcional</div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat"><div class="stat-val">35</div><div class="stat-lbl">Rotas totais</div></div>
+    <div class="stat"><div class="stat-val" style="color:var(--fp)">6</div><div class="stat-lbl">Exclusivas FastPRO</div></div>
+    <div class="stat"><div class="stat-val" style="color:var(--wl)">24</div><div class="stat-lbl">No White-label</div></div>
+    <div class="stat"><div class="stat-val" style="color:var(--mod)">5</div><div class="stat-lbl">Módulos add-on</div></div>
+  </div>
+
+  <!-- ════════ DUAL SITEMAP ════════ -->
+  <div class="dual">
+
+    <!-- Col headers -->
+    <div style="border-bottom:1px solid var(--border); background:#FAFAFA;"></div>
+    <div class="col-header" style="background:var(--fp-bg); border-bottom:1px solid var(--border); border-right:1px solid var(--border);">
+      <div>
+        <div class="col-header-label" style="color:var(--fp)">🔮 FastShop PRO</div>
+        <div class="col-header-sub">Modo Custom — todas as features</div>
+      </div>
+      <span class="col-count">35 rotas</span>
+    </div>
+    <div class="col-header" style="background:var(--wl-bg); border-bottom:1px solid var(--border);">
+      <div>
+        <div class="col-header-label" style="color:var(--wl)">🌐 Produto White-label</div>
+        <div class="col-header-sub">Modo Produto — core genérico</div>
+      </div>
+      <span class="col-count">29 rotas</span>
+    </div>
+
+    <!-- ─── ANÁLISE ─── -->
+    <div class="section-label analise" style="grid-row: span 1;">
+      <span class="section-icon">📊</span>
+      <span class="section-name" style="color:var(--analise)">Análise</span>
+      <span class="section-desc">Dashboards e desempenho do programa</span>
+    </div>
+
+    <div class="col-pages">
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Dashboard</span><span class="pg-route">/</span></div>
+        <span class="pg-desc">KPIs, gráficos de crescimento e distribuição de tiers</span>
+        <div class="pg-subs">
+          <div class="sub"><span class="sub-name">Resultados</span><span class="sub-route">/dashboard-resultados</span></div>
+        </div>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Ranking</span><span class="pg-route">/ranking</span></div>
+        <span class="pg-desc">Pódio top 3 e classificação completa por pontos</span>
+        <div class="pg-chips"><span class="pg-chip chip-mod">Módulo</span></div>
+      </div>
+    </div>
+
+    <div class="col-pages">
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Dashboard</span><span class="pg-route">/</span></div>
+        <span class="pg-desc">KPIs, gráficos de crescimento e distribuição de tiers</span>
+        <div class="pg-subs">
+          <div class="sub"><span class="sub-name">Resultados</span><span class="sub-route">/dashboard-resultados</span></div>
+        </div>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+      <div class="pg" style="opacity:.5;">
+        <div class="pg-top"><span class="pg-name">Ranking</span><span class="pg-route">/ranking</span></div>
+        <span class="pg-desc">Disponível como módulo add-on</span>
+        <div class="pg-chips"><span class="pg-chip chip-mod">Módulo opcional</span></div>
+      </div>
+    </div>
+
+    <div class="section-sep"></div>
+
+    <!-- ─── OPERAÇÃO ─── -->
+    <div class="section-label op">
+      <span class="section-icon">⚙️</span>
+      <span class="section-name" style="color:var(--op)">Operação</span>
+      <span class="section-desc">Membros, campanhas, comunicações e resgates</span>
+    </div>
+
+    <div class="col-pages">
+      <!-- Membros FastPRO -->
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Membros</span><span class="pg-route">/membros</span></div>
+        <span class="pg-desc">Lista, cadastro, segmentos, extrato — <strong>membro = arquiteto/vendedor</strong></span>
+        <div class="pg-subs">
+          <div class="sub"><span class="sub-name">Tier / Níveis</span><span class="sub-route">/membros/tier</span></div>
+          <div class="sub"><span class="sub-name">Segmentos</span><span class="sub-route">/membros/segmentos</span><span class="sub-chip chip-mod">Módulo</span></div>
+          <div class="sub"><span class="sub-name">Extrato de pontos</span><span class="sub-route">/membros/extrato</span></div>
+          <div class="sub"><span class="sub-name">Minha Conta</span><span class="sub-route">/minha-conta</span></div>
+        </div>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+
+      <!-- Afiliados — FastPRO only -->
+      <div class="pg" style="border-color:var(--fp); background:var(--fp-bg);">
+        <div class="pg-top"><span class="pg-name" style="color:var(--fp)">Afiliados</span><span class="pg-route">/afiliados</span></div>
+        <span class="pg-desc" style="color:#4C1D95;">Arquitetos e Vendedores — são os próprios membros do programa. Tabs separadas, código GAN, coordenador</span>
+        <div class="pg-chips"><span class="pg-chip chip-fp">FastPRO exclusivo</span></div>
+      </div>
+
+      <!-- Ajuste manual -->
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Ajuste manual</span><span class="pg-route">/membros/ajuste</span></div>
+        <span class="pg-desc">Crédito e débito de pontos com justificativa</span>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+
+      <!-- Campanhas -->
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Campanhas</span><span class="pg-route">/campanhas</span></div>
+        <span class="pg-desc">Ativas, Rascunhos, Arquivadas — criação com FormDrawer</span>
+        <div class="pg-subs">
+          <div class="sub"><span class="sub-name">Nova campanha</span><span class="sub-route">/campanhas/nova</span></div>
+          <div class="sub"><span class="sub-name">Detalhe</span><span class="sub-route">/campanhas/:id</span></div>
+        </div>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+
+      <!-- Indicações -->
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Indicações de Venda</span><span class="pg-route">/indicacoes</span></div>
+        <span class="pg-desc">Registro e acompanhamento de indicações dos afiliados</span>
+        <div class="pg-chips"><span class="pg-chip chip-mod">Módulo</span></div>
+      </div>
+
+      <!-- Comunicações -->
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Comunicações</span><span class="pg-route">/comunicacoes</span></div>
+        <span class="pg-desc">Eventos transacionais e histórico de disparos</span>
+        <div class="pg-subs">
+          <div class="sub"><span class="sub-name">Histórico</span><span class="sub-route">/comunicados</span></div>
+        </div>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+
+      <!-- Conteúdo editorial -->
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Conteúdo editorial</span><span class="pg-route">/conteudo</span></div>
+        <span class="pg-desc">Gestão de artigos do programa</span>
+        <div class="pg-chips"><span class="pg-chip chip-mod">Módulo</span></div>
+      </div>
+
+      <!-- Resgates FastPRO -->
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Resgates</span><span class="pg-route">/recompensas</span></div>
+        <span class="pg-desc">Fila de pedidos com aprovação e transições de status</span>
+        <div class="pg-subs">
+          <div class="sub"><span class="sub-name">Pedidos especificados</span><span class="sub-route">/pedidos</span><span class="sub-chip chip-fp">FastPRO</span></div>
+          <div class="sub"><span class="sub-name">Catálogo de resgate</span><span class="sub-route">/recompensas/catalogo</span></div>
+          <div class="sub"><span class="sub-name">Fluxo documental</span><span class="sub-route">/recompensas/documental</span><span class="sub-chip chip-fp">FastPRO</span></div>
+        </div>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+    </div>
+
+    <!-- OPERAÇÃO — White-label -->
+    <div class="col-pages">
+      <!-- Membros WL -->
+      <div class="pg" style="border-color:var(--wl); background:var(--wl-bg);">
+        <div class="pg-top"><span class="pg-name" style="color:var(--wl)">Membros</span><span class="pg-route">/membros</span></div>
+        <span class="pg-desc" style="color:#1E3A5F;">Lista, cadastro, segmentos, extrato — <strong>membro = qualquer cliente B2C</strong></span>
+        <div class="pg-subs">
+          <div class="sub"><span class="sub-name">Tier / Níveis</span><span class="sub-route">/membros/tier</span></div>
+          <div class="sub"><span class="sub-name">Segmentos</span><span class="sub-route">/membros/segmentos</span><span class="sub-chip chip-mod">Módulo</span></div>
+          <div class="sub"><span class="sub-name">Extrato de pontos</span><span class="sub-route">/membros/extrato</span></div>
+          <div class="sub"><span class="sub-name">Minha Conta</span><span class="sub-route">/minha-conta</span></div>
+        </div>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+
+      <!-- Afiliados — Absent -->
+      <div class="absent">
+        <span class="absent-icon">🚫</span>
+        <span>Afiliados não disponível — sem conceito de especificação técnica</span>
+      </div>
+
+      <!-- Ajuste manual -->
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Ajuste manual</span><span class="pg-route">/membros/ajuste</span></div>
+        <span class="pg-desc">Crédito e débito de pontos com justificativa</span>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+
+      <!-- Campanhas -->
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Campanhas</span><span class="pg-route">/campanhas</span></div>
+        <span class="pg-desc">Ativas, Rascunhos, Arquivadas — criação com FormDrawer</span>
+        <div class="pg-subs">
+          <div class="sub"><span class="sub-name">Nova campanha</span><span class="sub-route">/campanhas/nova</span></div>
+          <div class="sub"><span class="sub-name">Detalhe</span><span class="sub-route">/campanhas/:id</span></div>
+        </div>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+
+      <!-- Indicações -->
+      <div class="pg" style="opacity:.55;">
+        <div class="pg-top"><span class="pg-name">Indicações de Venda</span><span class="pg-route">/indicacoes</span></div>
+        <span class="pg-desc">Disponível como módulo opcional</span>
+        <div class="pg-chips"><span class="pg-chip chip-mod">Módulo opcional</span></div>
+      </div>
+
+      <!-- Comunicações -->
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Comunicações</span><span class="pg-route">/comunicacoes</span></div>
+        <span class="pg-desc">Eventos transacionais e histórico de disparos</span>
+        <div class="pg-subs">
+          <div class="sub"><span class="sub-name">Histórico</span><span class="sub-route">/comunicados</span></div>
+        </div>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+
+      <!-- Conteúdo editorial -->
+      <div class="pg" style="opacity:.55;">
+        <div class="pg-top"><span class="pg-name">Conteúdo editorial</span><span class="pg-route">/conteudo</span></div>
+        <span class="pg-desc">Disponível como módulo opcional</span>
+        <div class="pg-chips"><span class="pg-chip chip-mod">Módulo opcional</span></div>
+      </div>
+
+      <!-- Resgates WL -->
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Resgates</span><span class="pg-route">/recompensas</span></div>
+        <span class="pg-desc">Fila de pedidos com aprovação e transições de status</span>
+        <div class="pg-subs">
+          <div class="sub" style="opacity:.4;text-decoration:line-through;"><span class="sub-name">Pedidos especificados</span><span class="sub-route">/pedidos</span></div>
+          <div class="sub"><span class="sub-name">Catálogo de resgate</span><span class="sub-route">/recompensas/catalogo</span></div>
+          <div class="sub" style="opacity:.4;text-decoration:line-through;"><span class="sub-name">Fluxo documental</span><span class="sub-route">/recompensas/documental</span></div>
+        </div>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+    </div>
+
+    <div class="section-sep"></div>
+
+    <!-- ─── CONFIGURAÇÃO ─── -->
+    <div class="section-label config">
+      <span class="section-icon">🔧</span>
+      <span class="section-name" style="color:var(--config)">Configuração</span>
+      <span class="section-desc">Setup do programa, permissões, canais e integrações</span>
+    </div>
+
+    <!-- Config — FastPRO -->
+    <div class="col-pages">
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Usuários & Papéis</span><span class="pg-route">/usuarios</span></div>
+        <span class="pg-desc">RBAC, convites, matriz de permissões</span>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Tier / Níveis</span><span class="pg-route">/membros/tier</span></div>
+        <span class="pg-desc">Limiares e benefícios por nível</span>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Catálogo de Produtos</span><span class="pg-route">/catalogo</span></div>
+        <span class="pg-desc">Produtos incentivados, novo produto (manual + upload)</span>
+        <div class="pg-subs">
+          <div class="sub"><span class="sub-name">Grupos</span><span class="sub-route">/catalogo/grupos</span></div>
+          <div class="sub"><span class="sub-name">Atualização 3P</span><span class="sub-route">/catalogo/atualizacao</span><span class="sub-chip chip-mod">Módulo</span></div>
+          <div class="sub"><span class="sub-name">Detalhe do produto</span><span class="sub-route">/catalogo/:id</span></div>
+        </div>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Canais</span><span class="pg-route">/canais</span></div>
+        <span class="pg-desc">Origens de pedidos integradas</span>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Múltiplas moedas</span><span class="pg-route">/carteiras</span></div>
+        <span class="pg-desc">Carteiras e moedas do programa</span>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Webhooks / Eventos</span><span class="pg-route">/webhooks</span></div>
+        <span class="pg-desc">Integrações via webhook</span>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Theming</span></div>
+        <span class="pg-desc">Personalização visual</span>
+        <div class="pg-subs">
+          <div class="sub"><span class="sub-name">Homepage</span><span class="sub-route">/homepage</span></div>
+          <div class="sub"><span class="sub-name">Banners</span><span class="sub-route">/banners</span></div>
+          <div class="sub"><span class="sub-name">Login</span><span class="sub-route">/login-config</span></div>
+        </div>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Logs de auditoria</span><span class="pg-route">/logs</span></div>
+        <span class="pg-desc">Histórico de ações operacionais + Conformidade (regulamento, termos, política)</span>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+    </div>
+
+    <!-- Config — White-label (same, just without FastPRO items) -->
+    <div class="col-pages">
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Usuários & Papéis</span><span class="pg-route">/usuarios</span></div>
+        <span class="pg-desc">RBAC, convites, matriz de permissões</span>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Tier / Níveis</span><span class="pg-route">/membros/tier</span></div>
+        <span class="pg-desc">Limiares e benefícios por nível</span>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Catálogo de Produtos</span><span class="pg-route">/catalogo</span></div>
+        <span class="pg-desc">Produtos para resgate, novo produto (manual + upload)</span>
+        <div class="pg-subs">
+          <div class="sub"><span class="sub-name">Grupos</span><span class="sub-route">/catalogo/grupos</span></div>
+          <div class="sub" style="opacity:.45;text-decoration:line-through;"><span class="sub-name">Atualização 3P</span><span class="sub-route">/catalogo/atualizacao</span></div>
+          <div class="sub"><span class="sub-name">Detalhe do produto</span><span class="sub-route">/catalogo/:id</span></div>
+        </div>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Canais</span><span class="pg-route">/canais</span></div>
+        <span class="pg-desc">Origens de pedidos integradas</span>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Múltiplas moedas</span><span class="pg-route">/carteiras</span></div>
+        <span class="pg-desc">Carteiras e moedas do programa</span>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Webhooks / Eventos</span><span class="pg-route">/webhooks</span></div>
+        <span class="pg-desc">Integrações via webhook</span>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Theming</span></div>
+        <span class="pg-desc">Personalização visual</span>
+        <div class="pg-subs">
+          <div class="sub"><span class="sub-name">Homepage</span><span class="sub-route">/homepage</span></div>
+          <div class="sub"><span class="sub-name">Banners</span><span class="sub-route">/banners</span></div>
+          <div class="sub"><span class="sub-name">Login</span><span class="sub-route">/login-config</span></div>
+        </div>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+      <div class="pg">
+        <div class="pg-top"><span class="pg-name">Logs de auditoria</span><span class="pg-route">/logs</span></div>
+        <span class="pg-desc">Histórico de ações operacionais + Conformidade</span>
+        <div class="pg-chips"><span class="pg-chip chip-both">Ambos</span></div>
+      </div>
+    </div>
+
+  </div><!-- end .dual -->
+
+</div>
+</body>
+</html>

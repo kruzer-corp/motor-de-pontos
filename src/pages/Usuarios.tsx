@@ -160,6 +160,7 @@ export default function Usuarios() {
     <div className="space-y-6">
       <PageHeader
         title="Usuários & Papéis"
+        path={[{ label: "Configuração" }]}
         description="Gestão de acesso e permissões (IAM)."
         actions={
           <Button size="sm" onClick={openInvite}>

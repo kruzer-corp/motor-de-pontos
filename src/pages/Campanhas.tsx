@@ -54,7 +54,8 @@ export default function Campanhas() {
       prev.map((c) => (c.id === id ? { ...c, status: "Encerrada" as CampaignStatus } : c))
     );
 
-  const active = campaigns.filter((c) => c.status !== "Arquivada");
+  const active   = campaigns.filter((c) => c.status !== "Arquivada" && c.status !== "Rascunho");
+  const drafts   = campaigns.filter((c) => c.status === "Rascunho");
   const archived = campaigns.filter((c) => c.status === "Arquivada");
 
   return (
@@ -72,6 +73,9 @@ export default function Campanhas() {
       <Tabs defaultValue="ativas">
         <TabsList>
           <TabsTrigger value="ativas">Ativas / Pausadas ({active.length})</TabsTrigger>
+          <TabsTrigger value="rascunhos">
+            Rascunhos {drafts.length > 0 && <Badge variant="secondary" className="ml-1.5">{drafts.length}</Badge>}
+          </TabsTrigger>
           <TabsTrigger value="arquivadas">
             <Archive className="size-3.5 mr-1.5" />
             Arquivadas ({archived.length})
@@ -123,6 +127,47 @@ export default function Campanhas() {
                       </Button>
                       <Button asChild variant="outline" size="sm" className="h-7 text-xs">
                         <Link to={`/campanhas/${camp.id}`}>Ver detalhes</Link>
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ── Draft campaigns ── */}
+        <TabsContent value="rascunhos" className="mt-4">
+          {drafts.length === 0 ? (
+            <div className="rounded-xl border-2 border-dashed border-border py-14 text-center space-y-2">
+              <p className="text-sm font-medium">Nenhum rascunho salvo</p>
+              <p className="text-xs text-muted-foreground">
+                Ao salvar uma campanha como rascunho ela aparece aqui.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {drafts.map((camp) => (
+                <Card key={camp.id} className="overflow-hidden">
+                  <div className={`h-2 ${camp.color}`} />
+                  <CardHeader className="flex items-start justify-between gap-4">
+                    <div>
+                      <CardTitle>{camp.title}</CardTitle>
+                      <p className="text-sm text-muted-foreground">{camp.description}</p>
+                    </div>
+                    <Badge className={STATUS_COLOR[camp.status]}>{camp.status}</Badge>
+                  </CardHeader>
+                  <div className="flex items-center justify-between border-t border-border px-6 py-3 gap-2">
+                    <div className="text-xs text-muted-foreground font-mono">{camp.id}</div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline" size="sm" className="text-xs h-7"
+                        onClick={() => setCampaigns((prev) => prev.map((c) => c.id === camp.id ? { ...c, status: "Ativa" as CampaignStatus } : c))}
+                      >
+                        Publicar
+                      </Button>
+                      <Button asChild variant="outline" size="sm" className="h-7 text-xs">
+                        <Link to={`/campanhas/${camp.id}`}>Continuar editando</Link>
                       </Button>
                     </div>
                   </div>

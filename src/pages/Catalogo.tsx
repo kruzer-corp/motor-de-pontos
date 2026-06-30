@@ -1,9 +1,16 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Card, Input, Badge, Button } from "@kruzer/ds";
-import { Package, ChevronDown, ChevronRight, Search } from "lucide-react";
+import {
+  Badge, Button, Card, ConfirmDialog, DropdownMenu, DropdownMenuContent,
+  DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+  FileUploadInput, FormDrawer, Input, Label,
+  NumberInput, Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Switch, Tabs, TabsContent, TabsList, TabsTrigger, toast,
+  type UploadedFile,
+} from "@kruzer/ds";
+import { Archive, FileUp, MoreHorizontal, Package, ChevronDown, ChevronRight, Plus, Search } from "lucide-react";
 
-type Product = { id: string; name: string; points: number; stock: number; active: boolean };
+type Product = { id: string; name: string; points: number; stock: number; active: boolean; archived?: boolean };
 
 const CATALOG: Record<string, Product[]> = {
   "Eletrônicos": [
@@ -23,10 +30,60 @@ const CATALOG: Record<string, Product[]> = {
 };
 
 export default function Catalogo() {
-  const [query, setQuery] = useState("");
+  const [catalog, setCatalog] = useState(CATALOG);
+  const [query,   setQuery]   = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>(
     Object.fromEntries(Object.keys(CATALOG).map((k) => [k, true]))
   );
+
+  // Novo produto
+  const [open,       setOpen]       = useState(false);
+  const [saving,     setSaving]     = useState(false);
+  const [newName,    setNewName]    = useState("");
+  const [newGroup,   setNewGroup]   = useState("");
+  const [newPoints,  setNewPoints]  = useState<number | null>(null);
+  const [newStock,   setNewStock]   = useState<number | null>(null);
+  const [newActive,  setNewActive]  = useState(true);
+  const [uploadMode,       setUploadMode]       = useState<"manual" | "arquivo">("manual");
+  const [files,            setFiles]            = useState<UploadedFile[]>([]);
+  const [archiveTarget,    setArchiveTarget]    = useState<Product | null>(null);
+
+  function resetForm() {
+    setNewName(""); setNewGroup(""); setNewPoints(null); setNewStock(null);
+    setNewActive(true); setUploadMode("manual"); setFiles([]);
+  }
+
+  function archiveProduct(product: Product) {
+    setCatalog((prev) => {
+      const updated: typeof prev = {};
+      for (const [g, prods] of Object.entries(prev)) {
+        updated[g] = prods.map((p) => p.id === product.id ? { ...p, archived: true } : p);
+      }
+      return updated;
+    });
+    setArchiveTarget(null);
+    toast.success(`${product.name} arquivado`);
+  }
+
+  async function handleSave() {
+    const isManualValid = uploadMode === "manual" && !!newName && !!newGroup && !!newPoints;
+    const isFileValid   = uploadMode === "arquivo" && files.length > 0;
+    if (!isManualValid && !isFileValid) return;
+    setSaving(true);
+    await new Promise((r) => setTimeout(r, 600));
+    if (uploadMode === "manual") {
+      const allIds = Object.values(catalog).flat().map((p) => parseInt(p.id.replace("P", "")));
+      const nextId = `P${String(Math.max(0, ...allIds) + 1).padStart(3, "0")}`;
+      const product: Product = { id: nextId, name: newName, points: newPoints!, stock: newStock ?? 0, active: newActive };
+      setCatalog((prev) => ({ ...prev, [newGroup]: [...(prev[newGroup] ?? []), product] }));
+      toast.success(`${newName} adicionado ao catálogo`);
+    } else {
+      toast.success(`${files[0].name} importado — produtos serão processados em breve`);
+    }
+    setOpen(false);
+    resetForm();
+    setSaving(false);
+  }
 
   const toggle = (group: string) =>
     setExpanded((prev) => ({ ...prev, [group]: !prev[group] }));
@@ -51,15 +108,18 @@ export default function Catalogo() {
               onChange={(e) => setQuery(e.target.value)}
             />
           </div>
-          <Button size="sm">+ Novo produto</Button>
+          <Button size="sm" onClick={() => setOpen(true)}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            Novo produto
+          </Button>
           <Button variant="outline" size="sm" asChild>
             <Link to="/catalogo/grupos">Grupos</Link>
           </Button>
         </div>
       </div>
 
-      {Object.entries(CATALOG).map(([group, products]) => {
-        const visible = products.filter((p) => matchesQuery(p.name));
+      {Object.entries(catalog).map(([group, products]) => {
+        const visible = products.filter((p) => !p.archived && matchesQuery(p.name));
         if (visible.length === 0) return null;
         const isOpen = expanded[group] ?? true;
 
@@ -117,9 +177,26 @@ export default function Catalogo() {
                           </span>
                         </td>
                         <td className="px-6 py-3 text-right">
-                          <Button asChild variant="outline" size="sm">
-                            <Link to={`/catalogo/${product.id}`}>Detalhes</Link>
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" aria-label="Ações do produto">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem asChild>
+                                <Link to={`/catalogo/${product.id}`}>Detalhes</Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-muted-foreground"
+                                onSelect={() => setArchiveTarget(product)}
+                              >
+                                <Archive className="mr-2 h-4 w-4" />
+                                Arquivar produto
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </td>
                       </tr>
                     ))}
@@ -130,6 +207,97 @@ export default function Catalogo() {
           </Card>
         );
       })}
+
+      <ConfirmDialog
+        open={!!archiveTarget}
+        onOpenChange={(o) => { if (!o) setArchiveTarget(null); }}
+        title={`Arquivar "${archiveTarget?.name}"?`}
+        description="O produto será removido do catálogo de resgate e não ficará mais disponível para os membros. Você poderá reativá-lo a qualquer momento."
+        confirmLabel="Arquivar"
+        variant="destructive"
+        onConfirm={() => archiveTarget && archiveProduct(archiveTarget)}
+      />
+
+      <FormDrawer
+        open={open}
+        onOpenChange={(o) => { setOpen(o); if (!o) resetForm(); }}
+        title="Novo produto"
+        description="Adicione um produto ao catálogo de resgate."
+        onSave={handleSave}
+        saving={saving}
+        saveLabel={uploadMode === "arquivo" ? "Importar arquivo" : "Adicionar produto"}
+        saveDisabled={
+          uploadMode === "manual"
+            ? !newName || !newGroup || !newPoints
+            : files.length === 0
+        }
+      >
+        <div className="space-y-4">
+          <Tabs value={uploadMode} onValueChange={(v) => setUploadMode(v as "manual" | "arquivo")}>
+            <TabsList className="w-full">
+              <TabsTrigger value="manual" className="flex-1">Preenchimento manual</TabsTrigger>
+              <TabsTrigger value="arquivo" className="flex-1">
+                <FileUp className="mr-1.5 h-3.5 w-3.5" />
+                Importar arquivo
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Manual */}
+            <TabsContent value="manual" className="mt-4 space-y-4">
+              <div className="space-y-1.5">
+                <Label>Nome do produto <span className="text-destructive">*</span></Label>
+                <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder='Ex: Smart TV 50"' />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Categoria <span className="text-destructive">*</span></Label>
+                <Select value={newGroup} onValueChange={setNewGroup}>
+                  <SelectTrigger><SelectValue placeholder="Selecione uma categoria" /></SelectTrigger>
+                  <SelectContent>
+                    {Object.keys(catalog).map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Pontos necessários <span className="text-destructive">*</span></Label>
+                  <NumberInput value={newPoints} onChange={setNewPoints} min={1} placeholder="Ex: 10000" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Estoque inicial</Label>
+                  <NumberInput value={newStock} onChange={setNewStock} min={0} placeholder="Ex: 50" />
+                </div>
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                <div>
+                  <div className="text-sm font-medium">Produto ativo</div>
+                  <div className="text-xs text-muted-foreground">Disponível para resgate imediato</div>
+                </div>
+                <Switch checked={newActive} onCheckedChange={setNewActive} size="sm" />
+              </div>
+            </TabsContent>
+
+            {/* Importar arquivo */}
+            <TabsContent value="arquivo" className="mt-4 space-y-4">
+              <FileUploadInput
+                value={files}
+                onChange={setFiles}
+                maxFiles={1}
+                accept=".csv,.xlsx,.xls"
+                maxSizeMB={10}
+              />
+              <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-1.5">
+                <p className="text-xs font-medium text-muted-foreground">Formato esperado</p>
+                <p className="text-xs text-muted-foreground">
+                  CSV ou Excel com colunas: <span className="font-mono">nome, categoria, pontos, estoque, ativo</span>
+                </p>
+                <a href="#" className="text-xs text-primary underline-offset-2 hover:underline" onClick={(e) => e.preventDefault()}>
+                  Baixar planilha modelo
+                </a>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </FormDrawer>
     </div>
   );
 }

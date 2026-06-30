@@ -5,6 +5,7 @@ import {
   AvatarFallback,
   Button,
   EmptyState,
+  InfoNotice,
   PageHeader,
   Pill,
   SearchInput,
@@ -115,14 +116,19 @@ export default function MembrosV2() {
     <div className="space-y-6">
       <PageHeader
         title="Membros"
-        description={`${MEMBERS.length} membros cadastrados`}
+        path={[{ label: "Operação" }]}
+        description={`${MEMBERS.length} membros registrados no programa`}
         actions={
           <Button>
             <UserPlus className="mr-2 h-4 w-4" />
-            Convidar membro
+            Registrar membro
           </Button>
         }
       />
+
+      <InfoNotice variant="info" title="Visão administrativa">
+        Membros não acessam esta interface. Eles participam do programa pelo canal próprio (loja, app ou dispositivo). Aqui você consulta e gerencia os registros e transações deles.
+      </InfoNotice>
 
       <div className="rounded-lg border border-border bg-card overflow-hidden">
         {/* toolbar flat */}

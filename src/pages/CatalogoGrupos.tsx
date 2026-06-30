@@ -26,6 +26,7 @@ export default function CatalogoGrupos() {
     <div className="space-y-6">
       <PageHeader
         title="Grupos de Produtos"
+        path={[{ label: "Configuração" }, { label: "Catálogo", to: "/catalogo" }]}
         description={`${groups.length} grupos cadastrados`}
         actions={
           <div className="flex items-center gap-2">

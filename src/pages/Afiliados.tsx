@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Avatar, AvatarFallback, Badge, Button, CopyButton,
-  FormDrawer, PageHeader, Pill, SearchInput,
+  FormDrawer, InfoNotice, PageHeader, Pill, SearchInput,
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
   Input, Label,
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -187,8 +187,13 @@ export default function Afiliados() {
     <div className="space-y-6">
       <PageHeader
         title="Afiliados"
-        description="Arquitetos e vendedores que participam do programa FastShop PRO."
+        path={[{ label: "Operação" }, { label: "Membros", to: "/membros" }]}
+        description="Consulta e gestão dos arquitetos e vendedores cadastrados no programa."
       />
+
+      <InfoNotice variant="info" title="Visão administrativa">
+        Arquitetos e vendedores não acessam esta interface. Eles participam do programa pelo canal próprio (loja, app ou dispositivo). Aqui você consulta e gerencia o cadastro e as transações deles.
+      </InfoNotice>
 
       {/* Edit panel */}
       {editing && (
@@ -270,8 +275,8 @@ export default function Afiliados() {
         onOpenChange={(o) => { setNewOpen(o); if (!o) resetNew(); }}
         title={`Novo ${TYPE_LABEL[newType].toLowerCase()}`}
         description={newType === "arquiteto"
-          ? "Arquitetos especificam produtos e acumulam pontos por indicação técnica."
-          : "Vendedores indicam clientes e acumulam pontos por conversão de venda."}
+          ? "Registre um arquiteto no programa. As especificações e pontuações dele serão rastreadas automaticamente pelo canal."
+          : "Registre um vendedor no programa. As indicações e conversões dele serão rastreadas automaticamente pelo canal."}
         onSave={handleNewAffiliate}
         saving={newSaving}
         saveLabel={`Cadastrar ${TYPE_LABEL[newType].toLowerCase()}`}

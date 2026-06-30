@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { UserPlus, Users } from "lucide-react";
 import {
   Avatar, AvatarFallback, Button, EmptyState,
-  FormDrawer, Input, Label, PageHeader, Pill,
+  FormDrawer, InfoNotice, Input, Label, PageHeader, Pill,
   SearchInput, Select, SelectContent, SelectItem,
   SelectTrigger, SelectValue,
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table, TableBody, TableHead, TableHeader, TableRow,
   toast,
 } from "@kruzer/ds";
 
@@ -13,15 +14,15 @@ type Tier    = "Diamante" | "Ouro" | "Prata" | "Bronze";
 type Segment = "Premium" | "Frete Grátis" | "Fidelidade" | "Básico";
 
 type Member = {
-  name: string; initials: string; balance: number;
+  id: string; name: string; initials: string; balance: number;
   tier: Tier; segment: Segment; joined: string;
 };
 
 const INITIAL_MEMBERS: Member[] = [
-  { name: "Aline P.",   initials: "AP", balance: 5200, tier: "Diamante", segment: "Premium",      joined: "12/04/2025" },
-  { name: "Bruno C.",   initials: "BC", balance: 3200, tier: "Ouro",     segment: "Frete Grátis", joined: "22/01/2025" },
-  { name: "Cecília M.", initials: "CM", balance: 1800, tier: "Prata",    segment: "Fidelidade",   joined: "03/08/2024" },
-  { name: "Danilo R.",  initials: "DR", balance:  760, tier: "Bronze",   segment: "Básico",       joined: "17/03/2025" },
+  { id: "1", name: "Aline P.",   initials: "AP", balance: 5200, tier: "Diamante", segment: "Premium",      joined: "12/04/2025" },
+  { id: "2", name: "Bruno C.",   initials: "BC", balance: 3200, tier: "Ouro",     segment: "Frete Grátis", joined: "22/01/2025" },
+  { id: "3", name: "Cecília M.", initials: "CM", balance: 1800, tier: "Prata",    segment: "Fidelidade",   joined: "03/08/2024" },
+  { id: "4", name: "Danilo R.",  initials: "DR", balance:  760, tier: "Bronze",   segment: "Básico",       joined: "17/03/2025" },
 ];
 
 const TIER_PILL: Record<Tier, "primary" | "warning" | "secondary" | "muted"> = {
@@ -32,6 +33,7 @@ const TIERS:    Tier[]    = ["Diamante", "Ouro", "Prata", "Bronze"];
 const SEGMENTS: Segment[] = ["Premium", "Frete Grátis", "Fidelidade", "Básico"];
 
 export default function Membros() {
+  const navigate = useNavigate();
   const [members, setMembers] = useState<Member[]>(INITIAL_MEMBERS);
   const [search, setSearch]   = useState("");
 
@@ -69,6 +71,7 @@ export default function Membros() {
     setMembers((prev) => [
       ...prev,
       {
+        id: String(prev.length + 1),
         name,
         initials,
         balance: 0,
@@ -88,14 +91,19 @@ export default function Membros() {
     <div className="space-y-6">
       <PageHeader
         title="Membros"
-        description={`${members.length} membros cadastrados`}
+        path={[{ label: "Operação" }]}
+        description={`${members.length} membros registrados no programa`}
         actions={
           <Button size="sm" onClick={() => setOpen(true)}>
             <UserPlus className="mr-2 h-4 w-4" />
-            Novo membro
+            Registrar membro
           </Button>
         }
       />
+
+      <InfoNotice variant="info" title="Visão administrativa">
+        Membros não acessam esta interface. Eles participam do programa pelo canal próprio (loja, app ou dispositivo). Aqui você consulta e gerencia os registros e transações deles.
+      </InfoNotice>
 
       <div className="rounded-lg border border-border bg-card overflow-hidden">
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
@@ -133,8 +141,12 @@ export default function Membros() {
             </TableHeader>
             <TableBody>
               {filtered.map((member) => (
-                <TableRow key={member.name} className="[&>td]:py-3.5">
-                  <TableCell>
+                <tr
+                  key={member.name}
+                  className="border-b border-border cursor-pointer hover:bg-muted/40 transition-colors"
+                  onClick={() => navigate(`/membros/${member.id}`)}
+                >
+                  <td className="px-4 py-3.5">
                     <div className="flex items-center gap-3">
                       <Avatar className="h-8 w-8 shrink-0">
                         <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
@@ -143,18 +155,18 @@ export default function Membros() {
                       </Avatar>
                       <span className="font-medium text-sm">{member.name}</span>
                     </div>
-                  </TableCell>
-                  <TableCell className="tabular-nums font-medium text-sm">
+                  </td>
+                  <td className="px-4 py-3.5 tabular-nums font-medium text-sm">
                     {member.balance.toLocaleString("pt-BR")} pts
-                  </TableCell>
-                  <TableCell>
+                  </td>
+                  <td className="px-4 py-3.5">
                     <Pill color={TIER_PILL[member.tier]} variant="soft" size="sm">
                       {member.tier}
                     </Pill>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">{member.segment}</TableCell>
-                  <TableCell className="text-muted-foreground tabular-nums text-sm">{member.joined}</TableCell>
-                </TableRow>
+                  </td>
+                  <td className="px-4 py-3.5 text-muted-foreground text-sm">{member.segment}</td>
+                  <td className="px-4 py-3.5 text-muted-foreground tabular-nums text-sm">{member.joined}</td>
+                </tr>
               ))}
             </TableBody>
           </Table>
@@ -165,8 +177,8 @@ export default function Membros() {
       <FormDrawer
         open={open}
         onOpenChange={(o) => { setOpen(o); if (!o) resetForm(); }}
-        title="Novo membro"
-        description="Cadastre um novo participante no programa de fidelidade."
+        title="Registrar membro"
+        description="Registre um participante no programa. As transações dele serão rastreadas automaticamente pelo canal."
         onSave={handleSave}
         saving={saving}
         saveLabel="Cadastrar membro"

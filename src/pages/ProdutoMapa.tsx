@@ -50,10 +50,8 @@ const SECTIONS: Section[] = [
     features: [
       { label: "Ranking (gamificação)", route: "/ranking" },
       { label: "Segmentação de membros", route: "/membros/segmentos" },
-      { label: "Afiliados (base)", route: "/afiliados", note: "GAN + coordenador são campos custom dentro" },
       { label: "Conteúdo editorial", route: "/conteudo" },
       { label: "Atualização de catálogo 3P", route: "/catalogo/atualizacao" },
-      { label: "Indicações de venda", route: "/indicacoes" },
     ],
   },
   {
@@ -70,11 +68,6 @@ const SECTIONS: Section[] = [
         label: "Informes de Rendimento (tab Minha Conta)",
         route: "/minha-conta",
         note: "Declaração IR pessoa física BR.",
-      },
-      {
-        label: "Campos GAN + Coordenador",
-        route: "/afiliados",
-        note: "Atributos internos Fast PRO. No produto: campos custom configuráveis pelo tenant.",
       },
       {
         label: "Homepage gerenciável",
@@ -194,9 +187,6 @@ export default function ProdutoMapa() {
           O que precisa acontecer antes do próximo cliente
         </div>
         <ol className="space-y-2 text-sm text-amber-800 list-decimal list-inside">
-          <li>
-            <strong>GAN + coordenador</strong> → transformar em campos custom configuráveis por tenant no módulo de afiliados
-          </li>
           <li>
             <strong>Fluxo documental + Informes de Rendimento</strong> → isolar como módulo <code className="bg-amber-100 px-1 rounded text-xs">fiscal-br</code>, desabilitado fora do Brasil
           </li>
