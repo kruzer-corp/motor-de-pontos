@@ -5,13 +5,13 @@ import { LogIn, ExternalLink, Eye, CheckCheck } from "lucide-react";
 export default function LoginConfig() {
   const [saved, setSaved] = useState(false);
   const [form, setForm] = useState({
-    institutionalLabel: "Conheça a FAST PRO",
+    institutionalLabel: "Conheça a Programa de Fidelidade",
     institutionalUrl: "https://www.fastpro.com.br",
     supportLabel: "Central de ajuda",
     supportUrl: "https://www.fastpro.com.br/ajuda",
     showInstitutional: true,
     showSupport: true,
-    loginTitle: "Acesse o FAST PRO",
+    loginTitle: "Acesse o Programa de Fidelidade",
     loginSubtitle: "Programa de pontos para parceiros e colaboradores.",
     allowSSOGoogle: true,
     allowSSOMS: false,

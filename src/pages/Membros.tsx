@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { UserPlus, Users } from "lucide-react";
+import { UserPlus, Users, X, SlidersHorizontal } from "lucide-react";
 import {
   Avatar, AvatarFallback, Button, EmptyState,
   FormDrawer, InfoNotice, Input, Label, PageHeader, Pill,
@@ -10,19 +10,43 @@ import {
   toast,
 } from "@kruzer/ds";
 
+// ── Membros ───────────────────────────────────────────────────────────────────
+
 type Tier    = "Diamante" | "Ouro" | "Prata" | "Bronze";
 type Segment = "Premium" | "Frete Grátis" | "Fidelidade" | "Básico";
 
+type SaldoCampanha = {
+  campanhaId: string;
+  campanhaNome: string;
+  moeda: string;
+  abrev: string;
+  valor: number;
+};
+
 type Member = {
-  id: string; name: string; initials: string; balance: number;
+  id: string; name: string; initials: string;
+  saldos: SaldoCampanha[];
   tier: Tier; segment: Segment; joined: string;
 };
 
 const INITIAL_MEMBERS: Member[] = [
-  { id: "1", name: "Aline P.",   initials: "AP", balance: 5200, tier: "Diamante", segment: "Premium",      joined: "12/04/2025" },
-  { id: "2", name: "Bruno C.",   initials: "BC", balance: 3200, tier: "Ouro",     segment: "Frete Grátis", joined: "22/01/2025" },
-  { id: "3", name: "Cecília M.", initials: "CM", balance: 1800, tier: "Prata",    segment: "Fidelidade",   joined: "03/08/2024" },
-  { id: "4", name: "Danilo R.",  initials: "DR", balance:  760, tier: "Bronze",   segment: "Básico",       joined: "17/03/2025" },
+  { id: "1", name: "Aline P.",   initials: "AP", tier: "Diamante", segment: "Premium",      joined: "12/04/2025",
+    saldos: [
+      { campanhaId: "BF2026",       campanhaNome: "Black Friday 2026", moeda: "Pontos",   abrev: "pts", valor: 5200 },
+      { campanhaId: "CAMP-2025-06", campanhaNome: "Campanha Junho",    moeda: "Cashback", abrev: "R$",  valor: 320  },
+    ]},
+  { id: "2", name: "Bruno C.",   initials: "BC", tier: "Ouro",     segment: "Frete Grátis", joined: "22/01/2025",
+    saldos: [
+      { campanhaId: "CAMP-2025-04", campanhaNome: "Campanha Abril",    moeda: "Pontos",   abrev: "pts", valor: 3200 },
+    ]},
+  { id: "3", name: "Cecília M.", initials: "CM", tier: "Prata",    segment: "Fidelidade",   joined: "03/08/2024",
+    saldos: [
+      { campanhaId: "CAMP-2025-05", campanhaNome: "Campanha Maio",     moeda: "Milhas",   abrev: "mi",  valor: 1800 },
+    ]},
+  { id: "4", name: "Danilo R.",  initials: "DR", tier: "Bronze",   segment: "Básico",       joined: "17/03/2025",
+    saldos: [
+      { campanhaId: "CAMP-2025-05", campanhaNome: "Campanha Maio",     moeda: "Pontos",   abrev: "pts", valor: 760  },
+    ]},
 ];
 
 const TIER_PILL: Record<Tier, "primary" | "warning" | "secondary" | "muted"> = {
@@ -34,18 +58,22 @@ const SEGMENTS: Segment[] = ["Premium", "Frete Grátis", "Fidelidade", "Básico"
 
 export default function Membros() {
   const navigate = useNavigate();
+
+  // ── Lista state ───────────────────────────────────────────────────────────
   const [members, setMembers] = useState<Member[]>(INITIAL_MEMBERS);
   const [search, setSearch]   = useState("");
 
   // Drawer state
-  const [open,    setOpen]    = useState(false);
-  const [saving,  setSaving]  = useState(false);
-  const [name,    setName]    = useState("");
-  const [email,   setEmail]   = useState("");
-  const [cpf,     setCpf]     = useState("");
-  const [phone,   setPhone]   = useState("");
-  const [tier,    setTier]    = useState<Tier | "">("");
-  const [segment, setSegment] = useState<Segment | "">("");
+  const [open,       setOpen]       = useState(false);
+  const [saving,     setSaving]     = useState(false);
+  const [tipoPessoa, setTipoPessoa] = useState<"PF" | "PJ">("PF");
+  const [name,       setName]       = useState("");
+  const [razaoSocial,setRazaoSocial]= useState("");
+  const [email,      setEmail]      = useState("");
+  const [documento,  setDocumento]  = useState("");
+  const [phone,      setPhone]      = useState("");
+  const [tier,       setTier]       = useState<Tier | "">("");
+  const [segment,    setSegment]    = useState<Segment | "">();
 
   const filtered = useMemo(
     () => members.filter((m) =>
@@ -55,9 +83,46 @@ export default function Membros() {
     [members, search]
   );
 
+  // ── Ajuste de saldo ───────────────────────────────────────────────────────
+  const [ajusteOpen,      setAjusteOpen]      = useState(false);
+  const [ajusteMembro,    setAjusteMembro]    = useState<Member | null>(null);
+  const [ajusteCampanha,  setAjusteCampanha]  = useState<SaldoCampanha | null>(null);
+  const [ajusteTipo,      setAjusteTipo]      = useState<"credito" | "debito">("credito");
+  const [ajusteValor,     setAjusteValor]     = useState("");
+  const [ajusteMotivo,    setAjusteMotivo]    = useState("");
+  const [ajusteSaving,    setAjusteSaving]    = useState(false);
+
+  function abrirAjuste(m: Member) {
+    setAjusteMembro(m);
+    setAjusteCampanha(m.saldos[0] ?? null);
+    setAjusteTipo("credito"); setAjusteValor(""); setAjusteMotivo("");
+    setAjusteOpen(true);
+  }
+
+  async function handleAjuste() {
+    if (!ajusteMembro || !ajusteCampanha || !ajusteValor || !ajusteMotivo) return;
+    setAjusteSaving(true);
+    await new Promise(r => setTimeout(r, 400));
+    const delta = ajusteTipo === "credito" ? Number(ajusteValor) : -Number(ajusteValor);
+    setMembers(prev => prev.map(m => {
+      if (m.id !== ajusteMembro.id) return m;
+      return {
+        ...m,
+        saldos: m.saldos.map(s =>
+          s.campanhaId === ajusteCampanha.campanhaId
+            ? { ...s, valor: Math.max(0, s.valor + delta) }
+            : s
+        ),
+      };
+    }));
+    toast.success(`${ajusteMembro.name} · ${ajusteCampanha.campanhaNome}: ${ajusteTipo === "credito" ? "+" : "−"}${Number(ajusteValor).toLocaleString("pt-BR")} ${ajusteCampanha.abrev}`);
+    setAjusteOpen(false);
+    setAjusteSaving(false);
+  }
+
   function resetForm() {
-    setName(""); setEmail(""); setCpf(""); setPhone("");
-    setTier(""); setSegment("");
+    setTipoPessoa("PF"); setName(""); setRazaoSocial(""); setEmail("");
+    setDocumento(""); setPhone(""); setTier(""); setSegment("");
   }
 
   async function handleSave() {
@@ -74,7 +139,7 @@ export default function Membros() {
         id: String(prev.length + 1),
         name,
         initials,
-        balance: 0,
+        saldos: [],
         tier: (tier || "Bronze") as Tier,
         segment: (segment || "Básico") as Segment,
         joined: today,
@@ -90,7 +155,7 @@ export default function Membros() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Membros"
+        title="Saldo dos membros"
         path={[{ label: "Operação" }]}
         description={`${members.length} membros registrados no programa`}
         actions={
@@ -101,6 +166,7 @@ export default function Membros() {
         }
       />
 
+      <>
       <InfoNotice variant="info" title="Visão administrativa">
         Membros não acessam esta interface. Eles participam do programa pelo canal próprio (loja, app ou dispositivo). Aqui você consulta e gerencia os registros e transações deles.
       </InfoNotice>
@@ -137,27 +203,41 @@ export default function Membros() {
                 <TableHead>Tier</TableHead>
                 <TableHead>Segmento</TableHead>
                 <TableHead>Entrou em</TableHead>
+                <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map((member) => (
-                <tr
-                  key={member.name}
-                  className="border-b border-border cursor-pointer hover:bg-muted/40 transition-colors"
-                  onClick={() => navigate(`/membros/${member.id}`)}
-                >
+                <tr key={member.name} className="border-b border-border hover:bg-muted/40 transition-colors">
                   <td className="px-4 py-3.5">
-                    <div className="flex items-center gap-3">
+                    <button
+                      className="flex items-center gap-3 hover:underline text-left"
+                      onClick={() => navigate(`/membros/${member.id}`)}
+                    >
                       <Avatar className="h-8 w-8 shrink-0">
                         <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
                           {member.initials}
                         </AvatarFallback>
                       </Avatar>
                       <span className="font-medium text-sm">{member.name}</span>
-                    </div>
+                    </button>
                   </td>
-                  <td className="px-4 py-3.5 tabular-nums font-medium text-sm">
-                    {member.balance.toLocaleString("pt-BR")} pts
+                  <td className="px-4 py-3.5">
+                    {member.saldos.length === 0 ? (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    ) : (
+                      <div className="flex flex-col gap-0.5">
+                        {member.saldos.map(s => (
+                          <div key={s.campanhaId} className="flex items-center gap-1.5">
+                            <span className="tabular-nums text-sm font-semibold">
+                              {s.valor.toLocaleString("pt-BR")}
+                            </span>
+                            <span className="text-xs text-muted-foreground">{s.abrev}</span>
+                            <span className="text-[10px] text-muted-foreground font-mono bg-muted rounded px-1">{s.campanhaId}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3.5">
                     <Pill color={TIER_PILL[member.tier]} variant="soft" size="sm">
@@ -166,12 +246,154 @@ export default function Membros() {
                   </td>
                   <td className="px-4 py-3.5 text-muted-foreground text-sm">{member.segment}</td>
                   <td className="px-4 py-3.5 text-muted-foreground tabular-nums text-sm">{member.joined}</td>
+                  <td className="px-4 py-3.5">
+                    <button
+                      onClick={() => abrirAjuste(member)}
+                      className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors whitespace-nowrap"
+                    >
+                      <SlidersHorizontal className="h-3 w-3" />
+                      Ajustar saldo
+                    </button>
+                  </td>
                 </tr>
               ))}
             </TableBody>
           </Table>
         )}
       </div>
+
+      {/* Modal — Ajuste de saldo */}
+      {ajusteOpen && ajusteMembro && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          onClick={() => setAjusteOpen(false)}>
+          <div className="bg-background rounded-xl shadow-2xl w-full max-w-md p-6 space-y-5"
+            onClick={e => e.stopPropagation()}>
+
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">Ajuste manual de saldo</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">O ajuste será registrado no extrato do membro.</p>
+              </div>
+              <button onClick={() => setAjusteOpen(false)} className="text-muted-foreground hover:text-foreground mt-0.5">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Membro */}
+            <div className="flex items-center gap-3 rounded-lg bg-muted/40 px-4 py-3">
+              <Avatar className="h-9 w-9 shrink-0">
+                <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                  {ajusteMembro.initials}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <p className="text-sm font-semibold">{ajusteMembro.name}</p>
+                <p className="text-xs text-muted-foreground">{ajusteMembro.tier} · {ajusteMembro.segment}</p>
+              </div>
+            </div>
+
+            {/* Campanha / Moeda */}
+            <div className="space-y-1.5">
+              <Label>Campanha e moeda <span className="text-destructive">*</span></Label>
+              {ajusteMembro.saldos.length === 0 ? (
+                <p className="text-xs text-muted-foreground rounded-lg border border-border px-3 py-2">
+                  Este membro não está vinculado a nenhuma campanha ativa.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {ajusteMembro.saldos.map(s => (
+                    <label key={s.campanhaId}
+                      className={`flex items-center justify-between gap-3 rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
+                        ajusteCampanha?.campanhaId === s.campanhaId
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/40"
+                      }`}>
+                      <div className="flex items-center gap-2">
+                        <input type="radio" name="ajusteCampanha" checked={ajusteCampanha?.campanhaId === s.campanhaId}
+                          onChange={() => setAjusteCampanha(s)} className="accent-primary" />
+                        <div>
+                          <p className="text-sm font-medium">{s.campanhaNome}</p>
+                          <p className="text-xs text-muted-foreground font-mono">{s.campanhaId} · moeda: {s.moeda}</p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-xs text-muted-foreground">Saldo atual</p>
+                        <p className="text-sm font-semibold tabular-nums">{s.valor.toLocaleString("pt-BR")} <span className="text-muted-foreground text-xs">{s.abrev}</span></p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Tipo */}
+            <div className="space-y-1.5">
+              <Label>Tipo de ajuste</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  ["credito", `Crédito (+${ajusteCampanha?.abrev ?? ""})`, "border-emerald-300 bg-emerald-50 text-emerald-700"],
+                  ["debito",  `Débito (−${ajusteCampanha?.abrev ?? ""})`,  "border-rose-300 bg-rose-50 text-rose-700"],
+                ] as const).map(([v, label, activeClass]) => (
+                  <label key={v} className={`flex items-center gap-2 rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
+                    ajusteTipo === v ? activeClass : "border-border text-muted-foreground hover:border-primary/40"
+                  }`}>
+                    <input type="radio" name="ajusteTipo" value={v} checked={ajusteTipo === v}
+                      onChange={() => setAjusteTipo(v)} className="sr-only" />
+                    <span className="text-sm font-semibold">{label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Valor */}
+            <div className="space-y-1.5">
+              <Label>Valor {ajusteCampanha ? `(${ajusteCampanha.abrev})` : ""} <span className="text-destructive">*</span></Label>
+              <Input
+                type="number" min={1}
+                value={ajusteValor}
+                onChange={e => setAjusteValor(e.target.value)}
+                placeholder="Ex: 500"
+                disabled={!ajusteCampanha}
+              />
+              {ajusteValor && ajusteCampanha && (
+                <p className="text-xs text-muted-foreground">
+                  Novo saldo: <strong className="text-foreground tabular-nums">
+                    {Math.max(0, ajusteCampanha.valor + (ajusteTipo === "credito" ? Number(ajusteValor) : -Number(ajusteValor))).toLocaleString("pt-BR")} {ajusteCampanha.abrev}
+                  </strong>
+                </p>
+              )}
+            </div>
+
+            {/* Motivo */}
+            <div className="space-y-1.5">
+              <Label>Motivo <span className="text-destructive">*</span></Label>
+              <textarea
+                value={ajusteMotivo}
+                onChange={e => setAjusteMotivo(e.target.value)}
+                placeholder="Descreva o motivo do ajuste. Ex: Correção de saldo não creditado na campanha de junho."
+                rows={3}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+              />
+              <p className="text-xs text-muted-foreground">Obrigatório — registrado no histórico para auditoria.</p>
+            </div>
+
+            {/* Ações */}
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setAjusteOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1"
+                disabled={!ajusteCampanha || !ajusteValor || !ajusteMotivo || ajusteSaving}
+                onClick={handleAjuste}
+              >
+                {ajusteSaving ? "Salvando…" : "Confirmar ajuste"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* FormDrawer — Novo membro */}
       <FormDrawer
@@ -186,48 +408,72 @@ export default function Membros() {
       >
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label>Nome completo <span className="text-destructive">*</span></Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Ana Silva" />
+            <Label>Tipo de pessoa <span className="text-destructive">*</span></Label>
+            <div className="flex gap-2">
+              {(["PF", "PJ"] as const).map((tipo) => (
+                <button key={tipo} type="button"
+                  onClick={() => { setTipoPessoa(tipo); setDocumento(""); setRazaoSocial(""); }}
+                  className={`flex-1 rounded-md border py-2 text-sm font-semibold transition-colors ${
+                    tipoPessoa === tipo ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:border-primary/40"
+                  }`}>
+                  {tipo === "PF" ? "Pessoa Física" : "Pessoa Jurídica"}
+                </button>
+              ))}
+            </div>
           </div>
-
+          {tipoPessoa === "PF" ? (
+            <div className="space-y-1.5">
+              <Label>Nome completo <span className="text-destructive">*</span></Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Ana Silva" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Razão social <span className="text-destructive">*</span></Label>
+                <Input value={razaoSocial} onChange={(e) => setRazaoSocial(e.target.value)} placeholder="Ex: Empresa LTDA" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Nome do responsável <span className="text-destructive">*</span></Label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Ana Silva" />
+              </div>
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label>E-mail <span className="text-destructive">*</span></Label>
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ana@email.com" />
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+              placeholder={tipoPessoa === "PF" ? "ana@email.com" : "contato@empresa.com"} />
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>CPF</Label>
-              <Input value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="000.000.000-00" />
+              <Label>{tipoPessoa === "PF" ? "CPF" : "CNPJ"}</Label>
+              <Input value={documento} onChange={(e) => setDocumento(e.target.value)}
+                placeholder={tipoPessoa === "PF" ? "000.000.000-00" : "00.000.000/0001-00"} />
             </div>
             <div className="space-y-1.5">
               <Label>Telefone</Label>
               <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(11) 99999-0000" />
             </div>
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Tier inicial</Label>
               <Select value={tier} onValueChange={(v) => setTier(v as Tier)}>
                 <SelectTrigger><SelectValue placeholder="Bronze" /></SelectTrigger>
-                <SelectContent>
-                  {TIERS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                </SelectContent>
+                <SelectContent>{TIERS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Segmento</Label>
               <Select value={segment} onValueChange={(v) => setSegment(v as Segment)}>
                 <SelectTrigger><SelectValue placeholder="Básico" /></SelectTrigger>
-                <SelectContent>
-                  {SEGMENTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
+                <SelectContent>{SEGMENTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>
         </div>
       </FormDrawer>
+      </>
+
     </div>
   );
 }

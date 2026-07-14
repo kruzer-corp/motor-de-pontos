@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Card, Input } from "@kruzer/ds";
-import { ArrowUpCircle, ArrowDownCircle, ChevronDown, ChevronRight, Search } from "lucide-react";
+import { Card, SearchInput } from "@kruzer/ds";
+import { MOEDA } from "../config/programa";
+import { ArrowUpCircle, ArrowDownCircle, ChevronDown, ChevronRight } from "lucide-react";
 
 type LineItem = { description: string; type: "credit" | "debit"; points: number };
 type Order = {
@@ -14,7 +15,7 @@ const ORDERS: Order[] = [
   {
     orderId: "PED-2025-00421",
     date: "10/06/2025",
-    channel: "FAST PRO",
+    channel: "Programa de Fidelidade",
     items: [
       { description: "Acúmulo base da compra", type: "credit", points: 2400 },
       { description: "Bônus Multiplicador Ouro (2×)", type: "credit", points: 2400 },
@@ -33,7 +34,7 @@ const ORDERS: Order[] = [
   {
     orderId: "PED-2025-00345",
     date: "14/05/2025",
-    channel: "FAST PRO",
+    channel: "Programa de Fidelidade",
     items: [
       { description: "Acúmulo base da compra", type: "credit", points: 950 },
       { description: "Bônus aniversário (3×)", type: "credit", points: 1900 },
@@ -75,17 +76,15 @@ export default function Extrato() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Extrato de Pontos / Bônus</h2>
+          <h2 className="text-lg font-semibold">Extrato de {MOEDA.nome} / Bônus</h2>
           <p className="text-sm text-muted-foreground">Histórico agrupado por pedido.</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <Input
-              className="pl-9 w-56"
+          <div className="w-56 shrink-0">
+            <SearchInput
               placeholder="Buscar pedido..."
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={setQuery}
             />
           </div>
         </div>
@@ -152,10 +151,10 @@ export default function Extrato() {
                     }`}
                   >
                     {order.total >= 0 ? "+" : ""}
-                    {order.total.toLocaleString("pt-BR")} pts
+                    {order.total.toLocaleString("pt-BR")} {MOEDA.abrev}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    saldo: {order.balance.toLocaleString("pt-BR")} pts
+                    saldo: {order.balance.toLocaleString("pt-BR")} {MOEDA.abrev}
                   </div>
                 </div>
                 {isOpen ? (
@@ -179,7 +178,7 @@ export default function Extrato() {
                         }`}
                       >
                         {item.points >= 0 ? "+" : ""}
-                        {item.points.toLocaleString("pt-BR")} pts
+                        {item.points.toLocaleString("pt-BR")} {MOEDA.abrev}
                       </span>
                     </div>
                   ))}

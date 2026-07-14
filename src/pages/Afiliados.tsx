@@ -10,6 +10,7 @@ import {
   toast,
 } from "@kruzer/ds";
 import { HardHat, Pencil, Plus, ShoppingBag, UserCog } from "lucide-react";
+import { renderCrumbLink } from "../lib/crumbLink";
 
 type AffStatus = "ativo" | "inativo" | "pendente";
 type AffType   = "arquiteto" | "vendedor";
@@ -188,6 +189,7 @@ export default function Afiliados() {
       <PageHeader
         title="Afiliados"
         path={[{ label: "Operação" }, { label: "Membros", to: "/membros" }]}
+        renderCrumbLink={renderCrumbLink}
         description="Consulta e gestão dos arquitetos e vendedores cadastrados no programa."
       />
 

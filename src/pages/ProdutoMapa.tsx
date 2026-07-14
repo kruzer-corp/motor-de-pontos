@@ -39,7 +39,7 @@ const SECTIONS: Section[] = [
       { label: "Theming da tela de login", route: "/login-config", note: "Conteúdo (links Fast PRO) é custom" },
       { label: "Níveis", route: "/niveis" },
       { label: "Canais", route: "/canais" },
-      { label: "Pedidos", route: "/pedidos", note: "Colunas GAN/coordenador são custom" },
+      { label: "Fila de Resgates", route: "/resgates", note: "Colunas GAN/coordenador são custom" },
       { label: "Configuração do programa", route: "/config" },
     ],
   },

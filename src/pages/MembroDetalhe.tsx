@@ -8,6 +8,7 @@ import {
   toast,
 } from "@kruzer/ds";
 import { ArrowLeft, ArrowDownLeft, ArrowUpRight, Clock, Plus } from "lucide-react";
+import { renderCrumbLink } from "../lib/crumbLink";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -172,7 +173,8 @@ export default function MembroDetalhe() {
     <div className="space-y-6">
       <PageHeader
         title={member.nome}
-        path={[{ label: "Operação" }, { label: "Membros" }]}
+        path={[{ label: "Operação" }, { label: "Saldo dos membros", to: "/membros" }]}
+        renderCrumbLink={renderCrumbLink}
         description={`CPF ${member.cpf} · ${member.canal} · Membro desde ${member.desde}`}
         actions={
           <div className="flex items-center gap-2">

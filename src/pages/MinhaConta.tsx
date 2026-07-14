@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CustomTag } from "../components/CustomTag";
 import {
   Card,
   CardHeader,
@@ -287,7 +288,7 @@ export default function MinhaConta() {
       <Tabs defaultValue="dados">
         <TabsList>
           <TabsTrigger value="dados">Meus Dados</TabsTrigger>
-          <TabsTrigger value="informes">Informes de Rendimento</TabsTrigger>
+          <TabsTrigger value="informes" className="gap-1.5">Informes de Rendimento <CustomTag className="text-[9px] px-1.5 py-0" /></TabsTrigger>
           <TabsTrigger value="resgates">Meus Resgates</TabsTrigger>
         </TabsList>
         <TabsContent value="dados" className="mt-4">

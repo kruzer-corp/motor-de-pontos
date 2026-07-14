@@ -15,13 +15,13 @@ import { CheckCheck, ExternalLink, ScrollText, FileSignature } from "lucide-reac
 
 // ── Mock document text ──────────────────────────────────────────────
 
-const REGULAMENTO_TEXT = `REGULAMENTO DO PROGRAMA DE PONTOS — FAST PRO
+const REGULAMENTO_TEXT = `REGULAMENTO DO PROGRAMA DE PONTOS — Programa de Fidelidade
 
 1. OBJETO
-O presente regulamento rege o Programa de Pontos FAST PRO ("Programa"), operado pela FAST PRO em parceria com a plataforma Kruzer.
+O presente regulamento rege o Programa de Pontos Programa de Fidelidade ("Programa"), operado pela Programa de Fidelidade em parceria com a plataforma Kruzer.
 
 2. ELEGIBILIDADE
-Podem participar do Programa pessoas físicas ou jurídicas cadastradas como membros ativos da plataforma FAST PRO.
+Podem participar do Programa pessoas físicas ou jurídicas cadastradas como membros ativos da plataforma Programa de Fidelidade.
 
 3. ACÚMULO DE PONTOS
 3.1 A cada R$1,00 gasto em compras elegíveis, o membro acumula 1 (um) ponto.
@@ -37,16 +37,16 @@ Podem participar do Programa pessoas físicas ou jurídicas cadastradas como mem
 5.2 O processamento ocorre em até 5 dias úteis após aprovação.
 
 6. DISPOSIÇÕES GERAIS
-A FAST PRO reserva-se o direito de alterar este regulamento mediante aviso prévio de 30 dias.`;
+A Programa de Fidelidade reserva-se o direito de alterar este regulamento mediante aviso prévio de 30 dias.`;
 
-const TERMO_TEXT = `TERMO DE ADESÃO AO PROGRAMA DE PONTOS — FAST PRO
+const TERMO_TEXT = `TERMO DE ADESÃO AO PROGRAMA DE PONTOS — Programa de Fidelidade
 
-Ao aderir ao Programa de Pontos FAST PRO, o participante declara:
+Ao aderir ao Programa de Pontos Programa de Fidelidade, o participante declara:
 
 I. Ter lido e compreendido o Regulamento do Programa em sua versão vigente;
 II. Concordar com as condições de acúmulo, expiração e resgate de pontos;
 III. Autorizar o tratamento de seus dados pessoais para fins de operação do Programa, conforme a Lei Geral de Proteção de Dados (LGPD — Lei 13.709/2018);
-IV. Estar ciente de que a participação no Programa não implica qualquer relação de consumo, emprego ou vínculo societário com a FAST PRO
+IV. Estar ciente de que a participação no Programa não implica qualquer relação de consumo, emprego ou vínculo societário com a Programa de Fidelidade
 
 O presente Termo é válido por tempo indeterminado e pode ser revogado pelo participante a qualquer momento mediante solicitação formal.`;
 
@@ -209,7 +209,7 @@ export default function Conformidade() {
               <CardHeader>
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <CardTitle>Política Comercial — FAST PRO</CardTitle>
+                    <CardTitle>Política Comercial — Programa de Fidelidade</CardTitle>
                     <p className="mt-1 text-sm text-muted-foreground">
                       Documento completo de regras comerciais e condições de parceria.
                     </p>
@@ -239,7 +239,7 @@ export default function Conformidade() {
                       rel="noopener noreferrer"
                     >
                       <ExternalLink className="size-4 mr-1.5" />
-                      Abrir no site FAST PRO
+                      Abrir no site Programa de Fidelidade
                     </a>
                   </Button>
                   <Button variant="outline">

@@ -62,6 +62,26 @@ export default function MecanicaPrograma() {
   const [multOuro,     setMultOuro]     = useState<number | null>(1.5);
   const [multDiamante, setMultDiamante] = useState<number | null>(2);
 
+  // Múltiplas moedas
+  type Moeda = { id: string; nome: string; simbolo: string; taxa: string; ativo: boolean; base?: boolean };
+  const [moedas, setMoedas] = useState<Moeda[]>([
+    { id: "pontos",   nome: "Pontos",   simbolo: "pts",  taxa: "1",    ativo: true,  base: true },
+    { id: "cashback", nome: "Cashback", simbolo: "R$",   taxa: "",     ativo: false },
+    { id: "milhas",   nome: "Milhas",   simbolo: "mi",   taxa: "",     ativo: false },
+    { id: "creditos", nome: "Créditos", simbolo: "cr",   taxa: "",     ativo: false },
+  ]);
+
+  const updateMoeda = (id: string, field: keyof Moeda, value: string | boolean) => {
+    setMoedas((prev) => prev.map((m) => {
+      if (field === "ativo" && value === true && !m.base) {
+        // ao habilitar uma moeda, desabilita todas as outras não-base
+        return { ...m, ativo: m.id === id ? true : (m.base ? m.ativo : false) };
+      }
+      return m.id === id ? { ...m, [field]: value } : m;
+    }));
+    setDirty(true);
+  };
+
   function handleChange(setter: (v: any) => void) {
     return (v: any) => { setter(v); setDirty(true); };
   }
@@ -77,7 +97,7 @@ export default function MecanicaPrograma() {
       <PageHeader
         title="Mecânica do Programa"
         path={[{ label: "Configuração" }]}
-        description="Regras base de acúmulo, expiração e resgate de pontos."
+        description="Programa base — regras aplicadas quando nenhuma campanha está ativa. Cada campanha define suas próprias regras e sobrescreve o programa base."
         actions={
           <Button size="sm" disabled={!dirty} onClick={() => setConfirmOpen(true)}>
             <Save className="mr-2 h-4 w-4" />
@@ -257,6 +277,72 @@ export default function MecanicaPrograma() {
           </div>
         </Field>
       </Section>
+
+      {/* ── Múltiplas moedas ── */}
+      <Section
+        title="Múltiplas moedas"
+        description="Habilite uma carteira adicional além da moeda base. Apenas um tipo de moeda secundária pode estar ativo por vez."
+      >
+        <div className="space-y-3">
+          {moedas.map((m) => (
+            <div key={m.id} className={`rounded-lg border px-4 py-3.5 transition-colors ${m.ativo ? "border-primary/30 bg-primary/5" : "border-border"}`}>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium">{m.nome}</p>
+                  {m.base
+                    ? <p className="text-xs text-muted-foreground">Moeda base do programa — sempre ativa</p>
+                    : <p className="text-xs text-muted-foreground">{m.ativo ? "Carteira habilitada" : "Desabilitada"}</p>
+                  }
+                </div>
+                <Switch
+                  size="sm"
+                  checked={m.ativo}
+                  disabled={!!m.base}
+                  onCheckedChange={(v) => updateMoeda(m.id, "ativo", v)}
+                />
+              </div>
+
+              {m.ativo && (
+                <div className="mt-4 grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Nome</Label>
+                    <Input
+                      value={m.nome}
+                      onChange={(e) => updateMoeda(m.id, "nome", e.target.value)}
+                      placeholder="Ex: Milhas"
+                      disabled={!!m.base}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Símbolo / abreviação</Label>
+                    <Input
+                      value={m.simbolo}
+                      onChange={(e) => updateMoeda(m.id, "simbolo", e.target.value)}
+                      placeholder="Ex: mi"
+                      disabled={!!m.base}
+                    />
+                  </div>
+                  {!m.base && (
+                    <div className="space-y-1">
+                      <Label className="text-xs">Taxa em relação à moeda base</Label>
+                      <div className="flex items-center gap-1.5">
+                        <Input
+                          type="number"
+                          value={m.taxa}
+                          onChange={(e) => updateMoeda(m.id, "taxa", e.target.value)}
+                          placeholder="Ex: 0.5"
+                        />
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">× base</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </Section>
+
     </div>
   );
 }

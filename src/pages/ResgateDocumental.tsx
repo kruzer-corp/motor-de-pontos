@@ -10,6 +10,7 @@ import {
   AvatarFallback,
 } from "@kruzer/ds";
 import { FileCheck, FileCheck2, Upload, AlertTriangle, CheckCheck } from "lucide-react";
+import { CustomTag } from "../components/CustomTag";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -125,11 +126,11 @@ const STATUS_CONFIG: Record<
   DocStatus,
   { label: string; color: string; step: number }
 > = {
-  aguardando_doc: { label: "Aguardando doc.", color: "bg-amber-100 text-amber-700", step: 1 },
-  em_analise: { label: "Em análise", color: "bg-sky-100 text-sky-700", step: 2 },
-  aprovado: { label: "Aprovado", color: "bg-violet-100 text-violet-700", step: 3 },
-  credito_processado: { label: "Crédito processado", color: "bg-emerald-100 text-emerald-700", step: 4 },
-  pendencia: { label: "Pendência", color: "bg-red-100 text-red-600", step: 0 },
+  aguardando_doc:    { label: "Aguard. do membro",  color: "bg-amber-100 text-amber-700",   step: 1 },
+  em_analise:        { label: "Aguard. analista",   color: "bg-sky-100 text-sky-700",       step: 2 },
+  aprovado:          { label: "Aprovado",           color: "bg-violet-100 text-violet-700", step: 3 },
+  credito_processado:{ label: "Crédito processado", color: "bg-emerald-100 text-emerald-700", step: 4 },
+  pendencia:         { label: "Pendência",          color: "bg-red-100 text-red-600",       step: 0 },
 };
 
 const STEPS: DocStatus[] = ["aguardando_doc", "em_analise", "aprovado", "credito_processado"];
@@ -157,26 +158,46 @@ function DocTable({
 
   const counts = STEPS.map((s) => list.filter((o) => o.status === s).length);
 
+  const aguardandoMembro  = list.filter(o => o.status === "aguardando_doc");
+  const aguardandoAnalista = list.filter(o => o.status === "em_analise");
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* Pipeline summary */}
       <div className="flex flex-wrap gap-3">
         {STEPS.map((step, i) => (
-          <div
-            key={step}
-            className={`rounded-2xl border px-4 py-2.5 ${STATUS_CONFIG[step].color}`}
-          >
+          <div key={step} className={`rounded-2xl border px-4 py-2.5 ${STATUS_CONFIG[step].color}`}>
             <div className="text-xl font-bold tabular-nums">{counts[i]}</div>
             <div className="text-xs font-medium">{STATUS_CONFIG[step].label}</div>
           </div>
         ))}
         <div className="rounded-2xl border px-4 py-2.5 bg-red-50 border-red-200 text-red-600">
-          <div className="text-xl font-bold tabular-nums">
-            {list.filter((o) => o.status === "pendencia").length}
-          </div>
+          <div className="text-xl font-bold tabular-nums">{list.filter(o => o.status === "pendencia").length}</div>
           <div className="text-xs font-medium">Pendência</div>
         </div>
       </div>
+
+      {/* Seção: Aguardando do membro */}
+      {aguardandoMembro.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 flex items-start gap-3">
+          <AlertTriangle className="size-4 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-amber-800">{aguardandoMembro.length} aguardando documento do membro</p>
+            <p className="text-xs text-amber-700 mt-0.5">O membro ainda não enviou o {docType === "RPA" ? "RPA assinado" : "arquivo de NF"}. Nenhuma ação necessária do analista agora.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Seção: Aguardando revisão do analista */}
+      {aguardandoAnalista.length > 0 && (
+        <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 flex items-start gap-3">
+          <FileCheck className="size-4 text-sky-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-sky-800">{aguardandoAnalista.length} documento{aguardandoAnalista.length > 1 ? "s" : ""} recebido{aguardandoAnalista.length > 1 ? "s" : ""} — aguardando sua revisão</p>
+            <p className="text-xs text-sky-700 mt-0.5">O membro enviou o documento. Revise e avance o pedido.</p>
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <Card>
@@ -280,9 +301,9 @@ export default function ResgateDocumental() {
       <div className="flex items-center gap-3">
         <FileCheck className="size-5 text-muted-foreground" />
         <div>
-          <h2 className="text-lg font-semibold">Fluxo Documental de Resgate</h2>
+          <div className="flex items-center gap-2"><h2 className="text-lg font-semibold">Fluxo Documental de Resgate</h2><CustomTag /></div>
           <p className="text-sm text-muted-foreground">
-            Gestão de RPA (Pessoa Física) e Nota Fiscal (Pessoa Jurídica).
+            Documentos enviados pelos membros via portal — revise e avance o pedido.
           </p>
         </div>
       </div>

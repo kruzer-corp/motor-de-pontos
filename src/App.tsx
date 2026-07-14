@@ -1,5 +1,13 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import AppLayout from "./layout/AppLayout";
+import PortalLayout from "./layout/PortalLayout";
+import PortalCarteira from "./pages/portal/Carteira";
+import PortalExtrato from "./pages/portal/Extrato";
+import PortalCatalogo from "./pages/portal/Catalogo";
+import PortalPedidos from "./pages/portal/MeusPedidos";
+import PortalNivel from "./pages/portal/MeuNivel";
+import PortalConta from "./pages/portal/MinhaConta";
+import PortalProdutos from "./pages/portal/PortalProdutos";
 import Dashboard from "./pages/Dashboard";
 import Usuarios from "./pages/Usuarios";
 import Membros from "./pages/Membros";
@@ -17,14 +25,15 @@ import CampanhasNova from "./pages/CampanhasNova";
 import CampanhasDetail from "./pages/CampanhasDetail";
 import Recompensas from "./pages/Recompensas";
 import ResgateCatalogo from "./pages/ResgateCatalogo";
-import ResgateDocumental from "./pages/ResgateDocumental";
 import Comunicacoes from "./pages/Comunicacoes";
 import MinhaConta from "./pages/MinhaConta";
 import CatalogoAtualizacao from "./pages/CatalogoAtualizacao";
 import Comunicados from "./pages/Comunicados";
 import Pedidos from "./pages/Pedidos";
-import IndicacaoVenda from "./pages/IndicacaoVenda";
 import PedidoDetalhe from "./pages/PedidoDetalhe";
+import Orcamentos from "./pages/Orcamentos";
+import CatalogoProdutos from "./pages/CatalogoProdutos";
+import CanaisFiliais from "./pages/CanaisFiliais";
 import Homepage from "./pages/Homepage";
 import Banners from "./pages/Banners";
 import Conteudo from "./pages/Conteudo";
@@ -39,16 +48,31 @@ import Config from "./pages/Config";
 import MecanicaPrograma from "./pages/MecanicaPrograma";
 import Ranking from "./pages/Ranking";
 import Logs from "./pages/Logs";
+import Regulamento from "./pages/Regulamento";
+import Indicacoes from "./pages/Indicacoes";
 
 export default function App() {
   return (
     <Routes>
+      {/* ── Portal do membro (B2C) ── */}
+      <Route element={<PortalLayout />}>
+        <Route path="portal" element={<PortalCarteira />} />
+        <Route path="portal/extrato" element={<PortalExtrato />} />
+        <Route path="portal/catalogo" element={<PortalCatalogo />} />
+        <Route path="portal/pedidos" element={<PortalPedidos />} />
+        <Route path="portal/produtos" element={<PortalProdutos />} />
+        <Route path="portal/nivel" element={<PortalNivel />} />
+        <Route path="portal/conta" element={<PortalConta />} />
+      </Route>
+
+      {/* ── Admin (analista) ── */}
       <Route element={<AppLayout />}>
-        <Route index element={<Navigate to="/campanhas" replace />} />
+        <Route index element={<Navigate to="/resgates" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="config" element={<Config />} />
         <Route path="mecanica" element={<MecanicaPrograma />} />
         <Route path="usuarios" element={<Usuarios />} />
+        <Route path="canais-filiais" element={<CanaisFiliais />} />
         <Route path="membros" element={<Membros />} />
         <Route path="membros-v2" element={<MembrosV2 />} />
         <Route path="membros/tier" element={<MembrosTier />} />
@@ -65,14 +89,15 @@ export default function App() {
         <Route path="campanhas/:id" element={<CampanhasDetail />} />
         <Route path="recompensas" element={<Recompensas />} />
         <Route path="recompensas/catalogo" element={<ResgateCatalogo />} />
-        <Route path="recompensas/documental" element={<ResgateDocumental />} />
+        <Route path="catalogo-produtos" element={<CatalogoProdutos />} />
         <Route path="conformidade" element={<Navigate to="/logs" replace />} />
         <Route path="comunicacoes" element={<Comunicacoes />} />
         <Route path="minha-conta" element={<MinhaConta />} />
         <Route path="comunicados" element={<Comunicados />} />
-        <Route path="pedidos" element={<Pedidos />} />
-        <Route path="pedidos/:id" element={<PedidoDetalhe />} />
-        <Route path="indicacoes" element={<IndicacaoVenda />} />
+        <Route path="resgates" element={<Pedidos />} />
+        <Route path="resgates/:id" element={<PedidoDetalhe />} />
+        <Route path="orcamentos" element={<Orcamentos />} />
+        <Route path="indicacoes" element={<Indicacoes />} />
         <Route path="homepage" element={<Homepage />} />
         <Route path="banners" element={<Banners />} />
         <Route path="conteudo" element={<Conteudo />} />
@@ -85,6 +110,7 @@ export default function App() {
         <Route path="canais" element={<Canais />} />
         <Route path="ranking" element={<Ranking />} />
         <Route path="logs" element={<Logs />} />
+        <Route path="regulamento" element={<Regulamento />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

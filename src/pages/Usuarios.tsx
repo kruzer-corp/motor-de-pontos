@@ -12,7 +12,7 @@ import { Pencil, Plus, Shield } from "lucide-react";
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 type UserStatus = "ativo" | "inativo" | "pendente";
-type Role = "Administrador" | "Operador" | "Analista" | "Visualizador";
+type Role = "Administrador" | "Operador" | "Analista" | "Visualizador" | "Membro";
 
 type User = {
   id: string; name: string; email: string;
@@ -21,13 +21,14 @@ type User = {
 
 // ── Data ───────────────────────────────────────────────────────────────────────
 
-const ROLES: Role[] = ["Administrador", "Operador", "Analista", "Visualizador"];
+const ROLES: Role[] = ["Administrador", "Operador", "Analista", "Visualizador", "Membro"];
 
 const ROLE_DESCRIPTIONS: Record<Role, string> = {
   Administrador: "Acesso total ao sistema",
   Operador:      "Aprova resgates e gerencia membros",
   Analista:      "Leitura de membros, campanhas e relatórios",
   Visualizador:  "Leitura básica de membros e campanhas",
+  Membro:        "Acesso exclusivo ao portal B2C — carteira, extrato, catálogo e pedidos",
 };
 
 const INITIAL_USERS: User[] = [
@@ -56,6 +57,7 @@ const DEFAULT_PERMS: Record<Role, string[]> = {
   Operador:      ["Ver membros", "Editar membros", "Ajuste manual de pontos", "Ver resgates", "Aprovar resgates"],
   Analista:      ["Ver membros", "Ver campanhas", "Ver resgates", "Ver relatórios"],
   Visualizador:  ["Ver membros", "Ver campanhas", "Ver resgates"],
+  Membro:        [],
 };
 
 type PermMatrix = Record<Role, Record<string, boolean>>;
@@ -161,7 +163,7 @@ export default function Usuarios() {
       <PageHeader
         title="Usuários & Papéis"
         path={[{ label: "Configuração" }]}
-        description="Gestão de acesso e permissões (IAM)."
+        description="Gestão de acesso e permissões do painel admin."
         actions={
           <Button size="sm" onClick={openInvite}>
             <Plus className="mr-2 h-4 w-4" />
@@ -285,12 +287,16 @@ export default function Usuarios() {
                     <tr key={perm} className="hover:bg-muted/20">
                       <td className="px-5 py-3 sticky left-0 bg-card font-medium">{perm}</td>
                       {ROLES.map((role) => (
-                        <td key={role} className="px-4 py-3 text-center">
-                          <Switch
-                            checked={matrix[role][perm] ?? false}
-                            onCheckedChange={() => togglePerm(role, perm)}
-                            size="sm"
-                          />
+                        <td key={role} className={`px-4 py-3 text-center ${role === "Membro" ? "bg-sky-50/50" : ""}`}>
+                          {role === "Membro" ? (
+                            <span className="text-[10px] text-sky-600 font-medium">Portal B2C</span>
+                          ) : (
+                            <Switch
+                              checked={matrix[role][perm] ?? false}
+                              onCheckedChange={() => togglePerm(role, perm)}
+                              size="sm"
+                            />
+                          )}
                         </td>
                       ))}
                     </tr>
@@ -300,6 +306,7 @@ export default function Usuarios() {
             </div>
           </div>
         </TabsContent>
+
       </Tabs>
 
       {/* ── Invite FormDrawer ── */}

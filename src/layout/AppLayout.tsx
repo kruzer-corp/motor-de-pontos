@@ -1,33 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { cn, TooltipProvider } from "@kruzer/ds";
+import { CustomTag } from "../components/CustomTag";
 import {
-  LayoutDashboard, Users, User, ShieldCheck, Gift, Sparkles, Boxes,
+  LayoutDashboard, Users, User, ShieldCheck, Gift, Sparkles, Boxes, Building2,
   ChevronDown, ChevronsLeft, ChevronsRight, ArrowLeftRight,
-  Package, Trophy, History, Settings, Share2,
-  Puzzle, Palette, Webhook, Wallet,
-  SlidersHorizontal,
+  Package, Trophy, History, ScrollText,
+  Palette, Webhook, Share2,
 } from "lucide-react";
 
 // ── Tenants ───────────────────────────────────────────────────────────────────
 
 type TenantMode = "custom" | "product";
-type Tenant = { id: string; name: string; mode: TenantMode; description: string };
 
-const TENANTS: Tenant[] = [
-  { id: "fastpro",    name: "FastShop PRO",  mode: "custom",  description: "Features exclusivas FastShop PRO" },
-  { id: "whitelabel", name: "Motor de Pontos", mode: "product", description: "Produto white-label Kruzer" },
-];
-
-// Nome exibido no header e sidebar conforme o modo
 const BRAND_NAME: Record<TenantMode, string> = {
-  custom:  "FastShop PRO",
+  custom:  "Programa de Fidelidade - Admin",
   product: "Motor de Pontos",
-};
-
-const MODE_LABEL: Record<TenantMode, string> = {
-  custom:  "Ver como Produto",
-  product: "Ver como FastShop PRO",
 };
 
 // ── Layer system ──────────────────────────────────────────────────────────────
@@ -49,7 +37,7 @@ function LayerDot(_: { layer?: Layer }) { return null; }
 
 type LucideIcon    = React.ComponentType<{ className?: string; strokeWidth?: number }>;
 type SubItem       = { to: string; label: string; layer?: Layer };
-type FlatMenuItem  = { to: string; label: string; icon: LucideIcon; layer?: Layer };
+type FlatMenuItem  = { to: string; label: string; icon: LucideIcon; layer?: Layer; badge?: string };
 type GroupMenuItem = { label: string; icon: LucideIcon; badge?: string; layer?: Layer; group: SubItem[] };
 type SectionHeader = { section: string };
 type MenuItem      = FlatMenuItem | GroupMenuItem | SectionHeader;
@@ -72,43 +60,32 @@ const MENU: MenuItem[] = [
 
   // ── OPERAÇÃO ───────────────────────────────────────────────────────────────
   { section: "Operação" },
+  { to: "/resgates", label: "Aprovações de Resgate", icon: Gift },
+  { to: "/membros",              label: "Saldo dos membros",      icon: Users   },
+  { to: "/indicacoes",           label: "Indicações",             icon: Share2  },
+  { to: "/catalogo-produtos",    label: "Produtos elegíveis",      icon: Boxes   },
+  { to: "/orcamentos",           label: "Orçamentos",             icon: Package },
   {
     label: "Campanhas", icon: Sparkles,
     group: [
-      { to: "/campanhas",      label: "Regras" },
       { to: "/campanhas/nova", label: "Nova campanha" },
+      { to: "/campanhas",      label: "Modelos de campanha" },
     ],
   },
-  {
-    label: "Membros", icon: Users,
-    group: [
-      { to: "/membros",           label: "Lista" },
-      { to: "/membros/segmentos", label: "Segmentos",        layer: "module" },
-      { to: "/membros/extrato",   label: "Extrato de pontos" },
-    ],
-  },
-  { to: "/membros/ajuste", label: "Ajuste manual", icon: SlidersHorizontal },
-  { to: "/pedidos",    label: "Pedidos",               icon: Gift   },
-  { to: "/indicacoes", label: "Indicações de membros", icon: Share2 },
-  { to: "/carteiras", label: "Múltiplas moedas", icon: Wallet },
-
   // ── CONFIGURAÇÃO ───────────────────────────────────────────────────────────
   { section: "Configuração" },
-  { to: "/mecanica",     label: "Mecânica do programa", icon: Settings },
-  { to: "/usuarios",     label: "Usuários & Papéis",    icon: User },
-  { to: "/membros/tier", label: "Tier / Níveis",        icon: ShieldCheck },
+  { to: "/usuarios",       label: "Usuários & Papéis",  icon: User      },
+  { to: "/canais-filiais", label: "Canais e Filiais",   icon: Building2 },
+  { to: "/membros/tier", label: "Tier e Segmentação", icon: ShieldCheck },
   {
     label: "Catálogo", icon: Package,
     group: [
-      { to: "/catalogo",             label: "Produtos incentivados" },
-      { to: "/recompensas/catalogo", label: "Catálogo de resgate" },
-      { to: "/catalogo/grupos",      label: "Grupos" },
-      { to: "/catalogo/atualizacao", label: "Atualização 3P", layer: "module" },
+      { to: "/catalogo",        label: "Produtos" },
+      { to: "/catalogo/grupos", label: "Grupos" },
     ],
   },
-  { to: "/canais",   label: "Canais",             icon: Boxes },
 
-  { to: "/webhooks", label: "Webhooks / Eventos", icon: Webhook },
+  { to: "/webhooks", label: "Conectividade",       icon: Webhook },
   {
     label: "Conteúdo & Aparência", icon: Palette,
     group: [
@@ -120,7 +97,8 @@ const MENU: MenuItem[] = [
       { to: "/comunicados",  label: "Histórico de comunicações" },
     ],
   },
-  { to: "/logs", label: "Logs de auditoria", icon: History },
+  { to: "/regulamento", label: "Regulamento",       icon: ScrollText },
+  { to: "/logs",        label: "Logs de auditoria", icon: History    },
 
 ];
 
@@ -439,18 +417,11 @@ function PlatformHeader({ mode, collapsed, hover }: { mode: TenantMode; collapse
 // ── App Layout ────────────────────────────────────────────────────────────────
 
 export default function AppLayout() {
-  const [tenant, setTenant]       = useState<Tenant>(TENANTS[0]);
+  const navigate    = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarHover,     setSidebarHover]     = useState(false);
-  const mode        = tenant.mode;
+  const mode: TenantMode = "custom"; // admin sempre mostra tudo
   const visibleMenu = filterMenu(MENU, mode);
-
-  function toggleTenant() {
-    const next = mode === "custom"
-      ? TENANTS.find((t) => t.mode === "product")!
-      : TENANTS.find((t) => t.mode === "custom")!;
-    setTenant(next);
-  }
 
   return (
     <TooltipProvider>
@@ -469,33 +440,20 @@ export default function AppLayout() {
           className="flex flex-1 flex-col overflow-auto"
           style={{ marginLeft: sidebarCollapsed ? 48 : 0 }}
         >
-          {mode === "product" && (
-            <div className="flex items-center justify-between gap-3 border-b border-sky-200 bg-sky-50 px-6 py-2.5">
-              <div className="flex items-center gap-2.5">
-                <Puzzle className="size-4 shrink-0 text-sky-500" />
-                <span className="text-sm text-sky-800">
-                  <span className="font-semibold">Modo produto white-label</span>
-                  {" — "}Pedidos especificados e Fluxo documental estão ocultos.
-                </span>
-              </div>
-              <span className="shrink-0 rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-bold text-sky-700">
-                2 features ocultas
-              </span>
-            </div>
-          )}
           <div className="flex-1 p-6">
             <Outlet />
           </div>
         </main>
       </div>
 
-      {/* Floating CTA — fora do grid, canto inferior direito */}
+      {/* Floating CTA — shift de papel */}
       <button
-        onClick={toggleTenant}
-        className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-xs font-medium text-muted-foreground shadow-lg transition-all hover:bg-muted hover:text-foreground hover:shadow-xl"
+        onClick={() => navigate("/portal")}
+        className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-700 shadow-lg transition-all hover:bg-amber-100 hover:shadow-xl"
       >
         <ArrowLeftRight className="size-3 shrink-0" />
-        {MODE_LABEL[mode]}
+        Ver como membro final
+        <CustomTag className="ml-0.5" />
       </button>
     </div>
     </TooltipProvider>

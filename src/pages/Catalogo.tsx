@@ -1,301 +1,352 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useMemo } from "react";
 import {
-  Badge, Button, Card, ConfirmDialog, DropdownMenu, DropdownMenuContent,
-  DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
-  FileUploadInput, FormDrawer, Input, Label,
-  NumberInput, Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-  Switch, Tabs, TabsContent, TabsList, TabsTrigger, toast,
-  type UploadedFile,
+  Button, FileUploadInput, FormDrawer, Input, Label, PageHeader, Pill,
+  SearchInput, Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Tabs, TabsList, TabsTrigger, toast, type UploadedFile,
 } from "@kruzer/ds";
-import { Archive, FileUp, MoreHorizontal, Package, ChevronDown, ChevronRight, Plus, Search } from "lucide-react";
+import { Archive, FileUp, Pencil, Plus, RotateCcw } from "lucide-react";
 
-type Product = { id: string; name: string; points: number; stock: number; active: boolean; archived?: boolean };
+// ── Tipos ─────────────────────────────────────────────────────────────────────
 
-const CATALOG: Record<string, Product[]> = {
-  "Eletrônicos": [
-    { id: "P001", name: 'Smart TV 50"', points: 45000, stock: 12, active: true },
-    { id: "P002", name: "Notebook Pro 14\"", points: 85000, stock: 5, active: true },
-    { id: "P003", name: "Fone Bluetooth", points: 8500, stock: 48, active: true },
-  ],
-  "Casa & Cozinha": [
-    { id: "P004", name: "Air Fryer XL", points: 18000, stock: 30, active: true },
-    { id: "P005", name: "Cafeteira Premium", points: 12000, stock: 0, active: false },
-    { id: "P006", name: "Liquidificador Pro", points: 9500, stock: 15, active: true },
-  ],
-  "Moda & Acessórios": [
-    { id: "P007", name: "Tênis Runner", points: 22000, stock: 8, active: true },
-    { id: "P008", name: "Bolsa Sport", points: 14000, stock: 3, active: true },
-  ],
+type Origem      = "1P" | "3P";
+type TierProduto = "Bronze" | "Prata" | "Ouro" | "Especial";
+type EntradaTipo = "manual" | "csv" | "api";
+type StatusProd  = "ativo" | "arquivado";
+
+type Produto = {
+  id: string; sku: string; nome: string; categoria: string;
+  origem: Origem; tier: TierProduto;
+  seller: string; plataforma: string;
+  estoque: number | null; entrada: EntradaTipo; status: StatusProd;
 };
 
-export default function Catalogo() {
-  const [catalog, setCatalog] = useState(CATALOG);
-  const [query,   setQuery]   = useState("");
-  const [expanded, setExpanded] = useState<Record<string, boolean>>(
-    Object.fromEntries(Object.keys(CATALOG).map((k) => [k, true]))
-  );
+// ── Constantes ────────────────────────────────────────────────────────────────
 
-  // Novo produto
-  const [open,       setOpen]       = useState(false);
+const CATEGORIAS   = ["Eletrônicos", "Eletrodomésticos", "Beleza", "Esportes", "Acessórios", "Voucher"];
+const TIERS_PROD: TierProduto[] = ["Bronze", "Prata", "Ouro", "Especial"];
+const PLATAFORMAS  = ["VTEX", "Shopify", "Magento", "Nuvemshop", "Mercado Livre", "Amazon", "Outro"];
+
+const TIER_COLOR: Record<TierProduto, string> = {
+  Bronze:   "bg-orange-100 text-orange-700",
+  Prata:    "bg-slate-100 text-slate-600",
+  Ouro:     "bg-amber-100 text-amber-700",
+  Especial: "bg-violet-100 text-violet-700",
+};
+
+const ENTRADA_LABEL: Record<EntradaTipo, { label: string; color: string }> = {
+  manual: { label: "Manual", color: "bg-muted text-muted-foreground" },
+  csv:    { label: "CSV",    color: "bg-sky-100 text-sky-700" },
+  api:    { label: "API",    color: "bg-emerald-100 text-emerald-700" },
+};
+
+// ── Mock data ─────────────────────────────────────────────────────────────────
+
+const MOCK: Produto[] = [
+  { id: "1P-001", sku: "TV-50-4K",    nome: 'Smart TV 50"',      categoria: "Eletrônicos",      origem: "1P", tier: "Especial", seller: "",             plataforma: "",              estoque: 12,   entrada: "manual", status: "ativo" },
+  { id: "1P-002", sku: "AIRFRY-XL",   nome: "Air Fryer XL",      categoria: "Eletrodomésticos", origem: "1P", tier: "Ouro",     seller: "",             plataforma: "",              estoque: 30,   entrada: "csv",    status: "ativo" },
+  { id: "1P-003", sku: "FONE-BT-02",  nome: "Fone Bluetooth",    categoria: "Eletrônicos",      origem: "1P", tier: "Prata",    seller: "",             plataforma: "",              estoque: 48,   entrada: "api",    status: "ativo" },
+  { id: "1P-004", sku: "KIT-SKIN-01", nome: "Kit Skincare",      categoria: "Beleza",           origem: "1P", tier: "Bronze",   seller: "",             plataforma: "",              estoque: 0,    entrada: "manual", status: "ativo" },
+  { id: "3P-001", sku: "ML-TV-9921",  nome: 'Smart TV 55" 4K',   categoria: "Eletrônicos",      origem: "3P", tier: "Especial", seller: "Tech Store BR", plataforma: "Mercado Livre", estoque: null, entrada: "api",    status: "ativo" },
+  { id: "3P-002", sku: "AMZ-FONE-03", nome: "Fone ANC Pro",      categoria: "Eletrônicos",      origem: "3P", tier: "Ouro",     seller: "AudioMax",     plataforma: "Amazon",        estoque: null, entrada: "api",    status: "ativo" },
+  { id: "3P-003", sku: "VTX-CREME-1", nome: "Creme Facial SPF",  categoria: "Beleza",           origem: "3P", tier: "Prata",    seller: "Beleza Total", plataforma: "VTEX",          estoque: null, entrada: "csv",    status: "ativo" },
+  { id: "3P-004", sku: "ML-TENIS-42", nome: "Tênis Running Pro", categoria: "Esportes",         origem: "3P", tier: "Bronze",   seller: "Sport Zone",   plataforma: "Mercado Livre", estoque: null, entrada: "manual", status: "arquivado" },
+];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function EntradaBadge({ tipo }: { tipo: EntradaTipo }) {
+  const { label, color } = ENTRADA_LABEL[tipo];
+  return <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${color}`}>{label}</span>;
+}
+
+function TierBadge({ tier }: { tier: TierProduto }) {
+  return <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${TIER_COLOR[tier]}`}>{tier}</span>;
+}
+
+function OrigemBadge({ origem }: { origem: Origem }) {
+  return (
+    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ${
+      origem === "1P" ? "bg-primary/10 text-primary" : "bg-violet-100 text-violet-700"
+    }`}>{origem}</span>
+  );
+}
+
+// ── Componente ────────────────────────────────────────────────────────────────
+
+export default function Catalogo() {
+  const [produtos, setProdutos] = useState<Produto[]>(MOCK);
+  const [search,          setSearch]          = useState("");
+  const [filtroOrigem,    setFiltroOrigem]    = useState<Origem | "todos">("todos");
+  const [filtroCategoria, setFiltroCategoria] = useState("todas");
+  const [filtroStatus,    setFiltroStatus]    = useState<StatusProd | "todos">("todos");
+
+  // ── Drawer: produto unitário ──────────────────────────────────────────────
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [saving,     setSaving]     = useState(false);
-  const [newName,    setNewName]    = useState("");
-  const [newGroup,   setNewGroup]   = useState("");
-  const [newPoints,  setNewPoints]  = useState<number | null>(null);
-  const [newStock,   setNewStock]   = useState<number | null>(null);
-  const [newActive,  setNewActive]  = useState(true);
-  const [uploadMode,       setUploadMode]       = useState<"manual" | "arquivo">("manual");
-  const [files,            setFiles]            = useState<UploadedFile[]>([]);
-  const [archiveTarget,    setArchiveTarget]    = useState<Product | null>(null);
+  const [fOrigem,    setFOrigem]    = useState<Origem>("1P");
+  const [fSku,       setFSku]       = useState("");
+  const [fNome,      setFNome]      = useState("");
+  const [fCat,       setFCat]       = useState("");
+  const [fTier,      setFTier]      = useState<TierProduto>("Bronze");
+  const [fSeller,    setFSeller]    = useState("");
+  const [fPlat,      setFPlat]      = useState("");
+  const [fEstoque,   setFEstoque]   = useState("");
 
   function resetForm() {
-    setNewName(""); setNewGroup(""); setNewPoints(null); setNewStock(null);
-    setNewActive(true); setUploadMode("manual"); setFiles([]);
+    setFOrigem("1P"); setFSku(""); setFNome(""); setFCat(""); setFTier("Bronze");
+    setFSeller(""); setFPlat(""); setFEstoque("");
   }
 
-  function archiveProduct(product: Product) {
-    setCatalog((prev) => {
-      const updated: typeof prev = {};
-      for (const [g, prods] of Object.entries(prev)) {
-        updated[g] = prods.map((p) => p.id === product.id ? { ...p, archived: true } : p);
-      }
-      return updated;
-    });
-    setArchiveTarget(null);
-    toast.success(`${product.name} arquivado`);
-  }
+  function abrirDrawer() { resetForm(); setDrawerOpen(true); }
+
+  const isSaveDisabled = !fNome || !fCat || (fOrigem === "3P" && !fSeller);
 
   async function handleSave() {
-    const isManualValid = uploadMode === "manual" && !!newName && !!newGroup && !!newPoints;
-    const isFileValid   = uploadMode === "arquivo" && files.length > 0;
-    if (!isManualValid && !isFileValid) return;
+    if (isSaveDisabled) return;
     setSaving(true);
-    await new Promise((r) => setTimeout(r, 600));
-    if (uploadMode === "manual") {
-      const allIds = Object.values(catalog).flat().map((p) => parseInt(p.id.replace("P", "")));
-      const nextId = `P${String(Math.max(0, ...allIds) + 1).padStart(3, "0")}`;
-      const product: Product = { id: nextId, name: newName, points: newPoints!, stock: newStock ?? 0, active: newActive };
-      setCatalog((prev) => ({ ...prev, [newGroup]: [...(prev[newGroup] ?? []), product] }));
-      toast.success(`${newName} adicionado ao catálogo`);
-    } else {
-      toast.success(`${files[0].name} importado — produtos serão processados em breve`);
-    }
-    setOpen(false);
-    resetForm();
-    setSaving(false);
+    await new Promise(r => setTimeout(r, 400));
+    const novo: Produto = {
+      id: `${fOrigem}-${String(produtos.length + 1).padStart(3, "0")}`,
+      sku: fSku, nome: fNome, categoria: fCat, origem: fOrigem, tier: fTier,
+      seller: fSeller, plataforma: fPlat,
+      estoque: fOrigem === "1P" && fEstoque ? parseInt(fEstoque) : null,
+      entrada: "manual", status: "ativo",
+    };
+    setProdutos(prev => [novo, ...prev]);
+    toast.success(`${fNome} adicionado ao catálogo`);
+    setSaving(false); setDrawerOpen(false); resetForm();
   }
 
-  const toggle = (group: string) =>
-    setExpanded((prev) => ({ ...prev, [group]: !prev[group] }));
+  // ── Drawer: importar em lote ──────────────────────────────────────────────
+  const [csvOpen,   setCsvOpen]   = useState(false);
+  const [csvSaving, setCsvSaving] = useState(false);
+  const [csvFiles,  setCsvFiles]  = useState<UploadedFile[]>([]);
 
-  const matchesQuery = (name: string) =>
-    !query || name.toLowerCase().includes(query.toLowerCase());
+  async function handleSaveCSV() {
+    if (csvFiles.length === 0) return;
+    setCsvSaving(true);
+    await new Promise(r => setTimeout(r, 400));
+    toast.success(`${csvFiles[0].name} importado — produtos serão processados em breve`);
+    setCsvSaving(false); setCsvOpen(false); setCsvFiles([]);
+  }
+
+  // ── Ações da tabela ───────────────────────────────────────────────────────
+  function toggleStatus(id: string) {
+    setProdutos(prev => prev.map(p =>
+      p.id === id ? { ...p, status: p.status === "ativo" ? "arquivado" : "ativo" } : p
+    ));
+  }
+
+  const filtered = useMemo(() => produtos.filter(p => {
+    const matchSearch    = !search || p.nome.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase()) || p.seller.toLowerCase().includes(search.toLowerCase());
+    const matchOrigem    = filtroOrigem === "todos" || p.origem === filtroOrigem;
+    const matchCategoria = filtroCategoria === "todas" || p.categoria === filtroCategoria;
+    const matchStatus    = filtroStatus === "todos" || p.status === filtroStatus;
+    return matchSearch && matchOrigem && matchCategoria && matchStatus;
+  }), [produtos, search, filtroOrigem, filtroCategoria, filtroStatus]);
+
+  const total1P = produtos.filter(p => p.origem === "1P" && p.status === "ativo").length;
+  const total3P = produtos.filter(p => p.origem === "3P" && p.status === "ativo").length;
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold">Catálogo de Produtos Incentivados</h2>
-          <p className="text-sm text-muted-foreground">Produtos agrupados por categoria.</p>
-        </div>
-        <div className="flex gap-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <Input
-              className="pl-9 w-64"
-              placeholder="Buscar produto..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
+      <PageHeader
+        title="Catálogo de produtos"
+        path={[{ label: "Configuração" }]}
+        description={`${total1P} próprios · ${total3P} de terceiros ativos`}
+        actions={
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => { setCsvFiles([]); setCsvOpen(true); }}>
+              <FileUp className="mr-1.5 h-3.5 w-3.5" />Importar em lote
+            </Button>
+            <Button size="sm" onClick={abrirDrawer}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" />Adicionar produto
+            </Button>
           </div>
-          <Button size="sm" onClick={() => setOpen(true)}>
-            <Plus className="mr-1.5 h-4 w-4" />
-            Novo produto
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link to="/catalogo/grupos">Grupos</Link>
-          </Button>
+        }
+      />
+
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
+        {/* Toolbar */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-border flex-wrap">
+          <div className="w-56 shrink-0">
+            <SearchInput value={search} onChange={setSearch} placeholder="Nome, SKU ou seller…" />
+          </div>
+          <Select value={filtroOrigem} onValueChange={v => setFiltroOrigem(v as Origem | "todos")}>
+            <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todas origens</SelectItem>
+              <SelectItem value="1P">1P — Próprio</SelectItem>
+              <SelectItem value="3P">3P — Terceiro</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
+            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todas">Todas categorias</SelectItem>
+              {CATEGORIAS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={filtroStatus} onValueChange={v => setFiltroStatus(v as StatusProd | "todos")}>
+            <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="ativo">Ativos</SelectItem>
+              <SelectItem value="arquivado">Arquivados</SelectItem>
+            </SelectContent>
+          </Select>
+          <span className="ml-auto text-xs text-muted-foreground">{filtered.length} produto(s)</span>
+        </div>
+
+        {/* Tabela */}
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-muted/20 border-b border-border">
+              <tr className="text-left text-muted-foreground">
+                {["Origem", "SKU", "Nome", "Categoria", "Tier", "Seller / Plataforma", "Estoque", "Entrada", "Status", ""].map(h => (
+                  <th key={h} className="px-4 py-3 text-xs font-medium whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {filtered.map(p => (
+                <tr key={p.id} className={`hover:bg-muted/20 transition-colors ${p.status === "arquivado" ? "opacity-50" : ""}`}>
+                  <td className="px-4 py-3.5"><OrigemBadge origem={p.origem} /></td>
+                  <td className="px-4 py-3.5 font-mono text-xs text-muted-foreground">{p.sku || "—"}</td>
+                  <td className="px-4 py-3.5 font-medium whitespace-nowrap">{p.nome}</td>
+                  <td className="px-4 py-3.5 text-sm text-muted-foreground">{p.categoria}</td>
+                  <td className="px-4 py-3.5"><TierBadge tier={p.tier} /></td>
+                  <td className="px-4 py-3.5">
+                    {p.origem === "3P" ? (
+                      <div>
+                        <p className="text-sm font-medium">{p.seller}</p>
+                        <p className="text-[10px] text-muted-foreground">{p.plataforma}</p>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3.5 tabular-nums text-sm">
+                    {p.origem === "3P" || p.estoque === null
+                      ? <span className="text-muted-foreground">—</span>
+                      : p.estoque === 0
+                        ? <span className="text-destructive font-medium">Esgotado</span>
+                        : p.estoque}
+                  </td>
+                  <td className="px-4 py-3.5"><EntradaBadge tipo={p.entrada} /></td>
+                  <td className="px-4 py-3.5">
+                    <Pill color={p.status === "ativo" ? "success" : "muted"} variant="soft" size="sm">
+                      {p.status === "ativo" ? "Ativo" : "Arquivado"}
+                    </Pill>
+                  </td>
+                  <td className="px-4 py-3.5">
+                    <div className="flex items-center gap-1 justify-end">
+                      <button className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button onClick={() => toggleStatus(p.id)}
+                        className={`p-1.5 rounded hover:bg-muted transition-colors ${p.status === "ativo" ? "text-muted-foreground hover:text-amber-600" : "text-muted-foreground hover:text-emerald-600"}`}>
+                        {p.status === "ativo" ? <Archive className="h-3.5 w-3.5" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {Object.entries(catalog).map(([group, products]) => {
-        const visible = products.filter((p) => !p.archived && matchesQuery(p.name));
-        if (visible.length === 0) return null;
-        const isOpen = expanded[group] ?? true;
-
-        return (
-          <Card key={group} className="overflow-hidden">
-            <button
-              onClick={() => toggle(group)}
-              className="flex w-full items-center gap-3 px-6 py-4 hover:bg-muted/30 text-left transition-colors"
-            >
-              <Package className="size-4 text-muted-foreground shrink-0" />
-              <span className="flex-1 font-semibold">{group}</span>
-              <Badge variant="secondary">{visible.length} produto{visible.length !== 1 ? "s" : ""}</Badge>
-              {isOpen ? (
-                <ChevronDown className="size-4 text-muted-foreground" />
-              ) : (
-                <ChevronRight className="size-4 text-muted-foreground" />
-              )}
-            </button>
-
-            {isOpen && (
-              <div className="overflow-x-auto border-t border-border">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-muted/20">
-                    <tr className="text-left text-muted-foreground">
-                      <th className="px-6 py-3 font-medium">Produto</th>
-                      <th className="px-6 py-3 font-medium">ID</th>
-                      <th className="px-6 py-3 font-medium">Pontos</th>
-                      <th className="px-6 py-3 font-medium">Estoque</th>
-                      <th className="px-6 py-3 font-medium">Status</th>
-                      <th className="px-6 py-3 font-medium" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {visible.map((product) => (
-                      <tr key={product.id} className="hover:bg-muted/20">
-                        <td className="px-6 py-3 font-medium">{product.name}</td>
-                        <td className="px-6 py-3 font-mono text-xs text-muted-foreground">{product.id}</td>
-                        <td className="px-6 py-3 tabular-nums">
-                          {product.points.toLocaleString("pt-BR")} pts
-                        </td>
-                        <td className="px-6 py-3 tabular-nums">
-                          <span className={product.stock === 0 ? "text-red-500 font-medium" : ""}>
-                            {product.stock === 0 ? "Esgotado" : product.stock}
-                          </span>
-                        </td>
-                        <td className="px-6 py-3">
-                          <span
-                            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                              product.active
-                                ? "bg-emerald-100 text-emerald-700"
-                                : "bg-slate-100 text-slate-500"
-                            }`}
-                          >
-                            {product.active ? "Ativo" : "Inativo"}
-                          </span>
-                        </td>
-                        <td className="px-6 py-3 text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" aria-label="Ações do produto">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem asChild>
-                                <Link to={`/catalogo/${product.id}`}>Detalhes</Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-muted-foreground"
-                                onSelect={() => setArchiveTarget(product)}
-                              >
-                                <Archive className="mr-2 h-4 w-4" />
-                                Arquivar produto
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Card>
-        );
-      })}
-
-      <ConfirmDialog
-        open={!!archiveTarget}
-        onOpenChange={(o) => { if (!o) setArchiveTarget(null); }}
-        title={`Arquivar "${archiveTarget?.name}"?`}
-        description="O produto será removido do catálogo de resgate e não ficará mais disponível para os membros. Você poderá reativá-lo a qualquer momento."
-        confirmLabel="Arquivar"
-        variant="destructive"
-        onConfirm={() => archiveTarget && archiveProduct(archiveTarget)}
-      />
-
+      {/* ── DRAWER: produto unitário ── */}
       <FormDrawer
-        open={open}
-        onOpenChange={(o) => { setOpen(o); if (!o) resetForm(); }}
-        title="Novo produto"
-        description="Adicione um produto ao catálogo de resgate."
+        open={drawerOpen}
+        onOpenChange={v => { if (!v) { setDrawerOpen(false); resetForm(); } }}
+        title="Adicionar produto"
+        description="Selecione a origem e preencha os dados do produto."
         onSave={handleSave}
         saving={saving}
-        saveLabel={uploadMode === "arquivo" ? "Importar arquivo" : "Adicionar produto"}
-        saveDisabled={
-          uploadMode === "manual"
-            ? !newName || !newGroup || !newPoints
-            : files.length === 0
-        }
+        saveLabel="Adicionar produto"
+        saveDisabled={isSaveDisabled}
       >
-        <div className="space-y-4">
-          <Tabs value={uploadMode} onValueChange={(v) => setUploadMode(v as "manual" | "arquivo")}>
+        <div className="space-y-5">
+          {/* Origem */}
+          <Tabs value={fOrigem} onValueChange={v => { setFOrigem(v as Origem); setFSeller(""); setFPlat(""); }}>
             <TabsList className="w-full">
-              <TabsTrigger value="manual" className="flex-1">Preenchimento manual</TabsTrigger>
-              <TabsTrigger value="arquivo" className="flex-1">
-                <FileUp className="mr-1.5 h-3.5 w-3.5" />
-                Importar arquivo
-              </TabsTrigger>
+              <TabsTrigger value="1P" className="flex-1">1P — Próprio</TabsTrigger>
+              <TabsTrigger value="3P" className="flex-1">3P — Terceiro</TabsTrigger>
             </TabsList>
+          </Tabs>
 
-            {/* Manual */}
-            <TabsContent value="manual" className="mt-4 space-y-4">
+          {/* Campos exclusivos 3P */}
+          {fOrigem === "3P" && (
+            <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-3">
               <div className="space-y-1.5">
-                <Label>Nome do produto <span className="text-destructive">*</span></Label>
-                <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder='Ex: Smart TV 50"' />
+                <Label>Seller <span className="text-destructive">*</span></Label>
+                <Input value={fSeller} onChange={e => setFSeller(e.target.value)} placeholder="Nome do seller" />
               </div>
               <div className="space-y-1.5">
-                <Label>Categoria <span className="text-destructive">*</span></Label>
-                <Select value={newGroup} onValueChange={setNewGroup}>
-                  <SelectTrigger><SelectValue placeholder="Selecione uma categoria" /></SelectTrigger>
-                  <SelectContent>
-                    {Object.keys(catalog).map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
-                  </SelectContent>
+                <Label>Plataforma</Label>
+                <Select value={fPlat} onValueChange={setFPlat}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>{PLATAFORMAS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>Pontos necessários <span className="text-destructive">*</span></Label>
-                  <NumberInput value={newPoints} onChange={setNewPoints} min={1} placeholder="Ex: 10000" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Estoque inicial</Label>
-                  <NumberInput value={newStock} onChange={setNewStock} min={0} placeholder="Ex: 50" />
-                </div>
-              </div>
-              <div className="flex items-center justify-between rounded-lg border border-border p-3">
-                <div>
-                  <div className="text-sm font-medium">Produto ativo</div>
-                  <div className="text-xs text-muted-foreground">Disponível para resgate imediato</div>
-                </div>
-                <Switch checked={newActive} onCheckedChange={setNewActive} size="sm" />
-              </div>
-            </TabsContent>
+            </div>
+          )}
 
-            {/* Importar arquivo */}
-            <TabsContent value="arquivo" className="mt-4 space-y-4">
-              <FileUploadInput
-                value={files}
-                onChange={setFiles}
-                maxFiles={1}
-                accept=".csv,.xlsx,.xls"
-                maxSizeMB={10}
-              />
-              <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-1.5">
-                <p className="text-xs font-medium text-muted-foreground">Formato esperado</p>
-                <p className="text-xs text-muted-foreground">
-                  CSV ou Excel com colunas: <span className="font-mono">nome, categoria, pontos, estoque, ativo</span>
-                </p>
-                <a href="#" className="text-xs text-primary underline-offset-2 hover:underline" onClick={(e) => e.preventDefault()}>
-                  Baixar planilha modelo
-                </a>
+          {/* Campos comuns */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>SKU</Label>
+              <Input value={fSku} onChange={e => setFSku(e.target.value)} placeholder="Ex: TV-50-4K" className="font-mono" />
+            </div>
+            {fOrigem === "1P" && (
+              <div className="space-y-1.5">
+                <Label>Estoque inicial</Label>
+                <Input value={fEstoque} onChange={e => setFEstoque(e.target.value)} type="number" min="0" placeholder="Ex: 50" />
               </div>
-            </TabsContent>
-          </Tabs>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <Label>Nome do produto <span className="text-destructive">*</span></Label>
+            <Input value={fNome} onChange={e => setFNome(e.target.value)} placeholder='Ex: Smart TV 50"' />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Categoria <span className="text-destructive">*</span></Label>
+              <Select value={fCat} onValueChange={setFCat}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>{CATEGORIAS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Tier</Label>
+              <Select value={fTier} onValueChange={v => setFTier(v as TierProduto)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{TIERS_PROD.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+      </FormDrawer>
+
+      {/* ── DRAWER: importar em lote ── */}
+      <FormDrawer
+        open={csvOpen}
+        onOpenChange={v => { if (!v) { setCsvOpen(false); setCsvFiles([]); } }}
+        title="Importar em lote"
+        description="Importe múltiplos produtos via CSV. Funciona para produtos 1P e 3P — inclua a coluna origem no arquivo."
+        onSave={handleSaveCSV}
+        saving={csvSaving}
+        saveLabel="Importar arquivo"
+        saveDisabled={csvFiles.length === 0}
+      >
+        <div className="space-y-4">
+          <FileUploadInput value={csvFiles} onChange={setCsvFiles} maxFiles={1} accept=".csv,.xlsx,.xls" maxSizeMB={10} />
+          <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-1">
+            <p className="text-xs font-medium text-muted-foreground">Colunas esperadas</p>
+            <p className="font-mono text-xs text-muted-foreground">sku, nome, categoria, origem, tier, seller, plataforma, estoque</p>
+          </div>
         </div>
       </FormDrawer>
     </div>

@@ -4,39 +4,51 @@ import {
   Avatar, AvatarFallback, Button, Card, CardContent, CardHeader, CardTitle,
   ConfirmDialog, InfoNotice, PageHeader, Pill, Separator, toast,
 } from "@kruzer/ds";
-import { ArrowLeft, CheckCircle2, Circle, Clock, XCircle, Package } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Clock, XCircle, Package, FileText, Download, Banknote } from "lucide-react";
 import { ORDERS } from "./Pedidos";
+import { renderCrumbLink } from "../lib/crumbLink";
 import type { OrderStatus, Order } from "./Pedidos";
+import { LIFECYCLE_POR_TIPO, TIPO_RESGATE_LABEL, TIPO_RESGATE_ICON, proximoStatus } from "../config/resgateLifecycle";
 
 // ── Lifecycle definition ──────────────────────────────────────────────────────
 
-const LIFECYCLE: OrderStatus[] = ["solicitado", "aprovado", "em_separacao", "entregue"];
-
 const STEP_LABEL: Record<OrderStatus, string> = {
-  solicitado:   "Solicitado",
-  aprovado:     "Aprovado",
-  em_separacao: "Em separação",
-  entregue:     "Entregue",
-  rejeitado:    "Rejeitado",
-  cancelado:    "Cancelado",
+  solicitado:    "Solicitado",
+  aguardando_doc:"Aguardando doc.",
+  doc_recebido:  "Doc. recebido",
+  aprovado:      "Aprovado",
+  em_separacao:  "Em separação",
+  entregue:      "Entregue",
+  enviado:       "Enviado",
+  creditado:     "Creditado",
+  rejeitado:     "Rejeitado",
+  cancelado:     "Cancelado",
 };
 
 const STEP_DESC: Record<OrderStatus, string> = {
-  solicitado:   "Membro solicitou o resgate pelo canal.",
-  aprovado:     "Pedido aprovado. Pontos debitados do saldo.",
-  em_separacao: "Produto em preparação para entrega.",
-  entregue:     "Entrega confirmada. Ciclo concluído.",
-  rejeitado:    "Pedido recusado pelo operador.",
-  cancelado:    "Pedido cancelado.",
+  solicitado:    "Membro solicitou o resgate pelo canal.",
+  aguardando_doc:"Aguardando envio de documento pelo membro.",
+  doc_recebido:  "Documento recebido. Analista precisa revisar.",
+  aprovado:      "Resgate aprovado. Saldo debitado da carteira.",
+  em_separacao:  "Produto em preparação para entrega.",
+  entregue:      "Entrega confirmada. Ciclo concluído.",
+  enviado:       "Voucher enviado ao membro. Ciclo concluído.",
+  creditado:     "Crédito processado na conta do membro. Ciclo concluído.",
+  rejeitado:     "Resgate recusado pelo operador.",
+  cancelado:     "Resgate cancelado.",
 };
 
 const STATUS_PILL: Record<OrderStatus, "warning" | "primary" | "secondary" | "success" | "destructive" | "muted"> = {
-  solicitado:   "warning",
-  aprovado:     "primary",
-  em_separacao: "secondary",
-  entregue:     "success",
-  rejeitado:    "destructive",
-  cancelado:    "muted",
+  solicitado:    "warning",
+  aguardando_doc:"warning",
+  doc_recebido:  "primary",
+  aprovado:      "primary",
+  em_separacao:  "secondary",
+  entregue:      "success",
+  enviado:       "success",
+  creditado:     "success",
+  rejeitado:     "destructive",
+  cancelado:     "muted",
 };
 
 const TIER_COLOR: Record<string, string> = {
@@ -46,14 +58,8 @@ const TIER_COLOR: Record<string, string> = {
   Bronze:   "bg-orange-100 text-orange-700",
 };
 
-function nextStatus(current: OrderStatus): OrderStatus | null {
-  const idx = LIFECYCLE.indexOf(current);
-  if (idx === -1 || idx === LIFECYCLE.length - 1) return null;
-  return LIFECYCLE[idx + 1];
-}
-
 function isTerminal(status: OrderStatus) {
-  return status === "entregue" || status === "rejeitado" || status === "cancelado";
+  return ["entregue", "enviado", "creditado", "rejeitado", "cancelado"].includes(status);
 }
 
 // ── Timeline step ─────────────────────────────────────────────────────────────
@@ -106,16 +112,18 @@ export default function PedidoDetalhe() {
 
   // Local state copy so we can mutate status in the prototype
   const [orders, setOrders] = useState<Order[]>(ORDERS);
-  const [confirmApprove, setConfirmApprove] = useState(false);
-  const [confirmAdvance, setConfirmAdvance] = useState(false);
-  const [confirmReject,  setConfirmReject]  = useState(false);
+  const [confirmApprove,  setConfirmApprove]  = useState(false);
+  const [confirmAdvance,  setConfirmAdvance]  = useState(false);
+  const [confirmReject,   setConfirmReject]   = useState(false);
+  const [confirmCreditar, setConfirmCreditar] = useState(false);
+  const [comprovante,     setComprovante]     = useState("");
 
   const orderFound = orders.find((o) => o.id === id);
   if (!orderFound) {
     return (
       <div className="p-8 text-center text-muted-foreground text-sm">
-        Pedido não encontrado.
-        <button className="ml-2 text-primary underline" onClick={() => navigate("/pedidos")}>
+        Resgate não encontrado.
+        <button className="ml-2 text-primary underline" onClick={() => navigate("/resgates")}>
           Voltar
         </button>
       </div>
@@ -123,7 +131,8 @@ export default function PedidoDetalhe() {
   }
 
   const order = orderFound;
-  const next = nextStatus(order.status);
+  const lifecycle = LIFECYCLE_POR_TIPO[order.tipoResgate];
+  const next = proximoStatus(order.tipoResgate, order.status);
   const terminal = isTerminal(order.status);
 
   function advance(toStatus: OrderStatus, operator = "Maria Admin") {
@@ -144,35 +153,41 @@ export default function PedidoDetalhe() {
   function handleApprove() {
     setConfirmApprove(false);
     advance("aprovado");
-    toast.success(`${order.points.toLocaleString("pt-BR")} pts debitados do saldo de ${order.memberName}`);
+    toast.success(`${order.points.toLocaleString("pt-BR")} ${order.moedaAbrev} debitados do saldo de ${order.memberName}`);
   }
 
   function handleAdvance() {
     setConfirmAdvance(false);
     if (!next) return;
     advance(next);
-    const msg = next === "em_separacao" ? "Pedido em separação" : "Entrega confirmada — pedido concluído";
+    const msg = next === "em_separacao" ? "Resgate em separação" : "Entrega confirmada — resgate concluído";
     toast.success(msg);
   }
 
   function handleReject() {
     setConfirmReject(false);
     advance("rejeitado");
-    toast.error(`Pedido ${order.id} rejeitado`);
+    toast.error(`Resgate ${order.id} rejeitado`);
   }
 
-  // Which step index is current
-  const currentIdx = LIFECYCLE.indexOf(order.status);
+  function handleCreditar() {
+    setConfirmCreditar(false);
+    advance("creditado");
+    toast.success(`Crédito processado — comprovante registrado`);
+  }
+
+  const currentIdx = lifecycle.indexOf(order.status);
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`Pedido ${order.id}`}
-        path={[{ label: "Operação" }, { label: "Pedidos" }]}
+        title={`Resgate ${order.id}`}
+        path={[{ label: "Operação" }, { label: "Aprovações de Resgate", to: "/resgates" }]}
+        renderCrumbLink={renderCrumbLink}
         description={`${order.product} · Solicitado em ${order.createdAt}`}
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => navigate("/pedidos")}>
+            <Button variant="outline" size="sm" onClick={() => navigate("/resgates")}>
               <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
               Voltar
             </Button>
@@ -191,7 +206,12 @@ export default function PedidoDetalhe() {
           {/* Timeline */}
           <Card>
             <CardHeader className="pb-4">
-              <CardTitle className="text-sm">Lifecycle do pedido</CardTitle>
+              <CardTitle className="text-sm flex items-center gap-2">
+                Lifecycle do resgate
+                <span className="text-xs font-normal text-muted-foreground border border-border rounded-full px-2 py-0.5">
+                  {TIPO_RESGATE_ICON[order.tipoResgate]} {TIPO_RESGATE_LABEL[order.tipoResgate]}
+                </span>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {order.status === "rejeitado" || order.status === "cancelado" ? (
@@ -214,11 +234,11 @@ export default function PedidoDetalhe() {
                 </div>
               ) : (
                 <div>
-                  {LIFECYCLE.map((step, idx) => {
+                  {lifecycle.map((step, idx) => {
                     const done   = idx < currentIdx;
                     const active = idx === currentIdx;
                     const entry  = order.timeline.find((t) => t.status === step);
-                    const isLast = idx === LIFECYCLE.length - 1;
+                    const isLast = idx === lifecycle.length - 1;
                     return (
                       <div key={step} className={isLast ? "[&_.timeline-line]:hidden" : ""}>
                         <TimelineStep step={step} active={active} done={done} entry={entry} />
@@ -240,7 +260,7 @@ export default function PedidoDetalhe() {
                 {order.status === "solicitado" && (
                   <>
                     <p className="text-sm text-muted-foreground">
-                      Revise o pedido e aprove ou rejeite. A aprovação debita os pontos imediatamente.
+                      Revise e aprove ou rejeite. A aprovação debita o saldo imediatamente.
                     </p>
                     <div className="flex gap-2">
                       <Button size="sm" className="flex-1" onClick={() => setConfirmApprove(true)}>
@@ -276,15 +296,42 @@ export default function PedidoDetalhe() {
             </Card>
           )}
 
+          {/* Aviso documental para crédito em conta */}
+          {order.tipoResgate === "credito_conta" && order.status === "aguardando_doc" && (
+            <InfoNotice variant="warning"
+              title={order.tipoPessoa === "PF" ? "Aguardando RPA do membro (PF)" : "Aguardando Nota Fiscal do membro (PJ)"}>
+              {order.tipoPessoa === "PF"
+                ? "O membro precisa assinar o RPA (Recibo de Pagamento Autônomo) pelo portal antes que o pagamento seja processado."
+                : "O membro PJ precisa emitir e enviar a Nota Fiscal de Serviços pelo portal antes que o pagamento seja processado."}
+            </InfoNotice>
+          )}
+
+          {order.tipoResgate === "credito_conta" && order.status === "doc_recebido" && (
+            <InfoNotice variant="info"
+              title={order.tipoPessoa === "PF" ? "RPA recebido — revisar e aprovar" : "Nota Fiscal recebida — revisar e aprovar"}>
+              {order.tipoPessoa === "PF"
+                ? "O membro enviou o RPA assinado. Revise o documento e aprove para liberar o pagamento via PIX/transferência."
+                : "O membro PJ enviou a Nota Fiscal. Revise e aprove para que o financeiro processe a transferência."}
+            </InfoNotice>
+          )}
+
+          {order.tipoResgate === "credito_conta" && order.status === "creditado" && (
+            <InfoNotice variant="success" title="Crédito processado">
+              {order.tipoPessoa === "PF"
+                ? "Pagamento via PIX/transferência processado. RPA arquivado."
+                : "Transferência para a conta PJ processada. NF arquivada."}
+            </InfoNotice>
+          )}
+
           {order.status === "entregue" && (
             <InfoNotice variant="success" title="Ciclo concluído">
-              Pedido entregue e pontos debitados. Nenhuma ação necessária.
+              Resgate concluído e saldo debitado. Nenhuma ação necessária.
             </InfoNotice>
           )}
 
           {order.status === "rejeitado" && (
-            <InfoNotice variant="warning" title="Pedido rejeitado">
-              Os pontos não foram debitados. O saldo do membro permanece inalterado.
+            <InfoNotice variant="warning" title="Resgate rejeitado">
+              Nenhum saldo foi debitado. A carteira do membro permanece inalterada.
             </InfoNotice>
           )}
         </div>
@@ -316,21 +363,25 @@ export default function PedidoDetalhe() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Saldo atual</span>
                   <span className="font-semibold tabular-nums">
-                    {order.memberBalance.toLocaleString("pt-BR")} pts
+                    {order.memberBalance.toLocaleString("pt-BR")} <span className="text-xs text-muted-foreground">{order.moedaAbrev}</span>
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Pontos do resgate</span>
+                  <span className="text-muted-foreground">Custo do resgate</span>
                   <span className="font-semibold tabular-nums text-rose-600">
-                    −{order.points.toLocaleString("pt-BR")} pts
+                    −{order.points.toLocaleString("pt-BR")} <span className="text-xs">{order.moedaAbrev}</span>
                   </span>
                 </div>
                 <Separator />
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Saldo após aprovação</span>
                   <span className={`font-bold tabular-nums ${(order.memberBalance - order.points) < 0 ? "text-destructive" : ""}`}>
-                    {(order.memberBalance - order.points).toLocaleString("pt-BR")} pts
+                    {(order.memberBalance - order.points).toLocaleString("pt-BR")} <span className="text-xs text-muted-foreground">{order.moedaAbrev}</span>
                   </span>
+                </div>
+                <div className="flex justify-between pt-1">
+                  <span className="text-muted-foreground">Moeda da campanha</span>
+                  <span className="text-xs font-semibold rounded-full border border-border px-2 py-0.5">{order.moedaCampanha}</span>
                 </div>
               </div>
               <button
@@ -341,6 +392,144 @@ export default function PedidoDetalhe() {
               </button>
             </CardContent>
           </Card>
+
+          {/* ── Cards exclusivos de crédito em conta ── */}
+          {order.tipoResgate === "credito_conta" && (
+            <>
+              {/* 1. Dados bancários do membro */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Banknote className="h-4 w-4 text-muted-foreground" />
+                    Dados para pagamento · {order.tipoPessoa}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  {order.tipoPessoa === "PF" ? (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Chave PIX</span>
+                        <span className="font-mono text-xs">123.456.789-00</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Banco</span>
+                        <span>Bradesco</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Agência / CC</span>
+                        <span className="font-mono text-xs">1234 / 56789-0</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">CNPJ</span>
+                        <span className="font-mono text-xs">12.345.678/0001-90</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Razão social</span>
+                        <span className="text-xs">{order.clienteName}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Banco</span>
+                        <span>Itaú</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Agência / CC</span>
+                        <span className="font-mono text-xs">5678 / 12345-6</span>
+                      </div>
+                    </>
+                  )}
+                  <div className="pt-1">
+                    <p className="text-[10px] text-muted-foreground">
+                      Dados cadastrados pelo membro em Minha conta → Dados para recebimento.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 2. Documento recebido (RPA / NF) */}
+              {["doc_recebido", "aprovado", "creditado"].includes(order.status) && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      {order.tipoPessoa === "PF" ? "RPA recebido" : "Nota Fiscal recebida"}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <div>
+                          <p className="text-xs font-medium">
+                            {order.tipoPessoa === "PF" ? `RPA-${order.id}.pdf` : `NF-${order.id}.xml`}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">Enviado em {order.timeline.find(t => t.status === "doc_recebido")?.date ?? "—"}</p>
+                        </div>
+                      </div>
+                      <button className="flex items-center gap-1 text-xs text-primary hover:underline shrink-0">
+                        <Download className="h-3 w-3" />
+                        Baixar
+                      </button>
+                    </div>
+                    {order.status === "doc_recebido" && (
+                      <p className="text-[10px] text-muted-foreground">
+                        Revise o documento antes de aprovar. Após aprovação o pagamento será liberado.
+                      </p>
+                    )}
+                    {order.status === "creditado" && (
+                      <div className="flex items-center gap-2 text-xs text-emerald-700">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Documento aprovado e arquivado
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* 3. Comprovante de pagamento */}
+              {["aprovado", "creditado"].includes(order.status) && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+                      Comprovante de pagamento
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {order.status === "aprovado" ? (
+                      <>
+                        <p className="text-xs text-muted-foreground">
+                          Após realizar a transferência, registre o comprovante aqui antes de marcar como creditado.
+                        </p>
+                        <input
+                          value={comprovante}
+                          onChange={e => setComprovante(e.target.value)}
+                          placeholder="Ex: E00000000202406121430... ou número do comprovante"
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                        />
+                        <button
+                          disabled={!comprovante}
+                          onClick={() => setConfirmCreditar(true)}
+                          className="w-full rounded-lg bg-primary text-primary-foreground py-2 text-xs font-semibold hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Confirmar crédito na conta
+                        </button>
+                      </>
+                    ) : (
+                      <div className="rounded-lg bg-muted/40 px-3 py-2.5 space-y-1">
+                        <p className="text-xs text-muted-foreground">Comprovante registrado</p>
+                        <p className="text-xs font-mono text-foreground break-all">
+                          {comprovante || "E00000000202406121430abc123def456"}
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
 
           {/* Produto */}
           <Card>
@@ -360,10 +549,18 @@ export default function PedidoDetalhe() {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Canal</span>
                 <span>{order.channel}</span>
+                </div>
+                <div className="flex justify-between py-2.5 border-b border-border last:border-0 text-sm">
+                <span className="text-muted-foreground">Origem</span>
+                {order.origem === "portal" ? (
+                  <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-sky-100 text-sky-700">📱 Portal do membro</span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-slate-100 text-slate-600">🖥 Criado pelo operador</span>
+                )}
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Custo em pontos</span>
-                <span className="font-semibold tabular-nums">{order.points.toLocaleString("pt-BR")} pts</span>
+                <span className="text-muted-foreground">Saldo debitado ({order.moedaCampanha})</span>
+                <span className="font-semibold tabular-nums">{order.points.toLocaleString("pt-BR")} <span className="text-xs text-muted-foreground">{order.moedaAbrev}</span></span>
               </div>
             </CardContent>
           </Card>
@@ -375,7 +572,7 @@ export default function PedidoDetalhe() {
         open={confirmApprove}
         onOpenChange={setConfirmApprove}
         title="Aprovar pedido"
-        description={`${order.points.toLocaleString("pt-BR")} pontos serão debitados do saldo de ${order.memberName} imediatamente. Confirmar aprovação?`}
+        description={`${order.points.toLocaleString("pt-BR")} ${order.moedaCampanha.toLowerCase()} serão debitados do saldo de ${order.memberName} imediatamente. Confirmar aprovação?`}
         confirmLabel="Sim, aprovar e debitar"
         onConfirm={handleApprove}
       />
@@ -396,10 +593,19 @@ export default function PedidoDetalhe() {
       <ConfirmDialog
         open={confirmReject}
         onOpenChange={setConfirmReject}
-        title="Rejeitar pedido"
-        description={`O pedido de ${order.memberName} será recusado. Nenhum ponto será debitado. Confirmar rejeição?`}
-        confirmLabel="Sim, rejeitar pedido"
+        title="Rejeitar resgate"
+        description={`O resgate de ${order.memberName} será recusado. Nenhum saldo será debitado. Confirmar rejeição?`}
+        confirmLabel="Sim, rejeitar"
         onConfirm={handleReject}
+      />
+
+      <ConfirmDialog
+        open={confirmCreditar}
+        onOpenChange={setConfirmCreditar}
+        title="Confirmar crédito na conta"
+        description={`O comprovante ${comprovante} será registrado e o resgate marcado como Creditado. Confirmar?`}
+        confirmLabel="Confirmar crédito"
+        onConfirm={handleCreditar}
       />
     </div>
   );
