@@ -1,10 +1,12 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   Button, FileUploadInput, FormDrawer, Input, Label, PageHeader, Pill,
   SearchInput, Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
   Tabs, TabsList, TabsTrigger, toast, type UploadedFile,
 } from "@kruzer/ds";
-import { Archive, FileUp, Pencil, Plus, RotateCcw } from "lucide-react";
+import { Archive, CheckCircle2, FileUp, Loader2, Pencil, Plus, RotateCcw, X } from "lucide-react";
+
+type ImportJob = { status: "processing" | "done"; filename: string; total: number; current: number };
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -118,15 +120,34 @@ export default function Catalogo() {
   }
 
   // ── Drawer: importar em lote ──────────────────────────────────────────────
-  const [csvOpen,   setCsvOpen]   = useState(false);
-  const [csvSaving, setCsvSaving] = useState(false);
-  const [csvFiles,  setCsvFiles]  = useState<UploadedFile[]>([]);
+  const [csvOpen,    setCsvOpen]    = useState(false);
+  const [csvSaving,  setCsvSaving]  = useState(false);
+  const [csvFiles,   setCsvFiles]   = useState<UploadedFile[]>([]);
+  const [importJob,  setImportJob]  = useState<ImportJob | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!importJob || importJob.status === "done") return;
+    intervalRef.current = setInterval(() => {
+      setImportJob(prev => {
+        if (!prev) return null;
+        const next = Math.min(prev.current + Math.ceil(prev.total / 12), prev.total);
+        if (next >= prev.total) {
+          clearInterval(intervalRef.current!);
+          return { ...prev, current: prev.total, status: "done" };
+        }
+        return { ...prev, current: next };
+      });
+    }, 400);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [importJob?.status]);
 
   async function handleSaveCSV() {
     if (csvFiles.length === 0) return;
     setCsvSaving(true);
     await new Promise(r => setTimeout(r, 400));
-    toast.success(`${csvFiles[0].name} importado — produtos serão processados em breve`);
+    const total = Math.floor(Math.random() * 80) + 20;
+    setImportJob({ status: "processing", filename: csvFiles[0].name, total, current: 0 });
     setCsvSaving(false); setCsvOpen(false); setCsvFiles([]);
   }
 
@@ -165,6 +186,47 @@ export default function Catalogo() {
           </div>
         }
       />
+
+      {/* ── Banner de importação ── */}
+      {importJob && (
+        <div className={`rounded-lg border px-4 py-3 flex items-center gap-3 ${
+          importJob.status === "done"
+            ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30"
+            : "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30"
+        }`}>
+          {importJob.status === "processing"
+            ? <Loader2 className="h-4 w-4 text-blue-500 shrink-0 animate-spin" />
+            : <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+          }
+          <div className="flex-1 min-w-0 space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium truncate">
+                {importJob.status === "processing"
+                  ? `Importando ${importJob.filename}…`
+                  : `${importJob.filename} importado com sucesso`
+                }
+              </p>
+              <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
+                {importJob.current} de {importJob.total} produtos
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${
+                  importJob.status === "done" ? "bg-emerald-500" : "bg-blue-500"
+                }`}
+                style={{ width: `${(importJob.current / importJob.total) * 100}%` }}
+              />
+            </div>
+          </div>
+          {importJob.status === "done" && (
+            <button onClick={() => setImportJob(null)}
+              className="p-1 rounded hover:bg-black/10 text-muted-foreground transition-colors shrink-0">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="rounded-lg border border-border bg-card overflow-hidden">
         {/* Toolbar */}

@@ -50,6 +50,11 @@ import Ranking from "./pages/Ranking";
 import Logs from "./pages/Logs";
 import Regulamento from "./pages/Regulamento";
 import Indicacoes from "./pages/Indicacoes";
+import PontosExpirando from "./pages/PontosExpirando";
+import SaldoExpirado from "./pages/SaldoExpirado";
+import Missoes from "./pages/Missoes";
+import AlertasFraude from "./pages/AlertasFraude";
+import TemplatesComunicacao from "./pages/TemplatesComunicacao";
 
 export default function App() {
   return (
@@ -98,6 +103,11 @@ export default function App() {
         <Route path="resgates/:id" element={<PedidoDetalhe />} />
         <Route path="orcamentos" element={<Orcamentos />} />
         <Route path="indicacoes" element={<Indicacoes />} />
+        <Route path="pontos-expirando" element={<PontosExpirando />} />
+        <Route path="saldo-expirado" element={<SaldoExpirado />} />
+        <Route path="missoes" element={<Missoes />} />
+        <Route path="alertas-fraude" element={<AlertasFraude />} />
+        <Route path="templates-comunicacao" element={<TemplatesComunicacao />} />
         <Route path="homepage" element={<Homepage />} />
         <Route path="banners" element={<Banners />} />
         <Route path="conteudo" element={<Conteudo />} />

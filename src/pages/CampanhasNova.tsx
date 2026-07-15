@@ -229,6 +229,8 @@ type Form = {
   limiteAtivo: boolean;
   limitePts: string;
   limiteEscopo: "membro_campanha" | "membro_dia";
+  tetoEmissaoAtivo: boolean;
+  tetoEmissaoPts: string;
   cancelamentoPolicy: "estornar_tudo" | "estornar_proporcional" | "manter";
   aprovacaoTipo: "manual" | "automatica";
   aprovacaoTiposResgate: string[];
@@ -276,6 +278,8 @@ const DEFAULTS: Form = {
   limiteAtivo: false,
   limitePts: "",
   limiteEscopo: "membro_campanha",
+  tetoEmissaoAtivo: false,
+  tetoEmissaoPts: "",
   cancelamentoPolicy: "estornar_tudo",
   aprovacaoTipo: "manual",
   aprovacaoTiposResgate: ["voucher_digital"],
@@ -970,6 +974,28 @@ export default function CampanhasNova() {
               )}
             </div>
 
+            {/* Teto de emissão */}
+            <div className="rounded-lg border border-border overflow-hidden">
+              <div className="px-4 py-3 bg-muted/30 border-b border-border flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold">Teto de emissão <span className="text-xs text-muted-foreground font-normal ml-1">orçamento total da campanha</span></p>
+                </div>
+                <Switch size="sm" checked={form.tetoEmissaoAtivo} onCheckedChange={(v) => set("tetoEmissaoAtivo", v)} />
+              </div>
+              {form.tetoEmissaoAtivo && (
+                <div className="px-4 py-4 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Input type="number" value={form.tetoEmissaoPts} onChange={(e) => set("tetoEmissaoPts", e.target.value)} placeholder="Ex: 500000" className="w-40" />
+                    <span className="text-sm text-muted-foreground">{MOEDA.abrev} no total</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Quando a campanha atingir esse volume acumulado entre todos os membros, novos acúmulos são bloqueados automaticamente — independente do limite individual por membro.</p>
+                </div>
+              )}
+              {!form.tetoEmissaoAtivo && (
+                <div className="px-4 py-3 text-xs text-muted-foreground">Sem teto — a campanha emite {MOEDA.nome.toLowerCase()} sem limite de orçamento total.</div>
+              )}
+            </div>
+
             {/* Cancelamento / estorno */}
             <div className="rounded-lg border border-border overflow-hidden">
               <div className="px-4 py-3 bg-muted/30 border-b border-border">
@@ -1287,7 +1313,8 @@ export default function CampanhasNova() {
                   form.expiracaoTipo === "meses" ? `${form.expiracaoMeses} meses após crédito` :
                   form.expiracaoData || "—"
                 } />
-                <ReviewRow label="Limite" value={form.limiteAtivo && form.limitePts ? `${form.limitePts} pts · ${form.limiteEscopo === "membro_campanha" ? "por membro / campanha" : "por membro / dia"}` : "Sem limite"} />
+                <ReviewRow label="Limite por membro" value={form.limiteAtivo && form.limitePts ? `${form.limitePts} pts · ${form.limiteEscopo === "membro_campanha" ? "por membro / campanha" : "por membro / dia"}` : "Sem limite"} />
+                <ReviewRow label="Teto de emissão" value={form.tetoEmissaoAtivo && form.tetoEmissaoPts ? `${Number(form.tetoEmissaoPts).toLocaleString("pt-BR")} ${MOEDA.abrev} no total` : "Sem teto"} />
                 <ReviewRow label="Cancelamento" value={{ estornar_tudo: "Estornar tudo", estornar_proporcional: "Estorno proporcional", manter: "Manter pontos" }[form.cancelamentoPolicy]} />
                 <ReviewRow label="Aprovação de resgates" value={
                   form.aprovacaoTipo === "manual"

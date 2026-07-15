@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardHeader, CardTitle, Button, Badge, Avatar, AvatarFallback } from "@kruzer/ds";
 import { ArrowRight, CheckCheck, X, ChevronRight, FileCheck, ShoppingCart } from "lucide-react";
+import { MOEDA } from "../config/programa";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -225,7 +226,7 @@ export default function Recompensas() {
                         {order.status}
                       </span>
                     </td>
-                    <td className="px-5 py-3 text-right tabular-nums">{order.points} pts</td>
+                    <td className="px-5 py-3 text-right tabular-nums">{order.points} {MOEDA.abrev}</td>
                     <td className="px-5 py-3 text-muted-foreground tabular-nums text-xs">
                       {order.submittedAt}
                     </td>

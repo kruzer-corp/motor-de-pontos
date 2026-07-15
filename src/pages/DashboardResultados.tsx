@@ -8,6 +8,7 @@ import {
   CartesianGrid,
   LineChart,
   Line,
+  ReferenceLine,
 } from "recharts";
 import {
   Card,
@@ -20,7 +21,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@kruzer/ds";
-import { TrendingUp, BarChart2 } from "lucide-react";
+import { TrendingUp, BarChart2, Users, ShoppingCart, Coins } from "lucide-react";
 
 // ── Data ─────────────────────────────────────────────────────────────
 
@@ -48,6 +49,57 @@ const TIER_EVOLUTION = [
   { month: "Mai", Diamante: 204, Ouro: 321, Prata: 610, Bronze: 1045 },
   { month: "Jun", Diamante: 228, Ouro: 352, Prata: 649, Bronze: 1261 },
 ];
+
+// ── Retenção, Uplift, Custo por resgate ────────────────────────────────
+
+const RETENCAO_COORTE = [
+  { mes: "M+0", pct: 100 },
+  { mes: "M+1", pct: 84  },
+  { mes: "M+2", pct: 71  },
+  { mes: "M+3", pct: 63  },
+  { mes: "M+4", pct: 57  },
+  { mes: "M+5", pct: 54  },
+];
+
+const UPLIFT_DATA = [
+  { grupo: "Sem programa", ticket: 168, frequencia: 2.8, receita: 470 },
+  { grupo: "Com pontos",   ticket: 248, frequencia: 4.2, receita: 1042 },
+];
+
+const ROI_METRICS = [
+  {
+    icon: Users,
+    label: "Retenção 90 dias",
+    value: "63%",
+    desc: "dos membros captados ainda ativos no 3° mês",
+    delta: "+5pp vs. coorte anterior",
+    positive: true,
+  },
+  {
+    icon: ShoppingCart,
+    label: "Uplift de receita",
+    value: "+47%",
+    desc: "ticket médio incentivado vs. sem programa",
+    delta: "R$ 248 vs. R$ 168",
+    positive: true,
+  },
+  {
+    icon: Coins,
+    label: "Custo por ponto resgatado",
+    value: "R$ 0,022",
+    desc: "custo médio por pt entregue como recompensa",
+    delta: "-R$ 0,003 vs. período anterior",
+    positive: true,
+  },
+];
+
+const RETENCAO_CONFIG: ChartConfig = {
+  pct: { label: "% ativos", color: "hsl(var(--primary))" },
+};
+
+const UPLIFT_CONFIG: ChartConfig = {
+  receita: { label: "Receita anual / membro (R$)", color: "hsl(var(--primary))" },
+};
 
 // ── Chart configs ─────────────────────────────────────────────────────
 
@@ -141,6 +193,76 @@ export default function DashboardResultados() {
             </ChartContainer>
           </div>
         </Card>
+      </div>
+
+      {/* ── Retenção, Uplift, Custo por resgate ── */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <TrendingUp className="size-4 text-muted-foreground" />
+          <h3 className="text-sm font-semibold">ROI e Retenção</h3>
+          <span className="text-xs text-muted-foreground">Coorte Jan/2026</span>
+        </div>
+
+        {/* Métricas */}
+        <div className="grid gap-4 sm:grid-cols-3 mb-4">
+          {ROI_METRICS.map(m => {
+            const Icon = m.icon;
+            return (
+              <Card key={m.label} className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Icon className="size-4 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">{m.label}</span>
+                </div>
+                <div className="text-2xl font-bold tabular-nums">{m.value}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">{m.desc}</div>
+                <div className={`mt-1 flex items-center gap-1 text-xs font-medium ${m.positive ? "text-emerald-600" : "text-red-500"}`}>
+                  <TrendingUp className="size-3" />
+                  {m.delta}
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Curva de retenção + Uplift */}
+        <div className="grid gap-4 xl:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Curva de retenção por coorte</CardTitle>
+            </CardHeader>
+            <div className="px-6 pb-6">
+              <ChartContainer config={RETENCAO_CONFIG} className="h-52 w-full">
+                <LineChart data={RETENCAO_COORTE} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="mes" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                  <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} domain={[0, 100]} tickFormatter={v => `${v}%`} />
+                  <ReferenceLine y={63} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 2" label={{ value: "63% (M+3)", fontSize: 10, fill: "hsl(var(--muted-foreground))", position: "right" }} />
+                  <ChartTooltip content={<ChartTooltipContent formatter={(v) => [`${v}%`, "Ativos"]} />} />
+                  <Line type="monotone" dataKey="pct" stroke="var(--color-pct)" strokeWidth={2.5} dot={{ r: 4, strokeWidth: 0, fill: "var(--color-pct)" }} />
+                </LineChart>
+              </ChartContainer>
+              <p className="text-xs text-muted-foreground mt-2">% de membros da coorte Jan/2026 ainda ativos a cada mês subsequente.</p>
+            </div>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Receita anual por membro</CardTitle>
+            </CardHeader>
+            <div className="px-6 pb-6">
+              <ChartContainer config={UPLIFT_CONFIG} className="h-52 w-full">
+                <BarChart data={UPLIFT_DATA} margin={{ top: 4, right: 4, left: -16, bottom: 0 }} barSize={56}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="grupo" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                  <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickFormatter={v => `R$ ${v}`} />
+                  <ChartTooltip content={<ChartTooltipContent formatter={(v) => [`R$ ${v}`, "Receita/membro"]} />} />
+                  <Bar dataKey="receita" fill="var(--color-receita)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ChartContainer>
+              <p className="text-xs text-muted-foreground mt-2">Estimativa: ticket médio × frequência anual de compra por tipo de membro.</p>
+            </div>
+          </Card>
+        </div>
       </div>
 
       {/* Tier evolution + Channel breakdown */}

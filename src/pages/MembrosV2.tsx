@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Pencil, SearchX, UserPlus, Users } from "lucide-react";
+import { MOEDA } from "../config/programa";
 import {
   Avatar,
   AvatarFallback,
@@ -214,7 +215,7 @@ export default function MembrosV2() {
                     {member.segment}
                   </TableCell>
                   <TableCell className="tabular-nums font-medium text-sm">
-                    {member.balance.toLocaleString("pt-BR")} pts
+                    {member.balance.toLocaleString("pt-BR")} {MOEDA.abrev}
                   </TableCell>
                   <TableCell>
                     <StatusBadge

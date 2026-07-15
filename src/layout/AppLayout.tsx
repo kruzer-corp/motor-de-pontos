@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { cn, TooltipProvider } from "@kruzer/ds";
 import { CustomTag } from "../components/CustomTag";
+import { MOEDA } from "../config/programa";
 import {
   LayoutDashboard, Users, User, ShieldCheck, Gift, Sparkles, Boxes, Building2,
   ChevronDown, ChevronsLeft, ChevronsRight, ArrowLeftRight,
   Package, Trophy, History, ScrollText,
-  Palette, Webhook, Share2,
+  Palette, Webhook, Share2, ShieldAlert,
 } from "lucide-react";
 
 // ── Tenants ───────────────────────────────────────────────────────────────────
@@ -60,16 +61,30 @@ const MENU: MenuItem[] = [
 
   // ── OPERAÇÃO ───────────────────────────────────────────────────────────────
   { section: "Operação" },
-  { to: "/resgates", label: "Aprovações de Resgate", icon: Gift },
-  { to: "/membros",              label: "Saldo dos membros",      icon: Users   },
-  { to: "/indicacoes",           label: "Indicações",             icon: Share2  },
-  { to: "/catalogo-produtos",    label: "Produtos elegíveis",      icon: Boxes   },
-  { to: "/orcamentos",           label: "Orçamentos",             icon: Package },
+  {
+    label: "Aprovações de Resgate", icon: Gift,
+    group: [
+      { to: "/resgates",   label: "Resgates" },
+      { to: "/orcamentos", label: "Orçamentos" },
+    ],
+  },
+  {
+    label: "Membros e Saldo", icon: Users,
+    group: [
+      { to: "/membros",          label: "Saldo dos membros" },
+      { to: "/pontos-expirando", label: `${MOEDA.nome} expirando`  },
+      { to: "/saldo-expirado",   label: "Saldo expirado"    },
+    ],
+  },
+  { to: "/indicacoes",        label: "Indicações",        icon: Share2       },
+  { to: "/alertas-fraude",   label: "Alertas de fraude", icon: ShieldAlert  },
+  { to: "/catalogo-produtos", label: "Produtos elegíveis", icon: Boxes },
   {
     label: "Campanhas", icon: Sparkles,
     group: [
-      { to: "/campanhas/nova", label: "Nova campanha" },
+      { to: "/campanhas/nova", label: "Nova campanha"      },
       { to: "/campanhas",      label: "Modelos de campanha" },
+      { to: "/missoes",        label: "Missões e desafios"  },
     ],
   },
   // ── CONFIGURAÇÃO ───────────────────────────────────────────────────────────
@@ -93,8 +108,9 @@ const MENU: MenuItem[] = [
       { to: "/banners",      label: "Banners" },
       { to: "/login-config", label: "Login" },
       { to: "/conteudo",     label: "Conteúdo editorial", layer: "module" },
-      { to: "/comunicacoes", label: "Eventos transacionais" },
-      { to: "/comunicados",  label: "Histórico de comunicações" },
+      { to: "/templates-comunicacao", label: "Templates"                  },
+      { to: "/comunicacoes",          label: "Eventos transacionais"       },
+      { to: "/comunicados",           label: "Histórico de comunicações"   },
     ],
   },
   { to: "/regulamento", label: "Regulamento",       icon: ScrollText },

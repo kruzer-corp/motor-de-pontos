@@ -1,5 +1,6 @@
 import { Avatar, AvatarFallback, PageHeader, Pill, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Card, CardContent } from "@kruzer/ds";
 import { Medal } from "lucide-react";
+import { MOEDA } from "../config/programa";
 
 type RankEntry = { position: number; name: string; initials: string; points: number; tier: string; segment: string; variation: number };
 
@@ -23,7 +24,7 @@ const podiumColor = ["text-amber-400", "text-slate-400", "text-orange-400"];
 
 const CONFIG = {
   Período:             "01/06/2025 – 30/06/2025",
-  Cálculo:             "Pontos acumulados no período",
+  Cálculo:             `${MOEDA.nome} acumulados no período`,
   "Atualização":       "Diária (02h00)",
   "Critério de empate":"Data de entrada no programa",
 };
@@ -92,7 +93,7 @@ export default function Ranking() {
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">{entry.segment}</TableCell>
                 <TableCell className="text-right tabular-nums font-semibold text-sm">
-                  {entry.points.toLocaleString("pt-BR")} pts
+                  {entry.points.toLocaleString("pt-BR")} {MOEDA.abrev}
                 </TableCell>
                 <TableCell className="text-right tabular-nums text-sm">
                   <span className={entry.variation >= 0 ? "text-success" : "text-destructive"}>

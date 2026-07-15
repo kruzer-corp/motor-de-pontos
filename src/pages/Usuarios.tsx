@@ -12,7 +12,7 @@ import { Pencil, Plus, Shield } from "lucide-react";
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 type UserStatus = "ativo" | "inativo" | "pendente";
-type Role = "Administrador" | "Operador" | "Analista" | "Visualizador" | "Membro";
+type Role = "Master" | "Coordenador" | "Analista";
 
 type User = {
   id: string; name: string; email: string;
@@ -21,22 +21,20 @@ type User = {
 
 // ── Data ───────────────────────────────────────────────────────────────────────
 
-const ROLES: Role[] = ["Administrador", "Operador", "Analista", "Visualizador", "Membro"];
+const ROLES: Role[] = ["Master", "Coordenador", "Analista"];
 
 const ROLE_DESCRIPTIONS: Record<Role, string> = {
-  Administrador: "Acesso total ao sistema",
-  Operador:      "Aprova resgates e gerencia membros",
-  Analista:      "Leitura de membros, campanhas e relatórios",
-  Visualizador:  "Leitura básica de membros e campanhas",
-  Membro:        "Acesso exclusivo ao portal B2C — carteira, extrato, catálogo e pedidos",
+  Master:      "Acesso total ao sistema — configuração, usuários e operação",
+  Coordenador: "Aprova resgates, gerencia membros e campanhas",
+  Analista:    "Leitura de membros, campanhas e relatórios",
 };
 
 const INITIAL_USERS: User[] = [
-  { id: "USR-001", name: "Mariana Souza",   email: "mariana.souza@kruzer.ai",  role: "Administrador", status: "ativo",    lastLogin: "16/06/2025 14:22" },
-  { id: "USR-002", name: "João Operações",  email: "joao.ops@cliente.com.br",  role: "Operador",      status: "ativo",    lastLogin: "15/06/2025 09:47" },
-  { id: "USR-003", name: "Fernanda Atend.", email: "fernanda@cliente.com.br",  role: "Analista",      status: "ativo",    lastLogin: "14/06/2025 16:30" },
-  { id: "USR-004", name: "Ricardo Lopes",   email: "ricardo@cliente.com.br",   role: "Visualizador",  status: "pendente", lastLogin: "—" },
-  { id: "USR-005", name: "Camila Freitas",  email: "camila@cliente.com.br",    role: "Operador",      status: "inativo",  lastLogin: "01/04/2025 11:00" },
+  { id: "USR-001", name: "Mariana Souza",   email: "mariana.souza@kruzer.ai",  role: "Master",      status: "ativo",    lastLogin: "16/06/2025 14:22" },
+  { id: "USR-002", name: "João Operações",  email: "joao.ops@cliente.com.br",  role: "Coordenador", status: "ativo",    lastLogin: "15/06/2025 09:47" },
+  { id: "USR-003", name: "Fernanda Atend.", email: "fernanda@cliente.com.br",  role: "Analista",    status: "ativo",    lastLogin: "14/06/2025 16:30" },
+  { id: "USR-004", name: "Ricardo Lopes",   email: "ricardo@cliente.com.br",   role: "Analista",    status: "pendente", lastLogin: "—" },
+  { id: "USR-005", name: "Camila Freitas",  email: "camila@cliente.com.br",    role: "Coordenador", status: "inativo",  lastLogin: "01/04/2025 11:00" },
 ];
 
 const PERMISSIONS = [
@@ -53,11 +51,9 @@ const PERMISSIONS = [
 ];
 
 const DEFAULT_PERMS: Record<Role, string[]> = {
-  Administrador: PERMISSIONS,
-  Operador:      ["Ver membros", "Editar membros", "Ajuste manual de pontos", "Ver resgates", "Aprovar resgates"],
-  Analista:      ["Ver membros", "Ver campanhas", "Ver resgates", "Ver relatórios"],
-  Visualizador:  ["Ver membros", "Ver campanhas", "Ver resgates"],
-  Membro:        [],
+  Master:      PERMISSIONS,
+  Coordenador: ["Ver membros", "Editar membros", "Ajuste manual de pontos", "Ver campanhas", "Ver resgates", "Aprovar resgates"],
+  Analista:    ["Ver membros", "Ver campanhas", "Ver resgates", "Ver relatórios"],
 };
 
 type PermMatrix = Record<Role, Record<string, boolean>>;
@@ -287,16 +283,12 @@ export default function Usuarios() {
                     <tr key={perm} className="hover:bg-muted/20">
                       <td className="px-5 py-3 sticky left-0 bg-card font-medium">{perm}</td>
                       {ROLES.map((role) => (
-                        <td key={role} className={`px-4 py-3 text-center ${role === "Membro" ? "bg-sky-50/50" : ""}`}>
-                          {role === "Membro" ? (
-                            <span className="text-[10px] text-sky-600 font-medium">Portal B2C</span>
-                          ) : (
-                            <Switch
-                              checked={matrix[role][perm] ?? false}
-                              onCheckedChange={() => togglePerm(role, perm)}
-                              size="sm"
-                            />
-                          )}
+                        <td key={role} className="px-4 py-3 text-center">
+                          <Switch
+                            checked={matrix[role][perm] ?? false}
+                            onCheckedChange={() => togglePerm(role, perm)}
+                            size="sm"
+                          />
                         </td>
                       ))}
                     </tr>

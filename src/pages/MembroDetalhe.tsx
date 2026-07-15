@@ -9,6 +9,7 @@ import {
 } from "@kruzer/ds";
 import { ArrowLeft, ArrowDownLeft, ArrowUpRight, Clock, Plus } from "lucide-react";
 import { renderCrumbLink } from "../lib/crumbLink";
+import { MOEDA } from "../config/programa";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -151,7 +152,7 @@ function TierProgress({ tier, pontos }: { tier: Tier; pontos: number }) {
       <div className="h-1.5 rounded-full bg-muted overflow-hidden">
         <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
       </div>
-      <p className="text-xs text-muted-foreground">Faltam {faltam.toLocaleString("pt-BR")} pts para {cfg.next}</p>
+      <p className="text-xs text-muted-foreground">Faltam {faltam.toLocaleString("pt-BR")} {MOEDA.abrev} para {cfg.next}</p>
     </div>
   );
 }
@@ -193,11 +194,11 @@ export default function MembroDetalhe() {
       {/* ── Stats ── */}
       <div className="grid grid-cols-4 gap-4">
         <StatCard label="Saldo total">
-          <span className="tabular-nums">{member.pontos.toLocaleString("pt-BR")} pts</span>
+          <span className="tabular-nums">{member.pontos.toLocaleString("pt-BR")} {MOEDA.abrev}</span>
         </StatCard>
         <StatCard label="Expiram em 30 dias">
           {member.expiram > 0 ? (
-            <span className="tabular-nums text-amber-600">{member.expiram.toLocaleString("pt-BR")} pts</span>
+            <span className="tabular-nums text-amber-600">{member.expiram.toLocaleString("pt-BR")} {MOEDA.abrev}</span>
           ) : (
             <span className="text-muted-foreground text-sm">Nenhum</span>
           )}
@@ -293,7 +294,7 @@ export default function MembroDetalhe() {
                         <p className="text-xs text-muted-foreground">{t.data}</p>
                       </div>
                       <span className={`text-sm font-semibold tabular-nums shrink-0 ${t.valor >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-                        {t.valor >= 0 ? "+" : ""}{t.valor.toLocaleString("pt-BR")} pts
+                        {t.valor >= 0 ? "+" : ""}{t.valor.toLocaleString("pt-BR")} {MOEDA.abrev}
                       </span>
                     </div>
                   );
@@ -303,8 +304,8 @@ export default function MembroDetalhe() {
           )}
 
           {member.expiram > 0 && (
-            <InfoNotice variant="warning" title="Pontos próximos de expirar">
-              {member.expiram.toLocaleString("pt-BR")} pontos expiram nos próximos 30 dias. Considere acionar uma campanha de reativação.
+            <InfoNotice variant="warning" title={`${MOEDA.nome} próximos de expirar`}>
+              {member.expiram.toLocaleString("pt-BR")} {MOEDA.nome.toLowerCase()} expiram nos próximos 30 dias. Considere acionar uma campanha de reativação.
             </InfoNotice>
           )}
         </TabsContent>
