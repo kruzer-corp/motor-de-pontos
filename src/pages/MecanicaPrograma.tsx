@@ -5,6 +5,7 @@ import {
   Switch, Separator, toast,
 } from "@kruzer/ds";
 import { Save } from "lucide-react";
+import { type Moeda, getMoedas, saveMoedas } from "../config/moedas";
 
 // ── Seção wrapper ──────────────────────────────────────────────────────────────
 
@@ -63,13 +64,7 @@ export default function MecanicaPrograma() {
   const [multDiamante, setMultDiamante] = useState<number | null>(2);
 
   // Múltiplas moedas
-  type Moeda = { id: string; nome: string; simbolo: string; taxa: string; ativo: boolean; base?: boolean };
-  const [moedas, setMoedas] = useState<Moeda[]>([
-    { id: "pontos",   nome: "Pontos",   simbolo: "pts",  taxa: "1",    ativo: true,  base: true },
-    { id: "cashback", nome: "Cashback", simbolo: "R$",   taxa: "",     ativo: false },
-    { id: "milhas",   nome: "Milhas",   simbolo: "mi",   taxa: "",     ativo: false },
-    { id: "creditos", nome: "Créditos", simbolo: "cr",   taxa: "",     ativo: false },
-  ]);
+  const [moedas, setMoedas] = useState<Moeda[]>(() => getMoedas());
 
   const updateMoeda = (id: string, field: keyof Moeda, value: string | boolean) => {
     setMoedas((prev) => prev.map((m) => {
@@ -87,6 +82,7 @@ export default function MecanicaPrograma() {
   }
 
   function handleSave() {
+    saveMoedas(moedas);
     setConfirmOpen(false);
     setDirty(false);
     toast.success("Mecânica do programa salva com sucesso");

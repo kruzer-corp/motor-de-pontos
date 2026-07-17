@@ -1,13 +1,19 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   Button, Input, Label, PageHeader, Select, SelectContent,
   SelectItem, SelectTrigger, SelectValue, Switch, toast,
 } from "@kruzer/ds";
-import { CheckCircle2, Plus, Pencil, Trash2, Upload, X, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronUp, Plus, Pencil, Trash2, Upload, X, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { MOEDA } from "../config/programa";
 import { FILIAIS } from "../config/filiais";
+import { SEGMENTOS, TIERS } from "../config/segmentacao";
+import { getMoedasAtivas } from "../config/moedas";
 import { renderCrumbLink } from "../lib/crumbLink";
+import {
+  type Classificacao, type Cluster, type Form, type Campanha,
+  DEFAULTS, getCampanha, upsertCampanha, novoIdCampanha,
+} from "../lib/campanhas";
 
 // ── Steps ─────────────────────────────────────────────────────────────────────
 
@@ -16,19 +22,15 @@ const STEPS = [
   { num: 2, label: "Fontes" },
   { num: 3, label: "Elegibilidade" },
   { num: 4, label: "Produtos" },
-  { num: 5, label: "Limites" },
-  { num: 6, label: "Multiplicadores" },
-  { num: 7, label: "Revisão" },
+  { num: 5, label: "Grupos de regras" },
+  { num: 6, label: "Limites" },
+  { num: 7, label: "Multiplicadores" },
+  { num: 8, label: "Revisão" },
 ];
 
 // ── Form state ────────────────────────────────────────────────────────────────
 
 // ── Classificação ────────────────────────────────────────────────────────────
-
-type Classificacao = {
-  id: string; nome: string; cor: string;
-  pontosPorReal: string; temBonus: boolean; bonus: string;
-};
 
 const CLASSIF_DEFAULTS: Omit<Classificacao, "id"> = {
   nome: "", cor: "#6366f1", pontosPorReal: "", temBonus: true, bonus: "",
@@ -202,44 +204,145 @@ const FONTES_DISPONIVEIS = [
   },
 ];
 
-type Form = {
-  codigo: string; nome: string; descricao: string; segmento: string;
-  periodoInicio: string; periodoFim: string;
-  vigenciaInicio: string; vigenciaFim: string;
-  fontes: Record<string, boolean>;
-  pdvEscopo: "todas" | "especificas";
-  pdvFiliais: string[];
-  // Pontuação base da campanha
-  moedaCampanha: string;
-  taxaTipo: "taxa" | "fixo" | "multiplicador";
-  taxaValor: string;
-  arredondamento: "baixo" | "cima" | "proximo";
-  statusConceder: Record<string, boolean>;
-  diasCreditado: string;
-  statusAnular: Record<string, boolean>;
-  classificacoes: Classificacao[];
-  moedas: Record<string, { ativo: boolean; valor: string }>;
-  produtosElegiveis: string[];
-  // Step 4 · Limites e vigência
-  liberacaoTipo: "imediato" | "dias";
-  liberacaoDias: string;
-  expiracaoTipo: "herdar" | "meses" | "data_fixa";
-  expiracaoMeses: string;
-  expiracaoData: string;
-  limiteAtivo: boolean;
-  limitePts: string;
-  limiteEscopo: "membro_campanha" | "membro_dia";
-  tetoEmissaoAtivo: boolean;
-  tetoEmissaoPts: string;
-  cancelamentoPolicy: "estornar_tudo" | "estornar_proporcional" | "manter";
-  aprovacaoTipo: "manual" | "automatica";
-  aprovacaoTiposResgate: string[];
-  aprovacaoValorMax: string;
-  aprovacaoTiers: string[];
-  multAlvo: "membro" | "produto";
-  multBronze: string; multPrata: string; multOuro: string; multDiamante: string;
-  multProdutos: Record<string, string>;
+// ── Cluster (grupo de regras) ────────────────────────────────────────────────
+
+const CLUSTER_DEFAULTS: Omit<Cluster, "id"> = {
+  nome: "", segmento: "todos", tiers: [], fontes: [], categoria: "todas",
+  resultadoTipo: "taxa", resultadoValor: "",
 };
+
+function ClusterModal({
+  initial, onSave, onClose,
+}: {
+  initial?: Cluster;
+  onSave: (c: Cluster) => void;
+  onClose: () => void;
+}) {
+  const [d, setD] = useState<Omit<Cluster, "id">>(
+    initial ? { nome: initial.nome, segmento: initial.segmento, tiers: initial.tiers, fontes: initial.fontes, categoria: initial.categoria, resultadoTipo: initial.resultadoTipo, resultadoValor: initial.resultadoValor }
+            : { ...CLUSTER_DEFAULTS }
+  );
+
+  const upd = <K extends keyof typeof d>(k: K, v: (typeof d)[K]) =>
+    setD((prev) => ({ ...prev, [k]: v }));
+
+  const categorias = Array.from(new Set(PRODUTOS_CATALOGO.map((p) => p.categoria)));
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-background rounded-xl shadow-2xl w-full max-w-md p-6 space-y-5 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-xl font-semibold leading-snug">Defina o grupo de regras</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground mt-0.5 shrink-0">
+            <span className="text-lg leading-none">×</span>
+          </button>
+        </div>
+
+        {/* Nome */}
+        <div className="space-y-1.5">
+          <Label className="text-sm">Nome<span className="text-destructive">*</span></Label>
+          <Input value={d.nome} onChange={(e) => upd("nome", e.target.value)} placeholder="Ex: VIP em Eletrônicos" />
+        </div>
+
+        {/* Condições */}
+        <div className="space-y-3 rounded-lg border border-border p-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Condições — todas precisam bater</p>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Segmento</Label>
+            <Select value={d.segmento} onValueChange={(v) => upd("segmento", v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os membros</SelectItem>
+                {SEGMENTOS.map((s) => (
+                  <SelectItem key={s.id} value={s.nome}>{s.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Tier</Label>
+            <div className="flex flex-wrap gap-2">
+              {TIERS.map((t) => {
+                const sel = d.tiers.includes(t.id);
+                return (
+                  <button key={t.id} type="button"
+                    onClick={() => upd("tiers", sel ? d.tiers.filter((id) => id !== t.id) : [...d.tiers, t.id])}
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                      sel ? t.corChip + " ring-1 ring-offset-1 ring-primary/40" : "border-border text-muted-foreground bg-background hover:border-primary/40"
+                    }`}>
+                    {t.nome}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground">Sem seleção = vale para todos os tiers.</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Fonte</Label>
+            <div className="flex flex-wrap gap-2">
+              {FONTES_DISPONIVEIS.map((f) => {
+                const sel = d.fontes.includes(f.id);
+                return (
+                  <button key={f.id} type="button"
+                    onClick={() => upd("fontes", sel ? d.fontes.filter((id) => id !== f.id) : [...d.fontes, f.id])}
+                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                      sel ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground bg-background hover:border-primary/40"
+                    }`}>
+                    {f.icon} {f.nome}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground">Sem seleção = vale para todas as fontes.</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Categoria de produto</Label>
+            <Select value={d.categoria} onValueChange={(v) => upd("categoria", v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Todas as categorias</SelectItem>
+                {categorias.map((c) => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Resultado */}
+        <div className="space-y-3 rounded-lg border border-border p-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Resultado quando as condições baterem</p>
+          <div className="flex gap-2">
+            {([["taxa", "Taxa por R$1"], ["multiplicador", "Multiplicador"]] as const).map(([v, label]) => (
+              <button key={v} type="button" onClick={() => upd("resultadoTipo", v)}
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                  d.resultadoTipo === v ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:border-primary/40"
+                }`}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <Input type="number" value={d.resultadoValor} onChange={(e) => upd("resultadoValor", e.target.value)}
+            placeholder={d.resultadoTipo === "multiplicador" ? "Ex: 2" : "Ex: 3"} />
+        </div>
+
+        <Button
+          className="w-full"
+          disabled={!d.nome || !d.resultadoValor}
+          onClick={() => onSave({ ...d, id: initial?.id ?? String(Date.now()) })}
+        >
+          Salvar grupo de regras
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Form state ────────────────────────────────────────────────────────────────
 
 const PRODUTOS_CATALOGO = [
   { id: "SKU-001", nome: "Smart TV 50\"",     categoria: "Eletrônicos",  sku: "TV-50-4K"    },
@@ -256,45 +359,6 @@ const STATUS_PEDIDO = [
   "Aprovado", "Faturado", "Em separação", "Entregue",
   "Concluído", "Cancelado", "Devolvido", "Recusado",
 ];
-
-const DEFAULTS: Form = {
-  codigo: "CAMP01", nome: "", descricao: "", segmento: "todos",
-  periodoInicio: "", periodoFim: "",
-  vigenciaInicio: "", vigenciaFim: "",
-  fontes: { portal: true, pdv: true, ecommerce: false, marketplace: false },
-  pdvEscopo: "todas",
-  pdvFiliais: [],
-  moedaCampanha: MOEDA.nome, taxaTipo: "taxa", taxaValor: "", arredondamento: "baixo",
-  statusConceder: { Aprovado: false, Faturado: false, "Em separação": false, Entregue: false, Concluído: false, Cancelado: false, Devolvido: false, Recusado: false },
-  diasCreditado: "",
-  statusAnular:   { Aprovado: false, Faturado: false, "Em separação": false, Entregue: false, Concluído: false, Cancelado: false, Devolvido: false, Recusado: false },
-  classificacoes: [],
-  produtosElegiveis: [],
-  liberacaoTipo: "imediato",
-  liberacaoDias: "7",
-  expiracaoTipo: "herdar",
-  expiracaoMeses: "12",
-  expiracaoData: "",
-  limiteAtivo: false,
-  limitePts: "",
-  limiteEscopo: "membro_campanha",
-  tetoEmissaoAtivo: false,
-  tetoEmissaoPts: "",
-  cancelamentoPolicy: "estornar_tudo",
-  aprovacaoTipo: "manual",
-  aprovacaoTiposResgate: ["voucher_digital"],
-  aprovacaoValorMax: "",
-  aprovacaoTiers: ["Ouro", "Diamante"],
-  moedas: {
-    Pontos:   { ativo: true,  valor: "" },
-    Cashback: { ativo: false, valor: "" },
-    Milhas:   { ativo: false, valor: "" },
-    Créditos: { ativo: false, valor: "" },
-  },
-  multAlvo: "membro",
-  multBronze: "1", multPrata: "1.25", multOuro: "1.5", multDiamante: "2",
-  multProdutos: {},
-};
 
 // ── Stepper ───────────────────────────────────────────────────────────────────
 
@@ -360,10 +424,21 @@ function ReviewRow({ label, value }: { label: string; value: React.ReactNode }) 
 
 export default function CampanhasNova() {
   const navigate  = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const existente = id ? getCampanha(id) : undefined;
+  const editando = !!existente;
+  const jaPublicada = editando && existente!.status !== "rascunho" && existente!.status !== "agendada";
+  const moedasAtivas = getMoedasAtivas();
+  const [campanhaId] = useState(() => existente?.id ?? novoIdCampanha());
+
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState<Form>(DEFAULTS);
+  const [form, setForm] = useState<Form>(existente ?? DEFAULTS);
   const [published, setPublished] = useState(false);
+  const [publicarModo, setPublicarModo] = useState<"agora" | "agendar">("agora");
+  const [dataAgendada, setDataAgendada] = useState("");
+  const [agendado, setAgendado] = useState(false);
   const [classifModal,   setClassifModal]   = useState<Classificacao | null | "new">(null);
+  const [clusterModal,   setClusterModal]   = useState<Cluster | null | "new">(null);
   const [importOpen,   setImportOpen]   = useState(false);
   const [importStep,   setImportStep]   = useState<"upload" | "status">("upload");
   const [importFile,   setImportFile]   = useState<File | null>(null);
@@ -406,29 +481,76 @@ export default function CampanhasNova() {
   const set = (key: keyof Form, value: Form[keyof Form]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
+  function moverCluster(idx: number, dir: -1 | 1) {
+    setForm((prev) => {
+      const lista = [...prev.clusters];
+      const alvo = idx + dir;
+      if (alvo < 0 || alvo >= lista.length) return prev;
+      [lista[idx], lista[alvo]] = [lista[alvo], lista[idx]];
+      return { ...prev, clusters: lista };
+    });
+  }
+
   const canContinue = () => {
     if (step === 1) return !!form.nome;
     return true;
   };
 
+  function persistir(status: Campanha["status"], agendadaPara?: string) {
+    const campanha: Campanha = {
+      ...form,
+      id: campanhaId,
+      status,
+      color: existente?.color ?? "bg-slate-500",
+      agendadaPara,
+    };
+    upsertCampanha(campanha);
+  }
+
+  function salvarComoRascunho() {
+    if (jaPublicada) {
+      persistir(existente!.status, existente!.agendadaPara);
+      toast.success("Alterações salvas");
+    } else {
+      persistir("rascunho");
+      toast.success("Rascunho salvo");
+    }
+    navigate("/campanhas");
+  }
+
   function handlePublish() {
-    setPublished(true);
-    toast.success(`Campanha "${form.nome}" publicada com sucesso`);
+    if (publicarModo === "agendar" && dataAgendada) {
+      const agendadaParaFmt = new Date(dataAgendada).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+      persistir("agendada", agendadaParaFmt);
+      setAgendado(true);
+      setPublished(true);
+      toast.success(`Campanha "${form.nome}" agendada com sucesso`);
+    } else {
+      persistir("ativa");
+      setAgendado(false);
+      setPublished(true);
+      toast.success(`Campanha "${form.nome}" publicada com sucesso`);
+    }
   }
 
   if (published) {
+    const dataAgendadaFmt = dataAgendada
+      ? new Date(dataAgendada).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+      : "";
     return (
       <div className="max-w-md mx-auto text-center pt-16 space-y-5">
         <div className="h-14 w-14 rounded-full bg-emerald-100 flex items-center justify-center mx-auto">
           <CheckCircle2 className="h-7 w-7 text-emerald-600" />
         </div>
         <div>
-          <h2 className="text-xl font-semibold">Campanha publicada!</h2>
-          <p className="text-sm text-muted-foreground mt-1">{form.nome} está ativa agora.</p>
+          <h2 className="text-xl font-semibold">{agendado ? "Campanha agendada!" : "Campanha publicada!"}</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            {agendado ? `${form.nome} entrará em vigência em ${dataAgendadaFmt}.` : `${form.nome} está ativa agora.`}
+          </p>
         </div>
         <div className="flex gap-3 justify-center">
           <Button onClick={() => navigate("/campanhas")}>Ver campanhas</Button>
-          <Button variant="outline" onClick={() => { setForm(DEFAULTS); setStep(1); setPublished(false); }}>
+          <Button variant="outline" onClick={() => { setForm(DEFAULTS); setStep(1); setPublished(false); setAgendado(false); setDataAgendada(""); setPublicarModo("agora"); }}>
             Criar outra
           </Button>
         </div>
@@ -439,8 +561,8 @@ export default function CampanhasNova() {
   return (
     <div className="space-y-2">
       <PageHeader
-        title="Nova campanha"
-        path={[{ label: "Operação" }, { label: "Campanhas", to: "/campanhas" }]}
+        title={editando ? `Editar campanha — ${form.nome || existente?.nome}` : "Nova campanha"}
+        path={[{ label: "Operação" }, { label: "Minhas Campanhas", to: "/campanhas" }]}
         renderCrumbLink={renderCrumbLink}
       />
 
@@ -476,52 +598,40 @@ export default function CampanhasNova() {
               />
             </Field>
 
-            <Field label="Segmento de membros elegíveis">
+            <Field label="Segmento de membros elegíveis" hint="Lista sincronizada com Configuração → Tier e Segmentação.">
               <Select value={form.segmento} onValueChange={(v) => set("segmento", v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione um segmento" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos os membros</SelectItem>
-                  <SelectItem value="Premium">Premium</SelectItem>
-                  <SelectItem value="Fidelidade">Fidelidade</SelectItem>
-                  <SelectItem value="Frete Grátis">Frete Grátis</SelectItem>
-                  <SelectItem value="Básico">Básico</SelectItem>
+                  {SEGMENTOS.map((s) => (
+                    <SelectItem key={s.id} value={s.nome}>{s.nome}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </Field>
 
-            <Field label="Período da campanha">
-              <div className="flex items-center gap-2">
-                <Input
-                  type="date" value={form.periodoInicio}
-                  onChange={(e) => set("periodoInicio", e.target.value)}
-                  className="flex-1"
-                />
-                <span className="text-muted-foreground text-sm shrink-0">→</span>
-                <Input
-                  type="date" value={form.periodoFim}
-                  onChange={(e) => set("periodoFim", e.target.value)}
-                  className="flex-1"
-                />
+            <Field label="Tier elegível" hint="Deixe sem seleção para valer para todos os tiers.">
+              <div className="flex flex-wrap gap-2">
+                {TIERS.map((t) => {
+                  const sel = form.tiersElegiveis.includes(t.id);
+                  return (
+                    <button key={t.id} type="button"
+                      onClick={() => set("tiersElegiveis", sel
+                        ? form.tiersElegiveis.filter((id) => id !== t.id)
+                        : [...form.tiersElegiveis, t.id]
+                      )}
+                      className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                        sel ? t.corChip + " ring-1 ring-offset-1 ring-primary/40" : "border-border text-muted-foreground bg-background hover:border-primary/40"
+                      }`}>
+                      {t.nome}
+                    </button>
+                  );
+                })}
               </div>
             </Field>
 
-            <Field label={`Vigência de ${MOEDA.nome.toLowerCase()} e bônus`} hint={`Janela em que os ${MOEDA.nome.toLowerCase()} acumulados nesta campanha ficam disponíveis para resgate.`}>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="date" value={form.vigenciaInicio}
-                  onChange={(e) => set("vigenciaInicio", e.target.value)}
-                  className="flex-1"
-                />
-                <span className="text-muted-foreground text-sm shrink-0">→</span>
-                <Input
-                  type="date" value={form.vigenciaFim}
-                  onChange={(e) => set("vigenciaFim", e.target.value)}
-                  className="flex-1"
-                />
-              </div>
-            </Field>
           </div>
         )}
 
@@ -664,20 +774,22 @@ export default function CampanhasNova() {
                 <div className="space-y-2">
                   <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Moeda desta campanha</Label>
                   <div className="flex gap-2 flex-wrap">
-                    {["Pontos", "Cashback", "Milhas", "Créditos"].map((m) => (
-                      <button key={m} type="button"
-                        onClick={() => set("moedaCampanha", m)}
+                    {moedasAtivas.map((m) => (
+                      <button key={m.id} type="button"
+                        onClick={() => set("moedaCampanha", m.nome)}
                         className={`rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${
-                          form.moedaCampanha === m
+                          form.moedaCampanha === m.nome
                             ? "border-primary bg-primary/10 text-primary"
                             : "border-border text-muted-foreground hover:border-primary/40"
                         }`}
                       >
-                        {m}
+                        {m.nome}
                       </button>
                     ))}
                   </div>
-                  <p className="text-xs text-muted-foreground">Selecione qual moeda esta campanha credita ao membro ao completar uma ação elegível.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Selecione qual moeda esta campanha credita ao membro ao completar uma ação elegível — lista sincronizada com as moedas ativas em Configuração → Mecânica do Programa.
+                  </p>
                 </div>
 
                 {/* Tipo */}
@@ -877,12 +989,129 @@ export default function CampanhasNova() {
           </div>
         )}
 
-        {/* ── Step 5: Limites e vigência ── (previously step 4) */}
+        {/* ── Step 5: Grupos de regras ── */}
         {step === 5 && (
+          <div className="space-y-7">
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold">Grupos de regras</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Opcional. Divida esta campanha em grupos com condições e resultados próprios — útil quando taxas diferentes se aplicam a públicos ou produtos diferentes dentro da mesma campanha.
+              </p>
+            </div>
+
+            {/* Estratégia de avaliação */}
+            <div className="rounded-lg border border-border overflow-hidden">
+              <div className="px-4 py-3 bg-muted/30 border-b border-border">
+                <p className="text-sm font-semibold">Estratégia de avaliação <span className="text-xs text-muted-foreground font-normal ml-1">o que fazer quando mais de um grupo bate na mesma transação</span></p>
+              </div>
+              <div className="px-4 py-4 space-y-3">
+                {[
+                  { value: "primeira",    label: "Primeira que casar",  desc: "Os grupos são avaliados na ordem da lista abaixo — o primeiro que bater vence, os demais são ignorados." },
+                  { value: "acumula",     label: "Todas se acumulam",   desc: "Aplica o resultado de todos os grupos que baterem, somando os efeitos." },
+                  { value: "maior_valor", label: "Maior valor vence",   desc: "Entre os grupos que baterem, só vale o de maior taxa/multiplicador." },
+                ].map(({ value, label, desc }) => (
+                  <label key={value} className="flex items-start gap-3 cursor-pointer">
+                    <input type="radio" name="clustersEstrategia" value={value} checked={form.clustersEstrategia === value}
+                      onChange={() => set("clustersEstrategia", value)} className="mt-1 accent-primary" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{label}</p>
+                      <p className="text-xs text-muted-foreground">{desc}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Lista de grupos */}
+            <div className="rounded-lg border border-border overflow-hidden">
+              <div className="px-4 py-3 bg-muted/30 border-b border-border flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold">Grupos configurados</p>
+                  {form.clustersEstrategia === "primeira" && form.clusters.length > 1 && (
+                    <p className="text-xs text-muted-foreground mt-0.5">Ordem de prioridade — use as flechas para reordenar.</p>
+                  )}
+                </div>
+                <Button size="sm" variant="outline" onClick={() => setClusterModal("new")}>
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />Adicionar grupo
+                </Button>
+              </div>
+              <div className="px-4 py-4">
+                {form.clusters.length === 0 ? (
+                  <button onClick={() => setClusterModal("new")}
+                    className="w-full rounded-lg border border-dashed border-border py-5 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors">
+                    Nenhum grupo — clique para adicionar (opcional)
+                  </button>
+                ) : (
+                  <div className="space-y-2">
+                    {form.clusters.map((cl, idx) => (
+                      <div key={cl.id} className="flex items-center gap-3 rounded-lg border border-border px-4 py-3">
+                        {form.clustersEstrategia === "primeira" && (
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">{idx + 1}</span>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium">{cl.nome}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {cl.segmento !== "todos" ? cl.segmento : "Todos"}
+                            {cl.tiers.length > 0 ? ` · ${TIERS.filter((t) => cl.tiers.includes(t.id)).map((t) => t.nome).join(", ")}` : ""}
+                            {cl.fontes.length > 0 ? ` · ${cl.fontes.length} fonte(s)` : ""}
+                            {cl.categoria !== "todas" ? ` · ${cl.categoria}` : ""}
+                            {" → "}
+                            {cl.resultadoValor}{cl.resultadoTipo === "multiplicador" ? "×" : ` ${MOEDA.abrev}/R$1`}
+                          </p>
+                        </div>
+                        {form.clustersEstrategia === "primeira" && form.clusters.length > 1 && (
+                          <div className="flex flex-col shrink-0">
+                            <button disabled={idx === 0} onClick={() => moverCluster(idx, -1)}
+                              className="p-0.5 rounded hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent text-muted-foreground">
+                              <ChevronUp className="h-3.5 w-3.5" />
+                            </button>
+                            <button disabled={idx === form.clusters.length - 1} onClick={() => moverCluster(idx, 1)}
+                              className="p-0.5 rounded hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent text-muted-foreground">
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        )}
+                        <div className="flex gap-1 shrink-0">
+                          <button onClick={() => setClusterModal(cl)} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button>
+                          <button onClick={() => set("clusters", form.clusters.filter((x) => x.id !== cl.id))} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 6: Limites e vigência ── */}
+        {step === 6 && (
           <div className="space-y-6">
             <div className="mb-6">
               <h3 className="text-lg font-semibold">Limites e vigência</h3>
-              <p className="text-sm text-muted-foreground mt-1">Configure quando os {MOEDA.nome.toLowerCase()} ficam disponíveis, quando expiram, teto de acúmulo e o que acontece em caso de cancelamento.</p>
+              <p className="text-sm text-muted-foreground mt-1">Configure o período de vigência da campanha, quando os {MOEDA.nome.toLowerCase()} ficam disponíveis, quando expiram, teto de acúmulo e o que acontece em caso de cancelamento.</p>
+            </div>
+
+            {/* Vigência da campanha */}
+            <div className="rounded-lg border border-border overflow-hidden">
+              <div className="px-4 py-3 bg-muted/30 border-b border-border">
+                <p className="text-sm font-semibold">Vigência da campanha <span className="text-xs text-muted-foreground font-normal ml-1">período em que a campanha fica ativa</span></p>
+              </div>
+              <div className="px-4 py-4">
+                <div className="flex items-center gap-2 max-w-sm">
+                  <Input
+                    type="date" value={form.periodoInicio}
+                    onChange={(e) => set("periodoInicio", e.target.value)}
+                    className="flex-1"
+                  />
+                  <span className="text-muted-foreground text-sm shrink-0">→</span>
+                  <Input
+                    type="date" value={form.periodoFim}
+                    onChange={(e) => set("periodoFim", e.target.value)}
+                    className="flex-1"
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Liberação */}
@@ -1121,8 +1350,8 @@ export default function CampanhasNova() {
           </div>
         )}
 
-        {/* ── Step 6: Multiplicadores ── */}
-        {step === 6 && (
+        {/* ── Step 7: Multiplicadores ── */}
+        {step === 7 && (
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h3 className="text-lg font-semibold">Multiplicadores</h3>
@@ -1217,8 +1446,8 @@ export default function CampanhasNova() {
           </div>
         )}
 
-        {/* ── Step 7: Revisão ── */}
-        {step === 7 && (
+        {/* ── Step 8: Revisão ── */}
+        {step === 8 && (
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h3 className="text-lg font-semibold">Revise antes de publicar</h3>
@@ -1236,8 +1465,11 @@ export default function CampanhasNova() {
                 <ReviewRow label="Nome"     value={form.nome || "—"} />
                 <ReviewRow label="Descrição" value={form.descricao || "—"} />
                 <ReviewRow label="Segmento" value={form.segmento} />
-                <ReviewRow label="Período"  value={form.periodoInicio && form.periodoFim ? `${form.periodoInicio} → ${form.periodoFim}` : "—"} />
-                <ReviewRow label="Vigência" value={form.vigenciaInicio && form.vigenciaFim ? `${form.vigenciaInicio} → ${form.vigenciaFim}` : "—"} />
+                <ReviewRow label="Tier elegível" value={
+                  form.tiersElegiveis.length === 0
+                    ? "Todos os tiers"
+                    : TIERS.filter((t) => form.tiersElegiveis.includes(t.id)).map((t) => t.nome).join(", ")
+                } />
               </div>
             </div>
 
@@ -1304,9 +1536,33 @@ export default function CampanhasNova() {
 
             <div className="rounded-lg border border-border bg-card overflow-hidden">
               <div className="px-5 py-3 border-b border-border bg-muted/30">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Grupos de regras</p>
+              </div>
+              <div className="px-5">
+                {form.clusters.length === 0 ? (
+                  <ReviewRow label="Grupos" value="Nenhum — campanha usa a regra única" />
+                ) : (
+                  <>
+                    <ReviewRow label="Estratégia" value={
+                      { primeira: "Primeira que casar", acumula: "Todas se acumulam", maior_valor: "Maior valor vence" }[form.clustersEstrategia]
+                    } />
+                    {form.clusters.map((cl, idx) => (
+                      <ReviewRow key={cl.id}
+                        label={form.clustersEstrategia === "primeira" ? `${idx + 1}. ${cl.nome}` : cl.nome}
+                        value={`${cl.resultadoValor}${cl.resultadoTipo === "multiplicador" ? "×" : ` ${MOEDA.abrev}/R$1`}`}
+                      />
+                    ))}
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-border bg-card overflow-hidden">
+              <div className="px-5 py-3 border-b border-border bg-muted/30">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Limites e vigência</p>
               </div>
               <div className="px-5">
+                <ReviewRow label="Período"   value={form.periodoInicio && form.periodoFim ? `${form.periodoInicio} → ${form.periodoFim}` : "—"} />
                 <ReviewRow label="Liberação" value={form.liberacaoTipo === "imediato" ? "Imediatamente" : `Após ${form.liberacaoDias} dias`} />
                 <ReviewRow label="Expiração" value={
                   form.expiracaoTipo === "herdar" ? "Herdar da Mecânica" :
@@ -1346,6 +1602,34 @@ export default function CampanhasNova() {
                 })()}
               </div>
             </div>
+
+            {!jaPublicada && (
+              <div className="rounded-lg border border-border overflow-hidden">
+                <div className="px-4 py-3 bg-muted/30 border-b border-border">
+                  <p className="text-sm font-semibold">Quando publicar?</p>
+                </div>
+                <div className="px-4 py-4 space-y-3">
+                  {[
+                    { value: "agora",   label: "Publicar agora",              desc: "A campanha fica ativa imediatamente." },
+                    { value: "agendar", label: "Agendar para uma data e hora", desc: "A campanha só entra em vigência na data e hora escolhidas." },
+                  ].map(({ value, label, desc }) => (
+                    <label key={value} className="flex items-start gap-3 cursor-pointer">
+                      <input type="radio" name="publicarModo" value={value} checked={publicarModo === value}
+                        onChange={() => setPublicarModo(value as "agora" | "agendar")} className="mt-1 accent-primary" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{label}</p>
+                        <p className="text-xs text-muted-foreground">{desc}</p>
+                        {value === "agendar" && publicarModo === "agendar" && (
+                          <div className="mt-2">
+                            <Input type="datetime-local" value={dataAgendada} onChange={(e) => setDataAgendada(e.target.value)} className="w-56" />
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1512,6 +1796,22 @@ export default function CampanhasNova() {
           />
         )}
 
+        {/* ── Modal de grupo de regras ── */}
+        {clusterModal !== null && (
+          <ClusterModal
+            initial={clusterModal === "new" ? undefined : clusterModal}
+            onClose={() => setClusterModal(null)}
+            onSave={(c) => {
+              set("clusters",
+                clusterModal === "new"
+                  ? [...form.clusters, c]
+                  : form.clusters.map((x) => x.id === c.id ? c : x)
+              );
+              setClusterModal(null);
+            }}
+          />
+        )}
+
         {/* ── Navigation ── */}
         <div className="flex gap-3 mt-10 pt-6 border-t border-border">
           <Button
@@ -1521,7 +1821,7 @@ export default function CampanhasNova() {
           >
             Voltar
           </Button>
-          {step < 7 ? (
+          {step < 8 ? (
             <Button
               className="flex-1"
               disabled={!canContinue()}
@@ -1529,19 +1829,27 @@ export default function CampanhasNova() {
             >
               Continuar
             </Button>
+          ) : jaPublicada ? (
+            <Button className="flex-1" onClick={salvarComoRascunho}>
+              Salvar alterações
+            </Button>
           ) : (
-            <Button className="flex-1" onClick={handlePublish}>
-              Publicar campanha
+            <Button
+              className="flex-1"
+              disabled={publicarModo === "agendar" && !dataAgendada}
+              onClick={handlePublish}
+            >
+              {publicarModo === "agendar" ? "Agendar campanha" : "Publicar campanha"}
             </Button>
           )}
         </div>
-        {step < 6 && (
+        {step < 7 && (
           <p className="text-center mt-3">
             <button
               className="text-xs text-muted-foreground hover:text-foreground underline"
-              onClick={() => { toast.success("Rascunho salvo"); navigate("/campanhas"); }}
+              onClick={salvarComoRascunho}
             >
-              Salvar como rascunho
+              {jaPublicada ? "Salvar alterações e voltar" : "Salvar como rascunho"}
             </button>
           </p>
         )}

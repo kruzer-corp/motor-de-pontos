@@ -23,6 +23,7 @@ Sempre responda em português brasileiro, independentemente do idioma das pergun
 - Prefira editar arquivos existentes a criar novos.
 - Antes de executar tarefas, pergunte se o usuário prefere um plano detalhado (passo a passo) ou resumido (1-2 linhas).
 - Ao realizar múltiplas buscas ou leituras em paralelo, informe quais operações serão feitas antes de executá-las.
+- Não co-autore commits
 
 ## Comportamento Geral
 

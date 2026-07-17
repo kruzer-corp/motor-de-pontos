@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, User, ShieldCheck, Gift, Sparkles, Boxes, Building2,
   ChevronDown, ChevronsLeft, ChevronsRight, ArrowLeftRight,
   Package, Trophy, History, ScrollText,
-  Palette, Webhook, Share2, ShieldAlert,
+  Palette, Webhook, Share2, ShieldAlert, Sliders, Wallet,
 } from "lucide-react";
 
 // ── Tenants ───────────────────────────────────────────────────────────────────
@@ -79,16 +79,11 @@ const MENU: MenuItem[] = [
   { to: "/indicacoes",        label: "Indicações",        icon: Share2       },
   { to: "/alertas-fraude",   label: "Alertas de fraude", icon: ShieldAlert  },
   { to: "/catalogo-produtos", label: "Produtos elegíveis", icon: Boxes },
-  {
-    label: "Campanhas", icon: Sparkles,
-    group: [
-      { to: "/campanhas/nova", label: "Nova campanha"      },
-      { to: "/campanhas",      label: "Modelos de campanha" },
-      { to: "/missoes",        label: "Missões e desafios"  },
-    ],
-  },
+  { to: "/campanhas", label: "Minhas Campanhas", icon: Sparkles },
   // ── CONFIGURAÇÃO ───────────────────────────────────────────────────────────
   { section: "Configuração" },
+  { to: "/mecanica",       label: "Mecânica do Programa", icon: Sliders },
+  { to: "/carteiras",      label: "Carteiras (múltiplas moedas)", icon: Wallet },
   { to: "/usuarios",       label: "Usuários & Papéis",  icon: User      },
   { to: "/canais-filiais", label: "Canais e Filiais",   icon: Building2 },
   { to: "/membros/tier", label: "Tier e Segmentação", icon: ShieldCheck },

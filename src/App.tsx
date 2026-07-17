@@ -22,7 +22,6 @@ import CatalogoDetalhe from "./pages/CatalogoDetalhe";
 import CatalogoGrupos from "./pages/CatalogoGrupos";
 import Campanhas from "./pages/Campanhas";
 import CampanhasNova from "./pages/CampanhasNova";
-import CampanhasDetail from "./pages/CampanhasDetail";
 import Recompensas from "./pages/Recompensas";
 import ResgateCatalogo from "./pages/ResgateCatalogo";
 import Comunicacoes from "./pages/Comunicacoes";
@@ -91,7 +90,7 @@ export default function App() {
         <Route path="catalogo/atualizacao" element={<CatalogoAtualizacao />} />
         <Route path="campanhas" element={<Campanhas />} />
         <Route path="campanhas/nova" element={<CampanhasNova />} />
-        <Route path="campanhas/:id" element={<CampanhasDetail />} />
+        <Route path="campanhas/:id" element={<CampanhasNova />} />
         <Route path="recompensas" element={<Recompensas />} />
         <Route path="recompensas/catalogo" element={<ResgateCatalogo />} />
         <Route path="catalogo-produtos" element={<CatalogoProdutos />} />

@@ -33,6 +33,9 @@ export default function Carteiras() {
             <li>Extrato unificado ou separado por moeda</li>
             <li>Regras de acúmulo e resgate por tipo de carteira</li>
           </ul>
+          <p className="text-xs">
+            Hoje já existe uma configuração básica de moeda ativa em <strong>Configuração → Mecânica do Programa</strong> (qual moeda o programa usa), mas sem suporte a carteiras por membro, conversão ou expiração independente — isso continua pendente aqui.
+          </p>
         </CardContent>
       </Card>
     </div>

@@ -14,6 +14,8 @@ type LogResult = "sucesso" | "falha" | "pendente";
 type LogEntry = { id: string; timestamp: string; operator: string; action: string; entity: string; entityId: string; detail: string; result: LogResult };
 
 const LOGS: LogEntry[] = [
+  { id: "LOG-0043", timestamp: "17/06/2025 10:02:37", operator: "mariana.souza", action: "Exclusão campanha",   entity: "Campanha", entityId: "CMP-008",   detail: "Rascunho 'Teste interno' excluído antes da publicação",  result: "sucesso" },
+  { id: "LOG-0042", timestamp: "16/06/2025 16:47:05", operator: "mariana.souza", action: "Edição campanha",     entity: "Campanha", entityId: "CMP-002",   detail: "Ajuste no período de vigência e no teto de emissão",     result: "sucesso" },
   { id: "LOG-0041", timestamp: "16/06/2025 14:23:11", operator: "mariana.souza", action: "Ajuste manual",       entity: "Membro",   entityId: "MBR-00312", detail: "+500 pts — Correção de erro de cálculo campanha Jun/25", result: "sucesso" },
   { id: "LOG-0040", timestamp: "16/06/2025 11:08:44", operator: "mariana.souza", action: "Aprovação resgate",   entity: "Pedido",   entityId: "REQ-501",   detail: "Voucher R$50 aprovado para Lívia R.",                    result: "sucesso" },
   { id: "LOG-0039", timestamp: "15/06/2025 17:51:02", operator: "admin",         action: "Criação campanha",    entity: "Campanha", entityId: "CMP-004",   detail: "Nova campanha 'Super Junho' criada",                     result: "sucesso" },
@@ -27,7 +29,7 @@ const RESULT_PILL: Record<LogResult, "success" | "destructive" | "warning"> = {
   sucesso: "success", falha: "destructive", pendente: "warning",
 };
 
-const ACTIONS = ["Todos", "Ajuste manual", "Aprovação resgate", "Criação campanha", "Inativação produto", "Expiração de pontos"];
+const ACTIONS = ["Todos", "Ajuste manual", "Aprovação resgate", "Criação campanha", "Edição campanha", "Exclusão campanha", "Inativação produto", "Expiração de pontos"];
 
 // ── Conformidade data ──────────────────────────────────────────────────────────
 

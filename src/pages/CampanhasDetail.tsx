@@ -50,13 +50,13 @@ const FALLBACK: DimensionState[] = CAMPAIGN_DIMENSIONS["CMP-001"].map((d) => ({
 
 const STATUS_LABEL: Record<string, string> = {
   Ativa:   "bg-emerald-100 text-emerald-700",
-  Pausa:   "bg-amber-100 text-amber-700",
+  Pausada: "bg-amber-100 text-amber-700",
   Rascunho:"bg-slate-100 text-slate-700",
 };
 
 const CAMPAIGN_META: Record<string, { title: string; status: string }> = {
   "CMP-001": { title: "Bônus de boas-vindas", status: "Ativa" },
-  "CMP-002": { title: "Dobro no aniversário",  status: "Pausa" },
+  "CMP-002": { title: "Dobro no aniversário",  status: "Pausada" },
   "CMP-003": { title: "Super compra",          status: "Rascunho" },
 };
 

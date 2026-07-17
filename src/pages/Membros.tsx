@@ -9,52 +9,16 @@ import {
   Table, TableBody, TableHead, TableHeader, TableRow,
   toast,
 } from "@kruzer/ds";
+import {
+  type Tier, type Segmento, type StatusMembro, type SaldoCampanha, type Membro,
+  MOEDA_COR, agruparSaldosPorMoeda, getMembros, saveMembros,
+} from "../lib/membros";
 
 // ── Membros ───────────────────────────────────────────────────────────────────
 
-type Tier    = "Diamante" | "Ouro" | "Prata" | "Bronze";
-type Segment = "Premium" | "Frete Grátis" | "Fidelidade" | "Básico";
-
-type SaldoCampanha = {
-  campanhaId: string;
-  campanhaNome: string;
-  moeda: string;
-  abrev: string;
-  valor: number;
-};
-
-type Status = "ativo" | "pendente" | "recusado";
-
-type Member = {
-  id: string; name: string; initials: string;
-  saldos: SaldoCampanha[];
-  tier: Tier; segment: Segment; joined: string;
-  status: Status;
-  motivoRecusa?: string;
-};
-
-const INITIAL_MEMBERS: Member[] = [
-  { id: "1", name: "Aline P.",    initials: "AP", tier: "Diamante", segment: "Premium",      joined: "12/04/2025", status: "ativo",
-    saldos: [
-      { campanhaId: "BF2026",       campanhaNome: "Black Friday 2026", moeda: "Pontos",   abrev: "pts", valor: 5200 },
-      { campanhaId: "CAMP-2025-06", campanhaNome: "Campanha Junho",    moeda: "Cashback", abrev: "R$",  valor: 320  },
-    ]},
-  { id: "2", name: "Bruno C.",    initials: "BC", tier: "Ouro",     segment: "Frete Grátis", joined: "22/01/2025", status: "ativo",
-    saldos: [
-      { campanhaId: "CAMP-2025-04", campanhaNome: "Campanha Abril",    moeda: "Pontos",   abrev: "pts", valor: 3200 },
-    ]},
-  { id: "3", name: "Cecília M.",  initials: "CM", tier: "Prata",    segment: "Fidelidade",   joined: "03/08/2024", status: "ativo",
-    saldos: [
-      { campanhaId: "CAMP-2025-05", campanhaNome: "Campanha Maio",     moeda: "Milhas",   abrev: "mi",  valor: 1800 },
-    ]},
-  { id: "4", name: "Danilo R.",   initials: "DR", tier: "Bronze",   segment: "Básico",       joined: "17/03/2025", status: "ativo",
-    saldos: [
-      { campanhaId: "CAMP-2025-05", campanhaNome: "Campanha Maio",     moeda: "Pontos",   abrev: "pts", valor: 760  },
-    ]},
-  { id: "5", name: "Eduardo F.",  initials: "EF", tier: "Bronze",   segment: "Básico",       joined: "08/07/2026", status: "pendente", saldos: [] },
-  { id: "6", name: "Fernanda L.", initials: "FL", tier: "Bronze",   segment: "Básico",       joined: "10/07/2026", status: "pendente", saldos: [] },
-  { id: "7", name: "Gustavo M.",  initials: "GM", tier: "Bronze",   segment: "Fidelidade",   joined: "14/07/2026", status: "pendente", saldos: [] },
-];
+type Member = Membro;
+type Segment = Segmento;
+type Status = StatusMembro;
 
 const TIER_PILL: Record<Tier, "primary" | "warning" | "secondary" | "muted"> = {
   Diamante: "primary", Ouro: "warning", Prata: "secondary", Bronze: "muted",
@@ -67,9 +31,14 @@ export default function Membros() {
   const navigate = useNavigate();
 
   // ── Lista state ───────────────────────────────────────────────────────────
-  const [members, setMembers] = useState<Member[]>(INITIAL_MEMBERS);
+  const [members, setMembers] = useState<Member[]>(() => getMembros());
   const [search,  setSearch]  = useState("");
   const [tab,     setTab]     = useState<"todos" | "ativos" | "pendentes">("todos");
+
+  function persist(next: Member[]) {
+    setMembers(next);
+    saveMembros(next);
+  }
 
   const pendingCount = members.filter(m => m.status === "pendente").length;
 
@@ -80,8 +49,8 @@ export default function Membros() {
   const [recusaSaving, setRecusaSaving] = useState(false);
 
   function handleAprovar(m: Member) {
-    setMembers(prev => prev.map(x => x.id === m.id ? { ...x, status: "ativo" as Status } : x));
-    toast.success(`${m.name} aprovado no programa`);
+    persist(members.map(x => x.id === m.id ? { ...x, status: "ativo" as Status } : x));
+    toast.success(`${m.nome} aprovado no programa`);
   }
 
   function abrirRecusa(m: Member) {
@@ -92,10 +61,10 @@ export default function Membros() {
     if (!recusaMembro || !recusaMotivo) return;
     setRecusaSaving(true);
     await new Promise(r => setTimeout(r, 350));
-    setMembers(prev => prev.map(x =>
+    persist(members.map(x =>
       x.id === recusaMembro.id ? { ...x, status: "recusado" as Status, motivoRecusa: recusaMotivo } : x
     ));
-    toast.success(`Cadastro de ${recusaMembro.name} recusado`);
+    toast.success(`Cadastro de ${recusaMembro.nome} recusado`);
     setRecusaSaving(false); setRecusaOpen(false);
   }
 
@@ -116,8 +85,8 @@ export default function Membros() {
                 : tab === "ativos"    ? members.filter(m => m.status === "ativo")
                 :                      members.filter(m => m.status === "pendente");
     return byTab.filter(m =>
-      m.name.toLowerCase().includes(search.toLowerCase()) ||
-      m.segment.toLowerCase().includes(search.toLowerCase())
+      m.nome.toLowerCase().includes(search.toLowerCase()) ||
+      m.segmento.toLowerCase().includes(search.toLowerCase())
     );
   }, [members, search, tab]);
 
@@ -142,7 +111,7 @@ export default function Membros() {
     setAjusteSaving(true);
     await new Promise(r => setTimeout(r, 400));
     const delta = ajusteTipo === "credito" ? Number(ajusteValor) : -Number(ajusteValor);
-    setMembers(prev => prev.map(m => {
+    persist(members.map(m => {
       if (m.id !== ajusteMembro.id) return m;
       return {
         ...m,
@@ -153,7 +122,7 @@ export default function Membros() {
         ),
       };
     }));
-    toast.success(`${ajusteMembro.name} · ${ajusteCampanha.campanhaNome}: ${ajusteTipo === "credito" ? "+" : "−"}${Number(ajusteValor).toLocaleString("pt-BR")} ${ajusteCampanha.abrev}`);
+    toast.success(`${ajusteMembro.nome} · ${ajusteCampanha.campanhaNome}: ${ajusteTipo === "credito" ? "+" : "−"}${Number(ajusteValor).toLocaleString("pt-BR")} ${ajusteCampanha.abrev}`);
     setAjusteOpen(false);
     setAjusteSaving(false);
   }
@@ -171,16 +140,25 @@ export default function Membros() {
     const initials = name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
     const today = new Date().toLocaleDateString("pt-BR");
 
-    setMembers((prev) => [
-      ...prev,
+    persist([
+      ...members,
       {
-        id: String(prev.length + 1),
-        name,
+        id: String(members.length + 1),
+        nome: name,
         initials,
+        cpf: documento,
+        email,
+        telefone: phone,
+        canal: "App",
         saldos: [],
         tier: (tier || "Bronze") as Tier,
-        segment: (segment || "Básico") as Segment,
-        joined: today,
+        segmento: (segment || "Básico") as Segment,
+        status: "ativo",
+        desde: today,
+        expiram30d: 0,
+        transacoes: [],
+        pedidos: [],
+        ajustes: [],
       },
     ]);
 
@@ -283,7 +261,7 @@ export default function Membros() {
                         </AvatarFallback>
                       </Avatar>
                       <span className={`font-medium text-sm ${member.status !== "ativo" ? "text-muted-foreground" : ""}`}>
-                        {member.name}
+                        {member.nome}
                       </span>
                     </button>
                   </td>
@@ -307,13 +285,11 @@ export default function Membros() {
                     {member.saldos.length === 0 ? (
                       <span className="text-xs text-muted-foreground">—</span>
                     ) : (
-                      <div className="flex flex-col gap-0.5">
-                        {member.saldos.map(s => (
-                          <div key={s.campanhaId} className="flex items-center gap-1.5">
-                            <span className="tabular-nums text-sm font-semibold">{s.valor.toLocaleString("pt-BR")}</span>
-                            <span className="text-xs text-muted-foreground">{s.abrev}</span>
-                            <span className="text-[10px] text-muted-foreground font-mono bg-muted rounded px-1">{s.campanhaId}</span>
-                          </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {agruparSaldosPorMoeda(member.saldos).map(s => (
+                          <Pill key={s.moeda} color={MOEDA_COR[s.moeda] ?? "muted"} variant="soft" size="sm" dot>
+                            {s.total.toLocaleString("pt-BR")} {s.abrev}
+                          </Pill>
                         ))}
                       </div>
                     )}
@@ -321,8 +297,8 @@ export default function Membros() {
                   <td className="px-4 py-3.5">
                     <Pill color={TIER_PILL[member.tier]} variant="soft" size="sm">{member.tier}</Pill>
                   </td>
-                  <td className="px-4 py-3.5 text-muted-foreground text-sm">{member.segment}</td>
-                  <td className="px-4 py-3.5 text-muted-foreground tabular-nums text-sm">{member.joined}</td>
+                  <td className="px-4 py-3.5 text-muted-foreground text-sm">{member.segmento}</td>
+                  <td className="px-4 py-3.5 text-muted-foreground tabular-nums text-sm">{member.desde}</td>
                   <td className="px-4 py-3.5">
                     {member.status === "ativo" && (
                       <button
@@ -385,8 +361,8 @@ export default function Membros() {
                 </AvatarFallback>
               </Avatar>
               <div>
-                <p className="text-sm font-semibold">{ajusteMembro.name}</p>
-                <p className="text-xs text-muted-foreground">{ajusteMembro.tier} · {ajusteMembro.segment}</p>
+                <p className="text-sm font-semibold">{ajusteMembro.nome}</p>
+                <p className="text-xs text-muted-foreground">{ajusteMembro.tier} · {ajusteMembro.segmento}</p>
               </div>
             </div>
 
@@ -517,8 +493,8 @@ export default function Membros() {
                 </AvatarFallback>
               </Avatar>
               <div>
-                <p className="text-sm font-medium text-rose-800">{recusaMembro.name}</p>
-                <p className="text-xs text-rose-500">Solicitação de {recusaMembro.joined}</p>
+                <p className="text-sm font-medium text-rose-800">{recusaMembro.nome}</p>
+                <p className="text-xs text-rose-500">Solicitação de {recusaMembro.desde}</p>
               </div>
             </div>
 

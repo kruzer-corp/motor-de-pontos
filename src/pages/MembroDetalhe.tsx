@@ -9,93 +9,7 @@ import {
 } from "@kruzer/ds";
 import { ArrowLeft, ArrowDownLeft, ArrowUpRight, Clock, Plus } from "lucide-react";
 import { renderCrumbLink } from "../lib/crumbLink";
-import { MOEDA } from "../config/programa";
-
-// ── Types ────────────────────────────────────────────────────────────────────
-
-type Tier = "Bronze" | "Prata" | "Ouro" | "Diamante";
-
-type MemberFull = {
-  id: string; initials: string; nome: string; cpf: string;
-  email: string; telefone: string; canal: string; status: "ativo" | "inativo";
-  tier: Tier; segmento: string; pontos: number; expiram: number; desde: string;
-};
-
-type Transacao = {
-  id: string; data: string; descricao: string;
-  tipo: "acumulo" | "resgate" | "ajuste" | "expiracao";
-  valor: number; saldo: number;
-};
-
-type Pedido = {
-  id: string; data: string; produto: string;
-  status: "entregue" | "processando" | "cancelado"; pontos: number;
-};
-
-type Ajuste = {
-  id: string; data: string; operador: string;
-  motivo: string; valor: number; saldoAntes: number;
-};
-
-// ── Mock data ─────────────────────────────────────────────────────────────────
-
-const MEMBERS: Record<string, MemberFull> = {
-  "1": { id: "1", initials: "AP", nome: "Aline P.", cpf: "123.456.789-00", email: "aline.p@email.com", telefone: "(11) 99876-5432", canal: "Loja física", status: "ativo", tier: "Diamante", segmento: "Premium", pontos: 5200, expiram: 0, desde: "Abr 2025" },
-  "2": { id: "2", initials: "BC", nome: "Bruno C.", cpf: "987.654.321-00", email: "bruno.c@email.com", telefone: "(21) 98765-4321", canal: "App", status: "ativo", tier: "Ouro", segmento: "Frete Grátis", pontos: 3200, expiram: 340, desde: "Jan 2025" },
-  "3": { id: "3", initials: "CM", nome: "Cecília M.", cpf: "456.789.123-00", email: "cecilia.m@email.com", telefone: "(31) 97654-3210", canal: "App", status: "ativo", tier: "Prata", segmento: "Fidelidade", pontos: 1800, expiram: 120, desde: "Ago 2024" },
-  "4": { id: "4", initials: "DR", nome: "Danilo R.", cpf: "321.654.987-00", email: "danilo.r@email.com", telefone: "(41) 96543-2109", canal: "Dispositivo (PDV)", status: "ativo", tier: "Bronze", segmento: "Básico", pontos: 760, expiram: 760, desde: "Mar 2025" },
-};
-
-const TRANSACOES: Record<string, Transacao[]> = {
-  "1": [
-    { id: "t1", data: "18/06/2025", descricao: "Compra na loja — R$ 320,00", tipo: "acumulo", valor: 320, saldo: 5200 },
-    { id: "t2", data: "15/06/2025", descricao: "Resgate — Cupom 10% desconto", tipo: "resgate", valor: -500, saldo: 4880 },
-    { id: "t3", data: "10/06/2025", descricao: "Compra na loja — R$ 180,00", tipo: "acumulo", valor: 180, saldo: 5380 },
-    { id: "t4", data: "05/06/2025", descricao: "Ajuste manual — Campanha Dia das Mães", tipo: "ajuste", valor: 200, saldo: 5200 },
-    { id: "t5", data: "01/06/2025", descricao: "Compra na loja — R$ 560,00", tipo: "acumulo", valor: 560, saldo: 5000 },
-    { id: "t6", data: "28/05/2025", descricao: "Expiração por inatividade", tipo: "expiracao", valor: -120, saldo: 4440 },
-    { id: "t7", data: "22/05/2025", descricao: "Compra na loja — R$ 240,00", tipo: "acumulo", valor: 240, saldo: 4560 },
-  ],
-  "2": [
-    { id: "t1", data: "17/06/2025", descricao: "Compra no app — R$ 210,00", tipo: "acumulo", valor: 263, saldo: 3200 },
-    { id: "t2", data: "12/06/2025", descricao: "Resgate — Frete grátis", tipo: "resgate", valor: -300, saldo: 2937 },
-    { id: "t3", data: "08/06/2025", descricao: "Compra no app — R$ 95,00", tipo: "acumulo", valor: 119, saldo: 3237 },
-    { id: "t4", data: "03/06/2025", descricao: "Ajuste manual — Erro de processamento", tipo: "ajuste", valor: 150, saldo: 3118 },
-    { id: "t5", data: "25/05/2025", descricao: "Compra no app — R$ 420,00", tipo: "acumulo", valor: 525, saldo: 2968 },
-  ],
-  "3": [
-    { id: "t1", data: "16/06/2025", descricao: "Compra no app — R$ 88,00", tipo: "acumulo", valor: 110, saldo: 1800 },
-    { id: "t2", data: "10/06/2025", descricao: "Expiração de saldo inativo", tipo: "expiracao", valor: -240, saldo: 1690 },
-    { id: "t3", data: "02/06/2025", descricao: "Compra no app — R$ 130,00", tipo: "acumulo", valor: 163, saldo: 1930 },
-  ],
-  "4": [
-    { id: "t1", data: "15/06/2025", descricao: "Compra no PDV — R$ 45,00", tipo: "acumulo", valor: 45, saldo: 760 },
-    { id: "t2", data: "08/06/2025", descricao: "Compra no PDV — R$ 120,00", tipo: "acumulo", valor: 120, saldo: 715 },
-    { id: "t3", data: "01/06/2025", descricao: "Compra no PDV — R$ 75,00", tipo: "acumulo", valor: 75, saldo: 595 },
-  ],
-};
-
-const PEDIDOS: Record<string, Pedido[]> = {
-  "1": [
-    { id: "PED-001", data: "15/06/2025", produto: "Cupom 10% desconto", status: "entregue", pontos: 500 },
-    { id: "PED-002", data: "28/04/2025", produto: "Kit presente premium", status: "entregue", pontos: 1200 },
-  ],
-  "2": [
-    { id: "PED-003", data: "12/06/2025", produto: "Frete grátis (voucher)", status: "processando", pontos: 300 },
-  ],
-  "3": [], "4": [],
-};
-
-const AJUSTES: Record<string, Ajuste[]> = {
-  "1": [
-    { id: "AJ-001", data: "05/06/2025", operador: "Maria Admin", motivo: "Campanha Dia das Mães — bônus manual", valor: 200, saldoAntes: 5000 },
-    { id: "AJ-002", data: "14/03/2025", operador: "João Ops", motivo: "Correção de transação duplicada", valor: -150, saldoAntes: 4200 },
-  ],
-  "2": [
-    { id: "AJ-003", data: "03/06/2025", operador: "Maria Admin", motivo: "Erro de processamento — reembolso em pontos", valor: 150, saldoAntes: 2968 },
-  ],
-  "3": [], "4": [],
-};
+import { getMembro, MOEDA_COR, agruparSaldosPorMoeda, type Tier } from "../lib/membros";
 
 // ── Tier config ───────────────────────────────────────────────────────────────
 
@@ -152,7 +66,7 @@ function TierProgress({ tier, pontos }: { tier: Tier; pontos: number }) {
       <div className="h-1.5 rounded-full bg-muted overflow-hidden">
         <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
       </div>
-      <p className="text-xs text-muted-foreground">Faltam {faltam.toLocaleString("pt-BR")} {MOEDA.abrev} para {cfg.next}</p>
+      <p className="text-xs text-muted-foreground">Faltam {faltam.toLocaleString("pt-BR")} pts para {cfg.next}</p>
     </div>
   );
 }
@@ -164,11 +78,12 @@ export default function MembroDetalhe() {
   const navigate = useNavigate();
   const [tab, setTab] = useState("visao-geral");
 
-  const member = MEMBERS[id] ?? MEMBERS["1"];
-  const transacoes = TRANSACOES[member.id] ?? [];
-  const pedidos = PEDIDOS[member.id] ?? [];
-  const ajustes = AJUSTES[member.id] ?? [];
+  const member = getMembro(id) ?? getMembro("1")!;
+  const transacoes = member.transacoes;
+  const pedidos = member.pedidos;
+  const ajustes = member.ajustes;
   const tierCfg = TIER_CONFIG[member.tier];
+  const pontosTotal = member.saldos.filter(s => s.moeda === "Pontos").reduce((a, s) => a + s.valor, 0);
 
   return (
     <div className="space-y-6">
@@ -193,12 +108,22 @@ export default function MembroDetalhe() {
 
       {/* ── Stats ── */}
       <div className="grid grid-cols-4 gap-4">
-        <StatCard label="Saldo total">
-          <span className="tabular-nums">{member.pontos.toLocaleString("pt-BR")} {MOEDA.abrev}</span>
+        <StatCard label="Saldo por carteira">
+          {member.saldos.length === 0 ? (
+            <span className="text-muted-foreground text-sm">Nenhum saldo</span>
+          ) : (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {agruparSaldosPorMoeda(member.saldos).map(s => (
+                <Pill key={s.moeda} color={MOEDA_COR[s.moeda] ?? "muted"} variant="soft" size="sm" dot>
+                  {s.total.toLocaleString("pt-BR")} {s.abrev}
+                </Pill>
+              ))}
+            </div>
+          )}
         </StatCard>
         <StatCard label="Expiram em 30 dias">
-          {member.expiram > 0 ? (
-            <span className="tabular-nums text-amber-600">{member.expiram.toLocaleString("pt-BR")} {MOEDA.abrev}</span>
+          {member.expiram30d > 0 ? (
+            <span className="tabular-nums text-amber-600">{member.expiram30d.toLocaleString("pt-BR")} pts</span>
           ) : (
             <span className="text-muted-foreground text-sm">Nenhum</span>
           )}
@@ -208,7 +133,7 @@ export default function MembroDetalhe() {
         </StatCard>
         <StatCard label="Status">
           <Badge variant={member.status === "ativo" ? "success" : "secondary"}>
-            {member.status === "ativo" ? "Ativo" : "Inativo"}
+            {member.status === "ativo" ? "Ativo" : member.status === "pendente" ? "Pendente" : member.status === "recusado" ? "Recusado" : "Inativo"}
           </Badge>
         </StatCard>
       </div>
@@ -263,7 +188,7 @@ export default function MembroDetalhe() {
                     <Pill color={tierCfg.pill} variant="soft" size="sm">{member.tier}</Pill>
                   </div>
                 </div>
-                <TierProgress tier={member.tier} pontos={member.pontos} />
+                <TierProgress tier={member.tier} pontos={pontosTotal} />
               </CardContent>
             </Card>
           </div>
@@ -294,7 +219,7 @@ export default function MembroDetalhe() {
                         <p className="text-xs text-muted-foreground">{t.data}</p>
                       </div>
                       <span className={`text-sm font-semibold tabular-nums shrink-0 ${t.valor >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-                        {t.valor >= 0 ? "+" : ""}{t.valor.toLocaleString("pt-BR")} {MOEDA.abrev}
+                        {t.valor >= 0 ? "+" : ""}{t.valor.toLocaleString("pt-BR")} pts
                       </span>
                     </div>
                   );
@@ -303,9 +228,9 @@ export default function MembroDetalhe() {
             </Card>
           )}
 
-          {member.expiram > 0 && (
-            <InfoNotice variant="warning" title={`${MOEDA.nome} próximos de expirar`}>
-              {member.expiram.toLocaleString("pt-BR")} {MOEDA.nome.toLowerCase()} expiram nos próximos 30 dias. Considere acionar uma campanha de reativação.
+          {member.expiram30d > 0 && (
+            <InfoNotice variant="warning" title="Pontos próximos de expirar">
+              {member.expiram30d.toLocaleString("pt-BR")} pontos expiram nos próximos 30 dias. Considere acionar uma campanha de reativação.
             </InfoNotice>
           )}
         </TabsContent>
