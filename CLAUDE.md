@@ -53,3 +53,7 @@ Sempre responda em português brasileiro, independentemente do idioma das pergun
 
 Projetos neste ambiente geralmente usam HTML, CSS e JavaScript vanilla — sem frameworks, sem build tools. Não sugira ou adicione dependências desnecessárias.
 
+## Code to Design Integration
+- Quando solicitado o fluxo de exportação de interfaces para o Figma, você deve seguir estritamente as diretrizes geométricas, de tokens e de responsividade contidas no arquivo `.claude/skills/code-to-design.md`.
+
+

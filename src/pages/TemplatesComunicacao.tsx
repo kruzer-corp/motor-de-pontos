@@ -264,7 +264,7 @@ function Editor({ template, onSave, onCancel }: {
           {/* Preview note */}
           {preview && (
             <p className="text-xs text-muted-foreground">
-              Prévia com dados de exemplo — <strong>{{"{{"}}membro_nome{{"}}"}}</strong> substituto por <strong>Ana Paula</strong>, etc.
+              Prévia com dados de exemplo — <strong>{"{{membro_nome}}"}</strong> substituído por <strong>Ana Paula</strong>, etc.
             </p>
           )}
         </div>
