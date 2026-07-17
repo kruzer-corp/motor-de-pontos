@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { cn, TooltipProvider } from "@kruzer/ds";
-import { CustomTag } from "../components/CustomTag";
-import { MOEDA } from "../config/programa";
 import {
-  LayoutDashboard, Users, User, ShieldCheck, Gift, Sparkles, Boxes, Building2,
-  ChevronDown, ChevronsLeft, ChevronsRight, ArrowLeftRight,
+  LayoutDashboard, Users, User, ShieldCheck, Sparkles, Boxes, Building2,
+  ChevronDown, ChevronsLeft, ChevronsRight,
   Package, Trophy, History, ScrollText,
-  Palette, Webhook, Share2, ShieldAlert, Sliders, Wallet,
+  Palette, Webhook, Share2, Sliders, Wallet,
 } from "lucide-react";
 
 // ── Tenants ───────────────────────────────────────────────────────────────────
@@ -61,25 +59,16 @@ const MENU: MenuItem[] = [
 
   // ── OPERAÇÃO ───────────────────────────────────────────────────────────────
   { section: "Operação" },
-  {
-    label: "Aprovações de Resgate", icon: Gift,
-    group: [
-      { to: "/resgates",   label: "Resgates" },
-      { to: "/orcamentos", label: "Orçamentos" },
-    ],
-  },
-  {
-    label: "Membros e Saldo", icon: Users,
-    group: [
-      { to: "/membros",          label: "Saldo dos membros" },
-      { to: "/pontos-expirando", label: `${MOEDA.nome} expirando`  },
-      { to: "/saldo-expirado",   label: "Saldo expirado"    },
-    ],
-  },
-  { to: "/indicacoes",        label: "Indicações",        icon: Share2       },
-  { to: "/alertas-fraude",   label: "Alertas de fraude", icon: ShieldAlert  },
-  { to: "/catalogo-produtos", label: "Produtos elegíveis", icon: Boxes },
   { to: "/campanhas", label: "Minhas Campanhas", icon: Sparkles },
+  { to: "/membros/extrato", label: "Membros e movimentações", icon: Users },
+  { to: "/indicacoes",        label: "Indicações",        icon: Share2       },
+  {
+    label: "Catálogos e produtos", icon: Boxes,
+    group: [
+      { to: "/catalogo-produtos", label: "Produtos elegíveis" },
+    ],
+  },
+
   // ── CONFIGURAÇÃO ───────────────────────────────────────────────────────────
   { section: "Configuração" },
   { to: "/mecanica",       label: "Mecânica do Programa", icon: Sliders },
@@ -428,7 +417,6 @@ function PlatformHeader({ mode, collapsed, hover }: { mode: TenantMode; collapse
 // ── App Layout ────────────────────────────────────────────────────────────────
 
 export default function AppLayout() {
-  const navigate    = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarHover,     setSidebarHover]     = useState(false);
   const mode: TenantMode = "custom"; // admin sempre mostra tudo
@@ -456,16 +444,6 @@ export default function AppLayout() {
           </div>
         </main>
       </div>
-
-      {/* Floating CTA — shift de papel */}
-      <button
-        onClick={() => navigate("/portal")}
-        className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-700 shadow-lg transition-all hover:bg-amber-100 hover:shadow-xl"
-      >
-        <ArrowLeftRight className="size-3 shrink-0" />
-        Ver como membro final
-        <CustomTag className="ml-0.5" />
-      </button>
     </div>
     </TooltipProvider>
   );

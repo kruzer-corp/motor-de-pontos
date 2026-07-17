@@ -88,10 +88,10 @@ export const DEFAULTS: Form = {
   tetoEmissaoAtivo: false,
   tetoEmissaoPts: "",
   cancelamentoPolicy: "estornar_tudo",
-  aprovacaoTipo: "manual",
+  aprovacaoTipo: "automatica",
   aprovacaoTiposResgate: ["voucher_digital"],
   aprovacaoValorMax: "",
-  aprovacaoTiers: ["Ouro", "Diamante"],
+  aprovacaoTiers: ["Bronze", "Prata", "Ouro", "Diamante"],
   moedas: {
     Pontos:   { ativo: true,  valor: "" },
     Cashback: { ativo: false, valor: "" },

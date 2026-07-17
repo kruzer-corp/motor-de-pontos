@@ -11,6 +11,8 @@ import {
 import { AlertTriangle, Ban, FileCheck, FileCheck2, MoreHorizontal, Package, Pencil, RotateCcw, Upload, CheckCheck, UserCircle } from "lucide-react";
 import { CustomTag } from "../components/CustomTag";
 import { TIPO_RESGATE_LABEL, TIPO_RESGATE_ICON } from "../config/resgateLifecycle";
+import { getCampanha } from "../lib/campanhas";
+import { registrarTransacaoSaldo } from "../lib/membros";
 
 // ── Fluxo Documental ──────────────────────────────────────────────────────────
 
@@ -168,6 +170,11 @@ export type TimelineEntry = {
   status: OrderStatus; date: string; operator?: string;
 };
 
+export type AjusteResgate = {
+  id: string; data: string; operador: string; motivo: string;
+  pontosAntes: number; pontosDepois: number;
+};
+
 export type Order = {
   id: string; memberId: string; memberName: string; memberInitials: string;
   memberTier: string; memberBalance: number;
@@ -189,6 +196,7 @@ export type Order = {
   dataEmissaoNF: string | null;
   status: OrderStatus; createdAt: string; timeline: TimelineEntry[];
   rejectReason?: string;
+  ajustes?: AjusteResgate[];
 };
 
 // ── Mock data ─────────────────────────────────────────────────────────────────
@@ -197,7 +205,7 @@ export const ORDERS: Order[] = [
   {
     id: "REQ-521", memberId: "1", memberName: "Aline P.", memberInitials: "AP",
     memberTier: "Diamante", memberBalance: 5200, clienteName: "Aline Paula Silva",
-    campanhaId: "CAMP-2025-06", classificacao: "Ouro",
+    campanhaId: "CMP-001", classificacao: "Ouro",
     product: "Voucher R$100", category: "Voucher", channel: "App Mobile", origem: "portal", tipoResgate: "voucher_digital", tipoPessoa: "PF", moedaCampanha: "Pontos", moedaAbrev: "pts",
     codigoSku: "VCH-100-BR", quantidade: 1, valorUnitario: 100, precoPedido: 100, valorTotal: 100,
     points: 2400, dataEmissaoNF: null,
@@ -289,6 +297,34 @@ export const ORDERS: Order[] = [
   },
 ];
 
+// ── Aprovação automática ──────────────────────────────────────────────────────
+// Conecta a config "Aprovação de resgates" do wizard de campanhas à fila real.
+
+export function deveAprovarAutomaticamente(order: Order): boolean {
+  if (order.tipoResgate === "credito_conta") return false; // sempre exige documento (RPA/NF)
+  const campanha = getCampanha(order.campanhaId);
+  if (!campanha || campanha.aprovacaoTipo !== "automatica") return false;
+  if (campanha.aprovacaoValorMax && order.valorTotal > Number(campanha.aprovacaoValorMax)) return false;
+  if (campanha.aprovacaoTiers.length > 0 && !campanha.aprovacaoTiers.includes(order.memberTier)) return false;
+  return true;
+}
+
+export function aplicarAprovacaoAutomatica(orders: Order[]): Order[] {
+  return orders.map((o) => {
+    if (o.status !== "solicitado" || !deveAprovarAutomaticamente(o)) return o;
+    registrarTransacaoSaldo(o.memberId, {
+      moeda: o.moedaCampanha, abrev: o.moedaAbrev, delta: -o.points,
+      descricao: `Resgate ${o.id} — ${o.product} (aprovação automática)`,
+      tipo: "resgate", refId: `AUTO-${o.id}`,
+    });
+    return {
+      ...o,
+      status: "aprovado",
+      timeline: [...o.timeline, { status: "aprovado", date: o.createdAt, operator: "Sistema (automático)" }],
+    };
+  });
+}
+
 // ── Config ────────────────────────────────────────────────────────────────────
 
 export const STATUS_LABEL: Record<OrderStatus, string> = {
@@ -346,7 +382,7 @@ const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", curren
 export default function Pedidos() {
   const navigate = useNavigate();
   const [pageView, setPageView] = useState<"pedidos" | "documental">("pedidos");
-  const [orders, setOrders] = useState<Order[]>(ORDERS);
+  const [orders, setOrders] = useState<Order[]>(() => aplicarAprovacaoAutomatica(ORDERS));
   const [search, setSearch] = useState("");
   const [tab,    setTab]    = useState("todos");
 
@@ -550,22 +586,32 @@ export default function Pedidos() {
 
                           <DropdownMenuSeparator />
 
-                          {/* Estornar — só após aprovação */}
+                          {/* Estornar — só após aprovação; devolve o saldo debitado */}
                           {["aprovado", "em_separacao", "enviado", "creditado"].includes(order.status) && (
                             <DropdownMenuItem onClick={() => {
+                              registrarTransacaoSaldo(order.memberId, {
+                                moeda: order.moedaCampanha, abrev: order.moedaAbrev, delta: order.points,
+                                descricao: `Estorno do resgate ${order.id} — ${order.product}`, tipo: "ajuste",
+                              });
                               updateStatus(order.id, "solicitado");
-                              toast.info(`Resgate ${order.id} estornado`);
+                              toast.info(`Resgate ${order.id} estornado — saldo devolvido ao membro`);
                             }}>
                               <RotateCcw className="size-3.5 mr-2" />
                               Estornar
                             </DropdownMenuItem>
                           )}
 
-                          {/* Anular — só quando ainda não é terminal */}
+                          {/* Anular — só quando ainda não é terminal; devolve o saldo se já tinha sido debitado */}
                           {!["cancelado", "rejeitado", "entregue", "enviado", "creditado"].includes(order.status) && (
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
                               onClick={() => {
+                                if (["aprovado", "em_separacao"].includes(order.status)) {
+                                  registrarTransacaoSaldo(order.memberId, {
+                                    moeda: order.moedaCampanha, abrev: order.moedaAbrev, delta: order.points,
+                                    descricao: `Cancelamento do resgate ${order.id} — saldo restituído`, tipo: "ajuste",
+                                  });
+                                }
                                 updateStatus(order.id, "cancelado");
                                 toast.error(`Registro de venda ${order.id} anulado`);
                               }}

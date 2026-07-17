@@ -4,11 +4,12 @@ import {
   Avatar, AvatarFallback, Button, Card, CardContent, CardHeader, CardTitle,
   ConfirmDialog, InfoNotice, PageHeader, Pill, Separator, toast,
 } from "@kruzer/ds";
-import { ArrowLeft, CheckCircle2, Circle, Clock, XCircle, Package, FileText, Download, Banknote } from "lucide-react";
-import { ORDERS } from "./Pedidos";
+import { ArrowLeft, CheckCircle2, Circle, Clock, XCircle, Package, FileText, Download, Banknote, Pencil, X } from "lucide-react";
+import { ORDERS, aplicarAprovacaoAutomatica } from "./Pedidos";
 import { renderCrumbLink } from "../lib/crumbLink";
 import type { OrderStatus, Order } from "./Pedidos";
 import { LIFECYCLE_POR_TIPO, TIPO_RESGATE_LABEL, TIPO_RESGATE_ICON, proximoStatus } from "../config/resgateLifecycle";
+import { registrarTransacaoSaldo } from "../lib/membros";
 
 // ── Lifecycle definition ──────────────────────────────────────────────────────
 
@@ -111,12 +112,16 @@ export default function PedidoDetalhe() {
   const navigate = useNavigate();
 
   // Local state copy so we can mutate status in the prototype
-  const [orders, setOrders] = useState<Order[]>(ORDERS);
+  const [orders, setOrders] = useState<Order[]>(() => aplicarAprovacaoAutomatica(ORDERS));
   const [confirmApprove,  setConfirmApprove]  = useState(false);
   const [confirmAdvance,  setConfirmAdvance]  = useState(false);
   const [confirmReject,   setConfirmReject]   = useState(false);
   const [confirmCreditar, setConfirmCreditar] = useState(false);
   const [comprovante,     setComprovante]     = useState("");
+  const [editOpen,   setEditOpen]   = useState(false);
+  const [editPontos, setEditPontos] = useState("");
+  const [editMotivo, setEditMotivo] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
 
   const orderFound = orders.find((o) => o.id === id);
   if (!orderFound) {
@@ -153,6 +158,10 @@ export default function PedidoDetalhe() {
   function handleApprove() {
     setConfirmApprove(false);
     advance("aprovado");
+    registrarTransacaoSaldo(order.memberId, {
+      moeda: order.moedaCampanha, abrev: order.moedaAbrev, delta: -order.points,
+      descricao: `Resgate ${order.id} — ${order.product}`, tipo: "resgate",
+    });
     toast.success(`${order.points.toLocaleString("pt-BR")} ${order.moedaAbrev} debitados do saldo de ${order.memberName}`);
   }
 
@@ -174,6 +183,43 @@ export default function PedidoDetalhe() {
     setConfirmCreditar(false);
     advance("creditado");
     toast.success(`Crédito processado — comprovante registrado`);
+  }
+
+  function abrirEdicaoPontos() {
+    setEditPontos(String(order.points));
+    setEditMotivo("");
+    setEditOpen(true);
+  }
+
+  async function handleEditarPontos() {
+    if (!editPontos || !editMotivo) return;
+    setEditSaving(true);
+    await new Promise((r) => setTimeout(r, 350));
+    const novo = Number(editPontos);
+    const delta = order.points - novo; // reduzir pontos do resgate = crédito de volta pro membro
+    const now = new Date().toLocaleDateString("pt-BR", {
+      day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
+    }).replace(",", "");
+
+    const jaDebitado = ["aprovado", "em_separacao", "entregue", "enviado", "creditado"].includes(order.status);
+    if (jaDebitado && delta !== 0) {
+      registrarTransacaoSaldo(order.memberId, {
+        moeda: order.moedaCampanha, abrev: order.moedaAbrev, delta,
+        descricao: `Ajuste manual no resgate ${order.id}: ${editMotivo}`, tipo: "ajuste",
+      });
+    }
+
+    setOrders((prev) => prev.map((o) => o.id !== order.id ? o : {
+      ...o,
+      points: novo,
+      ajustes: [
+        ...(o.ajustes ?? []),
+        { id: `AJR-${o.ajustes?.length ?? 0}`, data: now, operador: "Maria Admin", motivo: editMotivo, pontosAntes: o.points, pontosDepois: novo },
+      ],
+    }));
+    toast.success(`Pontos do resgate ${order.id} ajustados para ${novo.toLocaleString("pt-BR")} ${order.moedaAbrev}`);
+    setEditSaving(false);
+    setEditOpen(false);
   }
 
   const currentIdx = lifecycle.indexOf(order.status);
@@ -558,10 +604,28 @@ export default function PedidoDetalhe() {
                   <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-slate-100 text-slate-600">🖥 Criado pelo operador</span>
                 )}
               </div>
-              <div className="flex justify-between">
+              <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Saldo debitado ({order.moedaCampanha})</span>
-                <span className="font-semibold tabular-nums">{order.points.toLocaleString("pt-BR")} <span className="text-xs text-muted-foreground">{order.moedaAbrev}</span></span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold tabular-nums">{order.points.toLocaleString("pt-BR")} <span className="text-xs text-muted-foreground">{order.moedaAbrev}</span></span>
+                  {!["cancelado", "rejeitado"].includes(order.status) && (
+                    <button onClick={abrirEdicaoPontos} title="Editar pontos do resgate" className="text-muted-foreground hover:text-primary">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
+              {order.ajustes && order.ajustes.length > 0 && (
+                <div className="pt-2 mt-2 border-t border-border space-y-1.5">
+                  <p className="text-xs font-semibold text-muted-foreground">Histórico de ajustes manuais</p>
+                  {order.ajustes.map((a) => (
+                    <div key={a.id} className="text-xs text-muted-foreground">
+                      <span className="tabular-nums">{a.pontosAntes.toLocaleString("pt-BR")} → {a.pontosDepois.toLocaleString("pt-BR")}</span>
+                      {" · "}{a.motivo} · {a.operador} · {a.data}
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -607,6 +671,62 @@ export default function PedidoDetalhe() {
         confirmLabel="Confirmar crédito"
         onConfirm={handleCreditar}
       />
+
+      {/* Modal — Editar pontos do resgate */}
+      {editOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setEditOpen(false)}>
+          <div className="bg-background rounded-xl shadow-2xl w-full max-w-md p-6 space-y-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">Editar pontos do resgate</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">O ajuste será registrado no histórico deste resgate.</p>
+              </div>
+              <button onClick={() => setEditOpen(false)} className="text-muted-foreground hover:text-foreground mt-0.5">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="rounded-lg bg-muted/40 px-4 py-3 text-sm flex justify-between">
+              <span className="text-muted-foreground">Valor atual</span>
+              <span className="font-semibold tabular-nums">{order.points.toLocaleString("pt-BR")} {order.moedaAbrev}</span>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Novo valor ({order.moedaAbrev}) <span className="text-destructive">*</span></label>
+              <input
+                type="number" min={0} value={editPontos}
+                onChange={(e) => setEditPontos(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Motivo <span className="text-destructive">*</span></label>
+              <textarea
+                value={editMotivo}
+                onChange={(e) => setEditMotivo(e.target.value)}
+                placeholder="Descreva o motivo do ajuste. Ex: Correção de pontos calculados incorretamente na aprovação automática."
+                rows={3}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+              />
+              <p className="text-xs text-muted-foreground">Obrigatório — registrado no histórico para auditoria.</p>
+            </div>
+
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setEditOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1"
+                disabled={!editPontos || !editMotivo || editSaving}
+                onClick={handleEditarPontos}
+              >
+                {editSaving ? "Salvando…" : "Confirmar ajuste"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
