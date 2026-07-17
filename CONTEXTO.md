@@ -208,3 +208,83 @@ Respeitando as dependências:
 ## Resumo de uma linha
 
 Construir o produto do Motor de Pontos é, no fundo, **desenhar a jornada do gerente** sobre um motor que já calcula pontos: dar uma **tela de regra** (formulário + templates + preview) ao que já existe, e **construir de verdade** as três peças que faltam — **cadastro de cliente, resgate e níveis** — sem deixar o vocabulário técnico vazar e sem assumir autosserviço puro antes de validar.
+
+---
+
+## 12. Construtor de campanha — estrutura implementada
+
+> Fonte: `src/pages/CampanhasNova.tsx` · Capturado em jul/2026
+
+### Steps do wizard (ordem exata)
+
+| # | Label | O que configura |
+|---|---|---|
+| 1 | **Detalhes** | Identidade e vigência da campanha |
+| 2 | **Fontes** | Sistemas que disparam eventos de acúmulo |
+| 3 | **Elegibilidade** | Moeda, tipo de cálculo, status de concessão/anulação |
+| 4 | **Produtos** | Classificações e SKUs elegíveis |
+| 5 | **Limites** | Liberação, expiração, teto, cancelamento, aprovação de resgates |
+| 6 | **Multiplicadores** | Fator extra por tier de membro ou por produto |
+| 7 | **Revisão** | Resumo antes de publicar |
+
+### Valores de domínio
+
+**Segmentos de membros** (Step 1)
+- Todos os membros · Premium · Fidelidade · Frete Grátis · Básico
+
+**Fontes de eventos** (Step 2)
+| ID | Nome | Canal | Sistema | Status | Evento concessão | Evento anulação |
+|---|---|---|---|---|---|---|
+| `portal` | Portal B2C | App Mobile | Motor de Pontos · Portal do membro | Conectado | `order.confirmed` | `order.cancelled` |
+| `pdv` | PDV / Loja física | Loja física | TOTVS Retail | Conectado | `sale.completed` | `sale.refunded` |
+| `ecommerce` | E-commerce | Web | VTEX | Não configurado | `order.invoiced` | `order.returned` |
+| `marketplace` | Marketplace | Web | Não configurado | Não configurado | — | — |
+
+> PDV permite escopo: **Todas as filiais** ou **Filiais específicas** (lista de FILIAIS filtrada por `canal === "PDV"`).
+
+**Moedas** (Step 3)
+- Pontos · Cashback · Milhas · Créditos
+
+**Tipo de cálculo** (Step 3)
+- Taxa por R$1 — `N moeda / R$1` + arredondamento (para baixo / para cima / mais próximo)
+- Valor fixo — `N moeda por ação`
+- Multiplicador — `N× a taxa do programa base`
+
+**Status de pedido** (Steps 3 — concessão e anulação)
+- Aprovado · Faturado · Em separação · Entregue · Concluído · Cancelado · Devolvido · Recusado
+
+**Tiers** (Steps 5 e 6)
+- Bronze · Prata · Ouro · Diamante
+
+**Liberação de pontos** (Step 5)
+- Imediatamente após o status de concessão
+- Após N dias do status de concessão
+
+**Expiração** (Step 5)
+- Herdar da Mecânica do Programa (política global)
+- N meses após o crédito
+- Data fixa
+
+**Cancelamento / estorno** (Step 5)
+- Estornar todos os pontos *(padrão)*
+- Estorno proporcional ao valor cancelado
+- Manter os pontos *(exceção — usar com cautela)*
+
+**Aprovação de resgates** (Step 5)
+- Manual — analista revisa individualmente
+- Automática — condições: tipo de resgate elegível (voucher digital / produto físico / crédito em conta), valor máximo, tiers elegíveis
+
+**Multiplicadores** (Step 6)
+- Alvo **Membro**: fator por tier (Bronze / Prata / Ouro / Diamante) — sobrescreve multiplicadores globais da Mecânica
+- Alvo **Produto**: fator por SKU elegível selecionado no Step 4
+
+### Campos do Step 1 (Detalhes)
+
+| Campo | Tipo | Obrigatório | Padrão / notas |
+|---|---|---|---|
+| Código | Input texto | Não | `CAMP01` |
+| Nome | Input texto | **Sim** | Habilita o botão Continuar |
+| Descrição | Textarea (4 linhas) | Não | — |
+| Segmento de membros elegíveis | Select | Não | Todos os membros |
+| Período da campanha | 2 × date input (início → fim) | Não | — |
+| Vigência de pontos e bônus | 2 × date input (início → fim) | Não | Janela em que pontos ficam disponíveis para resgate |
