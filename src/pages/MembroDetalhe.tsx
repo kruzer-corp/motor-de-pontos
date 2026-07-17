@@ -9,7 +9,11 @@ import {
 } from "@kruzer/ds";
 import { ArrowLeft, ArrowDownLeft, ArrowUpRight, Clock, Plus, X, CheckCircle2, XCircle, Ban } from "lucide-react";
 import { renderCrumbLink } from "../lib/crumbLink";
-import { getMembro, upsertMembro, registrarTransacaoSaldo, MOEDA_COR, agruparSaldosPorMoeda, type Tier } from "../lib/membros";
+import {
+  getMembro, upsertMembro, registrarTransacaoSaldo,
+  avaliarEventosMembro, creditarEventosAcumulo, creditarBonusEventos,
+  MOEDA_COR, agruparSaldosPorMoeda, type Tier,
+} from "../lib/membros";
 
 // ── Tier config ───────────────────────────────────────────────────────────────
 
@@ -87,11 +91,21 @@ export default function MembroDetalhe() {
   const [bloqueioMotivo, setBloqueioMotivo] = useState("");
   const [bloqueioSaving, setBloqueioSaving] = useState(false);
 
+  // Roda o motor de acúmulo uma vez, na montagem — credita os eventos elegíveis e os bônus de cadastro no ledger real.
+  useState(() => {
+    const m = getMembro(id) ?? getMembro("1");
+    if (m) {
+      creditarEventosAcumulo(m.id, avaliarEventosMembro(m));
+      creditarBonusEventos(m);
+    }
+    return null;
+  });
+
   const member = getMembro(id) ?? getMembro("1")!;
   const transacoes = member.transacoes;
   const pedidos = member.pedidos;
   const ajustes = member.ajustes;
-  const eventos = member.eventos;
+  const eventos = avaliarEventosMembro(member);
   const tierCfg = TIER_CONFIG[member.tier];
   const pontosTotal = member.saldos.filter(s => s.moeda === "Pontos").reduce((a, s) => a + s.valor, 0);
   const moedasMembro = agruparSaldosPorMoeda(member.saldos);

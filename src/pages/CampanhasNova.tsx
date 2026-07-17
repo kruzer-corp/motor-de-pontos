@@ -362,13 +362,13 @@ const STATUS_PEDIDO = [
 
 // ── Stepper ───────────────────────────────────────────────────────────────────
 
-function Stepper({ current }: { current: number }) {
+function Stepper({ current, steps }: { current: number; steps: typeof STEPS }) {
   return (
     <div className="flex items-center justify-center gap-0 mb-10">
-      {STEPS.map((s, idx) => {
+      {steps.map((s, idx) => {
         const done    = s.num < current;
         const active  = s.num === current;
-        const isLast  = idx === STEPS.length - 1;
+        const isLast  = idx === steps.length - 1;
         return (
           <div key={s.num} className="flex items-center">
             <div className="flex flex-col items-center gap-1.5">
@@ -377,7 +377,7 @@ function Stepper({ current }: { current: number }) {
                 : active ? "bg-foreground border-foreground text-background"
                 : "bg-background border-border text-muted-foreground"
               }`}>
-                {done ? <CheckCircle2 className="h-4 w-4" /> : s.num}
+                {done ? <CheckCircle2 className="h-4 w-4" /> : idx + 1}
               </div>
               <span className={`text-xs whitespace-nowrap text-center max-w-[100px] leading-tight ${
                 active ? "font-semibold text-foreground" : "text-muted-foreground"
@@ -393,6 +393,19 @@ function Stepper({ current }: { current: number }) {
       })}
     </div>
   );
+}
+
+// Steps 2 (Fontes), 4 (Produtos) e 5 (Grupos de regras) só existem pra campanha por pedido —
+// não fazem sentido quando a campanha pontua por evento (sem compra/venda envolvida).
+function stepsVisiveis(gatilhoTipo: "pedido" | "evento") {
+  return gatilhoTipo === "evento" ? STEPS.filter((s) => ![2, 4, 5].includes(s.num)) : STEPS;
+}
+
+function proximoStep(atual: number, direcao: 1 | -1, gatilhoTipo: "pedido" | "evento"): number {
+  const visiveis = stepsVisiveis(gatilhoTipo).map((s) => s.num);
+  const idx = visiveis.indexOf(atual);
+  const novoIdx = idx + direcao;
+  return novoIdx < 0 || novoIdx >= visiveis.length ? atual : visiveis[novoIdx];
 }
 
 // ── Field wrapper ─────────────────────────────────────────────────────────────
@@ -567,7 +580,7 @@ export default function CampanhasNova() {
       />
 
       <div className="max-w-2xl mx-auto pt-6">
-        <Stepper current={step} />
+        <Stepper current={step} steps={stepsVisiveis(form.gatilhoTipo)} />
 
         {/* ── Step 1: Detalhes e vigências ── */}
         {step === 1 && (
@@ -597,6 +610,47 @@ export default function CampanhasNova() {
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
               />
             </Field>
+
+            <Field label="Quando esta campanha pontua?" hint="Muda o que aparece nos próximos passos.">
+              <div className="grid grid-cols-2 gap-3">
+                {([
+                  ["pedido", "Em pedidos elegíveis", "Pontua a cada compra/venda que bater com as regras desta campanha."],
+                  ["evento", "Em outro evento (sem pedido)", "Pontua quando um evento específico acontece — cadastro, aniversário, indicação, avaliação etc."],
+                ] as const).map(([value, label, desc]) => (
+                  <label key={value} className={`flex flex-col gap-1 rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
+                    form.gatilhoTipo === value ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
+                  }`}>
+                    <input type="radio" name="gatilhoTipo" value={value} checked={form.gatilhoTipo === value}
+                      onChange={() => {
+                        set("gatilhoTipo", value);
+                        if (value === "evento") { set("taxaTipo", "fixo"); set("multAlvo", "membro"); }
+                      }} className="sr-only" />
+                    <span className="text-sm font-semibold">{label}</span>
+                    <span className="text-xs text-muted-foreground">{desc}</span>
+                  </label>
+                ))}
+              </div>
+            </Field>
+
+            {form.gatilhoTipo === "evento" && (
+              <Field label="Qual evento concede os pontos?">
+                <Select value={form.gatilhoEvento} onValueChange={(v) => set("gatilhoEvento", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cadastro">Cadastro no programa</SelectItem>
+                    <SelectItem value="aniversario">Aniversário do membro</SelectItem>
+                    <SelectItem value="indicacao">Indicação confirmada</SelectItem>
+                    <SelectItem value="avaliacao">Avaliação/pesquisa enviada</SelectItem>
+                    <SelectItem value="outro">Outro (definido por integração)</SelectItem>
+                  </SelectContent>
+                </Select>
+                {form.gatilhoEvento !== "cadastro" && (
+                  <p className="text-xs text-amber-600 mt-1.5">
+                    Hoje só "Cadastro no programa" já dispara automaticamente neste protótipo — os demais ficam configurados aqui, mas ainda sem a fonte do evento conectada.
+                  </p>
+                )}
+              </Field>
+            )}
 
             <Field label="Segmento de membros elegíveis" hint="Lista sincronizada com Configuração → Tier e Segmentação.">
               <Select value={form.segmento} onValueChange={(v) => set("segmento", v)}>
@@ -795,12 +849,18 @@ export default function CampanhasNova() {
                 {/* Tipo */}
                 <div className="space-y-2">
                   <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tipo de cálculo</Label>
+                  {form.gatilhoTipo === "evento" && (
+                    <p className="text-xs text-muted-foreground">Gatilho por evento só aceita valor fixo — não há valor de compra pra calcular taxa ou multiplicador.</p>
+                  )}
                   <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { value: "taxa",         label: `Taxa por R$1`,         hint: `Ex: 1 ${MOEDA.abrev}/R$1` },
-                      { value: "fixo",         label: `Valor fixo`,           hint: `Ex: 500 ${MOEDA.abrev} por ação` },
-                      { value: "multiplicador",label: `Multiplicador`,        hint: `Ex: 2× a taxa do programa base` },
-                    ].map(({ value, label, hint }) => (
+                    {(form.gatilhoTipo === "evento"
+                      ? [{ value: "fixo", label: `Valor fixo`, hint: `Ex: 500 ${MOEDA.abrev} no evento` }]
+                      : [
+                          { value: "taxa",         label: `Taxa por R$1`,         hint: `Ex: 1 ${MOEDA.abrev}/R$1` },
+                          { value: "fixo",         label: `Valor fixo`,           hint: `Ex: 500 ${MOEDA.abrev} por ação` },
+                          { value: "multiplicador",label: `Multiplicador`,        hint: `Ex: 2× a taxa do programa base` },
+                        ]
+                    ).map(({ value, label, hint }) => (
                       <label key={value} className={`flex flex-col gap-0.5 rounded-lg border px-3 py-2.5 cursor-pointer transition-colors ${
                         form.taxaTipo === value ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
                       }`}>
@@ -846,61 +906,67 @@ export default function CampanhasNova() {
               </div>
             </div>
 
-            {/* Status para conceder */}
-            <div className="space-y-2">
-              <Label className="text-sm">
-                Status de pedido para <strong>conceder</strong> {MOEDA.nome.toLowerCase()}
-                <span className="text-destructive ml-0.5">*</span>
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Marque quando você deseja disponibilizar os {MOEDA.nome.toLowerCase()}/bônus ao membro.
-              </p>
-              <div className="rounded-md border border-input overflow-hidden">
-                {STATUS_PEDIDO.map((s) => (
-                  <label
-                    key={s}
-                    className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/40 border-b border-border last:border-0"
-                  >
-                    <input
-                      type="checkbox"
-                      className="accent-primary h-4 w-4 shrink-0"
-                      checked={(form.statusConceder as Record<string, boolean>)[s] ?? false}
-                      onChange={(e) => set("statusConceder", { ...(form.statusConceder as Record<string, boolean>), [s]: e.target.checked })}
-                    />
-                    <span className="text-sm">{s}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
+            {form.gatilhoTipo === "pedido" ? (
+              <>
+                {/* Status para conceder */}
+                <div className="space-y-2">
+                  <Label className="text-sm">
+                    Status de pedido para <strong>conceder</strong> {MOEDA.nome.toLowerCase()}
+                    <span className="text-destructive ml-0.5">*</span>
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Marque quando você deseja disponibilizar os {MOEDA.nome.toLowerCase()}/bônus ao membro.
+                  </p>
+                  <div className="rounded-md border border-input overflow-hidden">
+                    {STATUS_PEDIDO.map((s) => (
+                      <label
+                        key={s}
+                        className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/40 border-b border-border last:border-0"
+                      >
+                        <input
+                          type="checkbox"
+                          className="accent-primary h-4 w-4 shrink-0"
+                          checked={(form.statusConceder as Record<string, boolean>)[s] ?? false}
+                          onChange={(e) => set("statusConceder", { ...(form.statusConceder as Record<string, boolean>), [s]: e.target.checked })}
+                        />
+                        <span className="text-sm">{s}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
 
-            {/* Dias para crédito — movido para Step 4 */}
-
-            {/* Status para anular */}
-            <div className="space-y-2">
-              <Label className="text-sm">
-                Status de pedido para <strong>anular</strong> {MOEDA.nome.toLowerCase()}
-                <span className="text-destructive ml-0.5">*</span>
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Marque quais casos você deseja estornar os {MOEDA.nome.toLowerCase()}/bônus.
-              </p>
-              <div className="rounded-md border border-input overflow-hidden">
-                {STATUS_PEDIDO.map((s) => (
-                  <label
-                    key={s}
-                    className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/40 border-b border-border last:border-0"
-                  >
-                    <input
-                      type="checkbox"
-                      className="accent-primary h-4 w-4 shrink-0"
-                      checked={(form.statusAnular as Record<string, boolean>)[s] ?? false}
-                      onChange={(e) => set("statusAnular", { ...(form.statusAnular as Record<string, boolean>), [s]: e.target.checked })}
-                    />
-                    <span className="text-sm">{s}</span>
-                  </label>
-                ))}
+                {/* Status para anular */}
+                <div className="space-y-2">
+                  <Label className="text-sm">
+                    Status de pedido para <strong>anular</strong> {MOEDA.nome.toLowerCase()}
+                    <span className="text-destructive ml-0.5">*</span>
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Marque quais casos você deseja estornar os {MOEDA.nome.toLowerCase()}/bônus.
+                  </p>
+                  <div className="rounded-md border border-input overflow-hidden">
+                    {STATUS_PEDIDO.map((s) => (
+                      <label
+                        key={s}
+                        className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/40 border-b border-border last:border-0"
+                      >
+                        <input
+                          type="checkbox"
+                          className="accent-primary h-4 w-4 shrink-0"
+                          checked={(form.statusAnular as Record<string, boolean>)[s] ?? false}
+                          onChange={(e) => set("statusAnular", { ...(form.statusAnular as Record<string, boolean>), [s]: e.target.checked })}
+                        />
+                        <span className="text-sm">{s}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="rounded-md bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
+                Gatilho por evento concede os pontos quando o evento selecionado acima acontece — não depende de status de pedido.
               </div>
-            </div>
+            )}
 
           </div>
         )}
@@ -1225,30 +1291,32 @@ export default function CampanhasNova() {
               )}
             </div>
 
-            {/* Cancelamento / estorno */}
-            <div className="rounded-lg border border-border overflow-hidden">
-              <div className="px-4 py-3 bg-muted/30 border-b border-border">
-                <p className="text-sm font-semibold">Cancelamento / estorno <span className="text-xs text-muted-foreground font-normal ml-1">o que acontece quando o pedido é cancelado</span></p>
+            {/* Cancelamento / estorno — só existe pedido no gatilho "pedido" */}
+            {form.gatilhoTipo === "pedido" && (
+              <div className="rounded-lg border border-border overflow-hidden">
+                <div className="px-4 py-3 bg-muted/30 border-b border-border">
+                  <p className="text-sm font-semibold">Cancelamento / estorno <span className="text-xs text-muted-foreground font-normal ml-1">o que acontece quando o pedido é cancelado</span></p>
+                </div>
+                <div className="px-4 py-4 space-y-3">
+                  {[
+                    { value: "estornar_tudo",        label: "Estornar todos os pontos",       desc: "Política padrão — todos os pontos acumulados são devolvidos ao pool." },
+                    { value: "estornar_proporcional", label: "Estorno proporcional ao valor",  desc: "Se o cancelamento é parcial, estorna apenas os pontos do valor cancelado." },
+                    { value: "manter",               label: "Manter os pontos",               desc: "Exceção — o membro mantém os pontos mesmo com cancelamento. Use com cautela." },
+                  ].map(({ value, label, desc }) => (
+                    <label key={value} className={`flex items-start gap-3 cursor-pointer rounded-lg border px-3 py-2.5 transition-colors ${
+                      form.cancelamentoPolicy === value ? "border-primary/40 bg-primary/5" : "border-transparent"
+                    }`}>
+                      <input type="radio" name="cancelamento" value={value} checked={form.cancelamentoPolicy === value}
+                        onChange={() => set("cancelamentoPolicy", value)} className="mt-1 accent-primary" />
+                      <div>
+                        <p className="text-sm font-medium">{label}</p>
+                        <p className="text-xs text-muted-foreground">{desc}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
               </div>
-              <div className="px-4 py-4 space-y-3">
-                {[
-                  { value: "estornar_tudo",        label: "Estornar todos os pontos",       desc: "Política padrão — todos os pontos acumulados são devolvidos ao pool." },
-                  { value: "estornar_proporcional", label: "Estorno proporcional ao valor",  desc: "Se o cancelamento é parcial, estorna apenas os pontos do valor cancelado." },
-                  { value: "manter",               label: "Manter os pontos",               desc: "Exceção — o membro mantém os pontos mesmo com cancelamento. Use com cautela." },
-                ].map(({ value, label, desc }) => (
-                  <label key={value} className={`flex items-start gap-3 cursor-pointer rounded-lg border px-3 py-2.5 transition-colors ${
-                    form.cancelamentoPolicy === value ? "border-primary/40 bg-primary/5" : "border-transparent"
-                  }`}>
-                    <input type="radio" name="cancelamento" value={value} checked={form.cancelamentoPolicy === value}
-                      onChange={() => set("cancelamentoPolicy", value)} className="mt-1 accent-primary" />
-                    <div>
-                      <p className="text-sm font-medium">{label}</p>
-                      <p className="text-xs text-muted-foreground">{desc}</p>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
+            )}
 
             {/* Aprovação de resgates */}
             <div className="rounded-lg border border-border overflow-hidden">
@@ -1347,6 +1415,73 @@ export default function CampanhasNova() {
               </div>
             </div>
 
+            {/* Regras de resgate */}
+            <div className="rounded-lg border border-border overflow-hidden">
+              <div className="px-4 py-3 bg-muted/30 border-b border-border">
+                <p className="text-sm font-semibold">Regras de resgate</p>
+                <p className="text-xs text-muted-foreground mt-0.5">O que esta campanha libera pra troca, e com que limite.</p>
+              </div>
+              <div className="px-4 py-4 space-y-4">
+                {/* Saldo mínimo */}
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium">Saldo mínimo para resgatar</p>
+                  <div className="flex items-center gap-2 max-w-xs">
+                    <Input type="number" value={form.resgateSaldoMinimo} onChange={(e) => set("resgateSaldoMinimo", e.target.value)} placeholder="Sem mínimo" />
+                    <span className="text-sm text-muted-foreground shrink-0">{form.moedaCampanha}</span>
+                  </div>
+                </div>
+
+                {/* Limite de resgate */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Limite de resgates por membro</p>
+                    <p className="text-xs text-muted-foreground">Quantas vezes um membro pode resgatar recompensas desta campanha.</p>
+                  </div>
+                  <Switch size="sm" checked={form.resgateLimiteAtivo} onCheckedChange={(v) => set("resgateLimiteAtivo", v)} />
+                </div>
+                {form.resgateLimiteAtivo && (
+                  <div className="flex items-center gap-3">
+                    <Input type="number" value={form.resgateLimitePts} onChange={(e) => set("resgateLimitePts", e.target.value)} placeholder="Ex: 1" className="w-24" min={1} />
+                    <span className="text-sm text-muted-foreground shrink-0">vezes por</span>
+                    <Select value={form.resgateLimiteEscopo} onValueChange={(v) => set("resgateLimiteEscopo", v)}>
+                      <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="mes">Mês</SelectItem>
+                        <SelectItem value="campanha">Vigência da campanha</SelectItem>
+                        <SelectItem value="ilimitado">Ilimitado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Produtos vinculados */}
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Produtos vinculados pra resgate</p>
+                  <p className="text-xs text-muted-foreground">Deixe em branco para liberar todo o catálogo.</p>
+                  <div className="rounded-md border border-input overflow-hidden">
+                    {PRODUTOS_CATALOGO.map((p) => {
+                      const sel = (form.resgateProdutosVinculados as string[]).includes(p.id);
+                      return (
+                        <label key={p.id} className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/40 border-b border-border last:border-0">
+                          <input type="checkbox" className="accent-primary h-4 w-4 shrink-0" checked={sel}
+                            onChange={() => set("resgateProdutosVinculados", sel
+                              ? (form.resgateProdutosVinculados as string[]).filter((id) => id !== p.id)
+                              : [...(form.resgateProdutosVinculados as string[]), p.id])} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm">{p.nome}</p>
+                            <p className="text-xs text-muted-foreground">{p.categoria} · {p.sku}</p>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {(form.resgateProdutosVinculados as string[]).length > 0 && (
+                    <p className="text-xs text-muted-foreground">{(form.resgateProdutosVinculados as string[]).length} produto(s) vinculado(s)</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
           </div>
         )}
 
@@ -1363,11 +1498,17 @@ export default function CampanhasNova() {
             {/* Alvo do multiplicador */}
             <div className="space-y-2">
               <p className="text-sm font-medium">Este fator se aplica a</p>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { value: "membro",  label: "Membro",  desc: "Fator por tier — Bronze, Prata, Ouro, Diamante" },
-                  { value: "produto", label: "Produto", desc: "Fator por produto ou categoria elegível" },
-                ].map(({ value, label, desc }) => (
+              {form.gatilhoTipo === "evento" && (
+                <p className="text-xs text-muted-foreground">Gatilho por evento não envolve produto — só multiplicador por tier.</p>
+              )}
+              <div className={`grid gap-3 ${form.gatilhoTipo === "evento" ? "grid-cols-1" : "grid-cols-2"}`}>
+                {(form.gatilhoTipo === "evento"
+                  ? [{ value: "membro", label: "Membro", desc: "Fator por tier — Bronze, Prata, Ouro, Diamante" }]
+                  : [
+                      { value: "membro",  label: "Membro",  desc: "Fator por tier — Bronze, Prata, Ouro, Diamante" },
+                      { value: "produto", label: "Produto", desc: "Fator por produto ou categoria elegível" },
+                    ]
+                ).map(({ value, label, desc }) => (
                   <label key={value} className={`flex flex-col gap-1 rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
                     form.multAlvo === value ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
                   }`}>
@@ -1473,19 +1614,21 @@ export default function CampanhasNova() {
               </div>
             </div>
 
-            <div className="rounded-lg border border-border bg-card overflow-hidden">
-              <div className="px-5 py-3 border-b border-border bg-muted/30">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Canais</p>
+            {form.gatilhoTipo === "pedido" && (
+              <div className="rounded-lg border border-border bg-card overflow-hidden">
+                <div className="px-5 py-3 border-b border-border bg-muted/30">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Canais</p>
+                </div>
+                <div className="px-5">
+                  <ReviewRow
+                    label="Fontes ativas"
+                    value={Object.entries(form.fontes as Record<string,boolean>).filter(([, v]) => v)
+                      .map(([k]) => FONTES_DISPONIVEIS.find(f => f.id === k)?.nome ?? k)
+                      .join(", ") || "—"}
+                  />
+                </div>
               </div>
-              <div className="px-5">
-                <ReviewRow
-                  label="Fontes ativas"
-                  value={Object.entries(form.fontes as Record<string,boolean>).filter(([, v]) => v)
-                    .map(([k]) => FONTES_DISPONIVEIS.find(f => f.id === k)?.nome ?? k)
-                    .join(", ") || "—"}
-                />
-              </div>
-            </div>
+            )}
 
             <div className="rounded-lg border border-border bg-card overflow-hidden">
               <div className="px-5 py-3 border-b border-border bg-muted/30">
@@ -1501,61 +1644,69 @@ export default function CampanhasNova() {
                     `${form.taxaValor}× a taxa do programa base`
                   }
                 />
-                <ReviewRow
-                  label="Conceder em"
-                  value={Object.entries(form.statusConceder).filter(([, v]) => v).map(([k]) => k).join(", ") || "—"}
-                />
-                <ReviewRow
-                  label="Anular em"
-                  value={Object.entries(form.statusAnular).filter(([, v]) => v).map(([k]) => k).join(", ") || "—"}
-                />
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-border bg-card overflow-hidden">
-              <div className="px-5 py-3 border-b border-border bg-muted/30">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Produtos da campanha</p>
-              </div>
-              <div className="px-5">
-                {form.classificacoes.length > 0 && (
-                  <ReviewRow
-                    label="Classificações"
-                    value={form.classificacoes.map((c) => c.nome).join(", ")}
-                  />
-                )}
-                <ReviewRow
-                  label="Produtos elegíveis"
-                  value={
-                    form.produtosElegiveis.length === 0
-                      ? "Todos os produtos"
-                      : PRODUTOS_CATALOGO.filter((p) => form.produtosElegiveis.includes(p.id)).map((p) => p.nome).join(", ")
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-border bg-card overflow-hidden">
-              <div className="px-5 py-3 border-b border-border bg-muted/30">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Grupos de regras</p>
-              </div>
-              <div className="px-5">
-                {form.clusters.length === 0 ? (
-                  <ReviewRow label="Grupos" value="Nenhum — campanha usa a regra única" />
-                ) : (
+                {form.gatilhoTipo === "pedido" && (
                   <>
-                    <ReviewRow label="Estratégia" value={
-                      { primeira: "Primeira que casar", acumula: "Todas se acumulam", maior_valor: "Maior valor vence" }[form.clustersEstrategia]
-                    } />
-                    {form.clusters.map((cl, idx) => (
-                      <ReviewRow key={cl.id}
-                        label={form.clustersEstrategia === "primeira" ? `${idx + 1}. ${cl.nome}` : cl.nome}
-                        value={`${cl.resultadoValor}${cl.resultadoTipo === "multiplicador" ? "×" : ` ${MOEDA.abrev}/R$1`}`}
-                      />
-                    ))}
+                    <ReviewRow
+                      label="Conceder em"
+                      value={Object.entries(form.statusConceder).filter(([, v]) => v).map(([k]) => k).join(", ") || "—"}
+                    />
+                    <ReviewRow
+                      label="Anular em"
+                      value={Object.entries(form.statusAnular).filter(([, v]) => v).map(([k]) => k).join(", ") || "—"}
+                    />
                   </>
                 )}
               </div>
             </div>
+
+            {form.gatilhoTipo === "pedido" && (
+              <div className="rounded-lg border border-border bg-card overflow-hidden">
+                <div className="px-5 py-3 border-b border-border bg-muted/30">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Produtos da campanha</p>
+                </div>
+                <div className="px-5">
+                  {form.classificacoes.length > 0 && (
+                    <ReviewRow
+                      label="Classificações"
+                      value={form.classificacoes.map((c) => c.nome).join(", ")}
+                    />
+                  )}
+                  <ReviewRow
+                    label="Produtos elegíveis"
+                    value={
+                      form.produtosElegiveis.length === 0
+                        ? "Todos os produtos"
+                        : PRODUTOS_CATALOGO.filter((p) => form.produtosElegiveis.includes(p.id)).map((p) => p.nome).join(", ")
+                    }
+                  />
+                </div>
+              </div>
+            )}
+
+            {form.gatilhoTipo === "pedido" && (
+              <div className="rounded-lg border border-border bg-card overflow-hidden">
+                <div className="px-5 py-3 border-b border-border bg-muted/30">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Grupos de regras</p>
+                </div>
+                <div className="px-5">
+                  {form.clusters.length === 0 ? (
+                    <ReviewRow label="Grupos" value="Nenhum — campanha usa a regra única" />
+                  ) : (
+                    <>
+                      <ReviewRow label="Estratégia" value={
+                        { primeira: "Primeira que casar", acumula: "Todas se acumulam", maior_valor: "Maior valor vence" }[form.clustersEstrategia]
+                      } />
+                      {form.clusters.map((cl, idx) => (
+                        <ReviewRow key={cl.id}
+                          label={form.clustersEstrategia === "primeira" ? `${idx + 1}. ${cl.nome}` : cl.nome}
+                          value={`${cl.resultadoValor}${cl.resultadoTipo === "multiplicador" ? "×" : ` ${MOEDA.abrev}/R$1`}`}
+                        />
+                      ))}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="rounded-lg border border-border bg-card overflow-hidden">
               <div className="px-5 py-3 border-b border-border bg-muted/30">
@@ -1571,11 +1722,24 @@ export default function CampanhasNova() {
                 } />
                 <ReviewRow label="Limite por membro" value={form.limiteAtivo && form.limitePts ? `${form.limitePts} pts · ${form.limiteEscopo === "membro_campanha" ? "por membro / campanha" : "por membro / dia"}` : "Sem limite"} />
                 <ReviewRow label="Teto de emissão" value={form.tetoEmissaoAtivo && form.tetoEmissaoPts ? `${Number(form.tetoEmissaoPts).toLocaleString("pt-BR")} ${MOEDA.abrev} no total` : "Sem teto"} />
-                <ReviewRow label="Cancelamento" value={{ estornar_tudo: "Estornar tudo", estornar_proporcional: "Estorno proporcional", manter: "Manter pontos" }[form.cancelamentoPolicy]} />
+                {form.gatilhoTipo === "pedido" && (
+                  <ReviewRow label="Cancelamento" value={{ estornar_tudo: "Estornar tudo", estornar_proporcional: "Estorno proporcional", manter: "Manter pontos" }[form.cancelamentoPolicy]} />
+                )}
                 <ReviewRow label="Aprovação de resgates" value={
                   form.aprovacaoTipo === "manual"
                     ? "Manual"
                     : `Automática — ${(form.aprovacaoTiposResgate as string[]).length} tipo(s)${form.aprovacaoValorMax ? ` · até ${form.aprovacaoValorMax} ${form.moedaCampanha}` : ""} · tiers: ${(form.aprovacaoTiers as string[]).join(", ") || "nenhum"}`
+                } />
+                <ReviewRow label="Saldo mínimo p/ resgate" value={form.resgateSaldoMinimo ? `${form.resgateSaldoMinimo} ${form.moedaCampanha}` : "Sem mínimo"} />
+                <ReviewRow label="Limite de resgate" value={
+                  form.resgateLimiteAtivo && form.resgateLimitePts
+                    ? `${form.resgateLimitePts}× por ${{ mes: "mês", campanha: "vigência da campanha", ilimitado: "—" }[form.resgateLimiteEscopo]}`
+                    : "Sem limite"
+                } />
+                <ReviewRow label="Produtos vinculados" value={
+                  (form.resgateProdutosVinculados as string[]).length === 0
+                    ? "Todo o catálogo"
+                    : PRODUTOS_CATALOGO.filter((p) => (form.resgateProdutosVinculados as string[]).includes(p.id)).map((p) => p.nome).join(", ")
                 } />
               </div>
             </div>
@@ -1817,7 +1981,7 @@ export default function CampanhasNova() {
           <Button
             variant="outline"
             className="flex-1"
-            onClick={() => step > 1 ? setStep(step - 1) : navigate("/campanhas")}
+            onClick={() => step > 1 ? setStep(proximoStep(step, -1, form.gatilhoTipo)) : navigate("/campanhas")}
           >
             Voltar
           </Button>
@@ -1825,7 +1989,7 @@ export default function CampanhasNova() {
             <Button
               className="flex-1"
               disabled={!canContinue()}
-              onClick={() => setStep(step + 1)}
+              onClick={() => setStep(proximoStep(step, 1, form.gatilhoTipo))}
             >
               Continuar
             </Button>

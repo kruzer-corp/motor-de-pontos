@@ -1,3 +1,5 @@
+import { getCampanhas } from "./campanhas";
+
 // ── Fonte única de dados de membro — usada pela listagem e pelo detalhe ──────
 
 export type Tier     = "Bronze" | "Prata" | "Ouro" | "Diamante";
@@ -25,12 +27,18 @@ export type AjusteManual = {
   motivo: string; valor: number; saldoAntes: number;
 };
 
-export type EventoDiagnostico = {
-  id: string; data: string; fonte: string; evento: string; descricao: string;
+// Evento bruto — o que a fonte reportou, ainda sem avaliação de campanha.
+export type EventoBruto = {
+  id: string; data: string; fonteId: string; fonte: string; evento: string; descricao: string;
+  statusPedido: string; valorCompra: number;
+};
+
+// Evento já avaliado contra as campanhas ativas — usado pra exibição/diagnóstico.
+export type EventoDiagnostico = EventoBruto & {
   resultado: "pontuado" | "rejeitado";
   motivo: string;
   campanhaNome?: string;
-  pontosGerados?: number; abrevGerado?: string;
+  pontosGerados?: number; moedaGerada?: string; abrevGerado?: string;
 };
 
 export type Membro = {
@@ -51,7 +59,7 @@ export type Membro = {
   transacoes: Transacao[];
   pedidos: PedidoResgate[];
   ajustes: AjusteManual[];
-  eventos: EventoDiagnostico[];
+  eventos: EventoBruto[];
 };
 
 // ── Cores por moeda — usadas nos chips de saldo ───────────────────────────────
@@ -100,8 +108,8 @@ const SEED: Membro[] = [
       { id: "AJ-002", data: "14/03/2025", operador: "João Ops", motivo: "Correção de transação duplicada", valor: -150, saldoAntes: 4200 },
     ],
     eventos: [
-      { id: "EVT-101", data: "18/06/2025", fonte: "Loja física", evento: "order.confirmed", descricao: "Compra na loja — R$ 320,00", resultado: "pontuado", motivo: "Elegível — tier Diamante, campanha Black Friday ativa, taxa 1pt/R$1", campanhaNome: "Black Friday 2026", pontosGerados: 320, abrevGerado: "pts" },
-      { id: "EVT-100", data: "16/06/2025", fonte: "Loja física", evento: "order.confirmed", descricao: "Compra na loja — R$ 45,00 (categoria Livros)", resultado: "rejeitado", motivo: "Produto fora do catálogo elegível da campanha ativa" },
+      { id: "EVT-101", data: "18/06/2025", fonteId: "pdv", fonte: "Loja física", evento: "order.confirmed", descricao: "Compra na loja — R$ 320,00", statusPedido: "Concluído", valorCompra: 320 },
+      { id: "EVT-100", data: "16/06/2025", fonteId: "pdv", fonte: "Loja física", evento: "order.confirmed", descricao: "Compra na loja — R$ 45,00", statusPedido: "Em separação", valorCompra: 45 },
     ],
   },
   {
@@ -126,8 +134,8 @@ const SEED: Membro[] = [
       { id: "AJ-003", data: "03/06/2025", operador: "Maria Admin", motivo: "Erro de processamento — reembolso em pontos", valor: 150, saldoAntes: 2968 },
     ],
     eventos: [
-      { id: "EVT-201", data: "17/06/2025", fonte: "App Mobile", evento: "order.confirmed", descricao: "Compra no app — R$ 210,00", resultado: "pontuado", motivo: "Elegível — tier Ouro, campanha Abril ativa, taxa 1,25pt/R$1", campanhaNome: "Campanha Abril", pontosGerados: 263, abrevGerado: "pts" },
-      { id: "EVT-200", data: "14/06/2025", fonte: "App Mobile", evento: "order.confirmed", descricao: "Compra no app — R$ 50,00", resultado: "rejeitado", motivo: "Status do pedido ainda não atingiu \"Aprovado\" — aguardando confirmação de pagamento" },
+      { id: "EVT-201", data: "17/06/2025", fonteId: "portal", fonte: "App Mobile", evento: "order.confirmed", descricao: "Compra no app — R$ 210,00", statusPedido: "Entregue", valorCompra: 210 },
+      { id: "EVT-200", data: "14/06/2025", fonteId: "portal", fonte: "App Mobile", evento: "order.confirmed", descricao: "Compra no app — R$ 50,00", statusPedido: "Em separação", valorCompra: 50 },
     ],
   },
   {
@@ -146,8 +154,8 @@ const SEED: Membro[] = [
     pedidos: [],
     ajustes: [],
     eventos: [
-      { id: "EVT-301", data: "16/06/2025", fonte: "App Mobile", evento: "order.confirmed", descricao: "Compra no app — R$ 88,00", resultado: "pontuado", motivo: "Elegível — campanha Maio ativa, taxa em Milhas", campanhaNome: "Campanha Maio", pontosGerados: 110, abrevGerado: "mi" },
-      { id: "EVT-300", data: "05/06/2025", fonte: "App Mobile", evento: "order.confirmed", descricao: "Compra no app — R$ 40,00", resultado: "rejeitado", motivo: "Valor da compra abaixo do mínimo elegível da campanha (R$50)" },
+      { id: "EVT-301", data: "16/06/2025", fonteId: "portal", fonte: "App Mobile", evento: "order.confirmed", descricao: "Compra no app — R$ 88,00", statusPedido: "Concluído", valorCompra: 88 },
+      { id: "EVT-300", data: "05/06/2025", fonteId: "portal", fonte: "App Mobile", evento: "order.confirmed", descricao: "Compra no app — R$ 40,00", statusPedido: "Em separação", valorCompra: 40 },
     ],
   },
   {
@@ -166,8 +174,8 @@ const SEED: Membro[] = [
     pedidos: [],
     ajustes: [],
     eventos: [
-      { id: "EVT-401", data: "15/06/2025", fonte: "Dispositivo (PDV)", evento: "sale.completed", descricao: "Compra no PDV — R$ 45,00", resultado: "pontuado", motivo: "Elegível — campanha Maio ativa, taxa 1pt/R$1", campanhaNome: "Campanha Maio", pontosGerados: 45, abrevGerado: "pts" },
-      { id: "EVT-400", data: "10/06/2025", fonte: "Dispositivo (PDV)", evento: "sale.completed", descricao: "Compra no PDV — R$ 20,00", resultado: "rejeitado", motivo: "Campanha atingiu o teto de emissão mensal — novos acúmulos bloqueados" },
+      { id: "EVT-401", data: "15/06/2025", fonteId: "pdv", fonte: "Dispositivo (PDV)", evento: "sale.completed", descricao: "Compra no PDV — R$ 45,00", statusPedido: "Concluído", valorCompra: 45 },
+      { id: "EVT-400", data: "10/06/2025", fonteId: "pdv", fonte: "Dispositivo (PDV)", evento: "sale.completed", descricao: "Compra no PDV — R$ 20,00", statusPedido: "Em separação", valorCompra: 20 },
     ],
   },
   {
@@ -265,4 +273,76 @@ export function registrarTransacaoSaldo(
   const next = [...membros];
   next[idx] = { ...m, saldos, transacoes: [transacao, ...m.transacoes] };
   saveMembros(next);
+}
+
+// ── Motor de acúmulo — avalia eventos brutos contra as campanhas ativas ──────
+
+const ABREV_MOEDA: Record<string, string> = { Pontos: "pts", Cashback: "R$", Milhas: "mi", Créditos: "cr" };
+
+function dataParaTimestamp(d: string): number {
+  const [dia, mes, ano] = d.split("/").map(Number);
+  return new Date(ano ?? 0, (mes ?? 1) - 1, dia ?? 1).getTime();
+}
+
+export function avaliarEventosMembro(membro: Membro): EventoDiagnostico[] {
+  const agora = Date.now();
+  const campanhasAtivas = getCampanhas().filter((c) => c.status === "ativa");
+
+  return membro.eventos.map((ev) => {
+    for (const c of campanhasAtivas) {
+      if (c.periodoInicio && c.periodoFim) {
+        const inicio = dataParaTimestamp(c.periodoInicio);
+        const fim = dataParaTimestamp(c.periodoFim);
+        if (agora < inicio || agora > fim) continue;
+      }
+      if (!c.fontes[ev.fonteId]) continue;
+      if (c.segmento !== "todos" && c.segmento !== membro.segmento) continue;
+      if (c.tiersElegiveis.length > 0 && !c.tiersElegiveis.includes(membro.tier.toLowerCase())) continue;
+      if (!c.statusConceder[ev.statusPedido]) continue;
+
+      const taxa = Number(c.taxaValor) || 0;
+      const pontos = c.taxaTipo === "fixo" ? Math.round(taxa) : Math.round(ev.valorCompra * taxa);
+      const abrev = ABREV_MOEDA[c.moedaCampanha] ?? "pts";
+      return {
+        ...ev,
+        resultado: "pontuado" as const,
+        motivo: `Elegível — campanha "${c.nome}" ativa · status "${ev.statusPedido}" concede pontos · taxa ${c.taxaTipo === "fixo" ? `${taxa} fixo` : `${taxa}pt/R$1`}`,
+        campanhaNome: c.nome, pontosGerados: pontos, moedaGerada: c.moedaCampanha, abrevGerado: abrev,
+      };
+    }
+    return {
+      ...ev,
+      resultado: "rejeitado" as const,
+      motivo: `Nenhuma campanha ativa elegível para este evento — status "${ev.statusPedido}" não está entre os que concedem pontos em nenhuma campanha ativa (ou fonte/segmento/tier não batem).`,
+    };
+  });
+}
+
+export function creditarEventosAcumulo(membroId: string, resultados: EventoDiagnostico[]): void {
+  for (const r of resultados) {
+    if (r.resultado === "pontuado" && r.pontosGerados && r.moedaGerada) {
+      registrarTransacaoSaldo(membroId, {
+        moeda: r.moedaGerada, abrev: r.abrevGerado ?? "pts", delta: r.pontosGerados,
+        descricao: r.descricao, tipo: "acumulo", refId: `EVT-${r.id}`,
+      });
+    }
+  }
+}
+
+// Campanhas com gatilho por evento (não por pedido) — cadastro, aniversário, indicação, avaliação etc.
+// Hoje só "cadastro" tem a origem do evento de fato conectada neste protótipo; os demais ficam
+// configuráveis na campanha, mas ainda dependem de uma fonte de evento real (ex: data de aniversário,
+// confirmação de indicação) que não existe ainda no cadastro do membro.
+export function creditarBonusEventos(membro: Membro): void {
+  const campanhas = getCampanhas().filter((c) => c.status === "ativa" && c.gatilhoTipo === "evento");
+  for (const c of campanhas) {
+    if (c.gatilhoEvento !== "cadastro") continue; // demais eventos: sem fonte real ainda, não credita
+    const pontos = Number(c.taxaValor) || 0;
+    if (pontos <= 0) continue;
+    registrarTransacaoSaldo(membro.id, {
+      moeda: c.moedaCampanha, abrev: ABREV_MOEDA[c.moedaCampanha] ?? "pts", delta: pontos,
+      descricao: `Bônus de cadastro — campanha "${c.nome}"`, tipo: "acumulo",
+      refId: `EVT-CADASTRO-${c.id}-${membro.id}`,
+    });
+  }
 }

@@ -24,6 +24,9 @@ export type Form = {
   codigo: string; nome: string; descricao: string; segmento: string;
   tiersElegiveis: string[];
   periodoInicio: string; periodoFim: string;
+  // Gatilho — o que dispara a pontuação desta campanha
+  gatilhoTipo: "pedido" | "evento";
+  gatilhoEvento: string; // usado quando gatilhoTipo === "evento": cadastro, aniversario, indicacao, avaliacao, outro
   fontes: Record<string, boolean>;
   pdvEscopo: "todas" | "especificas";
   pdvFiliais: string[];
@@ -57,6 +60,12 @@ export type Form = {
   aprovacaoTiposResgate: string[];
   aprovacaoValorMax: string;
   aprovacaoTiers: string[];
+  // Regras de resgate — o que essa campanha libera pra troca, e com que limite
+  resgateSaldoMinimo: string;
+  resgateLimiteAtivo: boolean;
+  resgateLimitePts: string;
+  resgateLimiteEscopo: "mes" | "campanha" | "ilimitado";
+  resgateProdutosVinculados: string[];
   multAlvo: "membro" | "produto";
   multBronze: string; multPrata: string; multOuro: string; multDiamante: string;
   multProdutos: Record<string, string>;
@@ -66,6 +75,8 @@ export const DEFAULTS: Form = {
   codigo: "CAMP01", nome: "", descricao: "", segmento: "todos",
   tiersElegiveis: [],
   periodoInicio: "", periodoFim: "",
+  gatilhoTipo: "pedido",
+  gatilhoEvento: "cadastro",
   fontes: { portal: true, pdv: true, ecommerce: false, marketplace: false },
   pdvEscopo: "todas",
   pdvFiliais: [],
@@ -92,6 +103,11 @@ export const DEFAULTS: Form = {
   aprovacaoTiposResgate: ["voucher_digital"],
   aprovacaoValorMax: "",
   aprovacaoTiers: ["Bronze", "Prata", "Ouro", "Diamante"],
+  resgateSaldoMinimo: "",
+  resgateLimiteAtivo: false,
+  resgateLimitePts: "",
+  resgateLimiteEscopo: "mes",
+  resgateProdutosVinculados: [],
   moedas: {
     Pontos:   { ativo: true,  valor: "" },
     Cashback: { ativo: false, valor: "" },
@@ -118,7 +134,8 @@ const SEED: Campanha[] = [
     id: "CMP-001", codigo: "BOAS-VINDAS", nome: "Bônus de Boas-vindas", status: "ativa",
     descricao: "Pontos na primeira compra de cada novo membro.",
     segmento: "todos", periodoInicio: "01/01/2026", periodoFim: "31/12/2026",
-    fontes: { portal: true, pdv: false, ecommerce: true, marketplace: false },
+    fontes: { portal: true, pdv: true, ecommerce: true, marketplace: false },
+    statusConceder: { Aprovado: false, Faturado: false, "Em separação": false, Entregue: true, Concluído: true, Cancelado: false, Devolvido: false, Recusado: false },
     taxaTipo: "taxa", taxaValor: "1", moedaCampanha: "Pontos",
     multAlvo: "membro", multBronze: "1", multPrata: "1", multOuro: "1", multDiamante: "1",
     limiteAtivo: true, limitePts: "500", limiteEscopo: "membro_campanha",
@@ -198,6 +215,15 @@ const SEED: Campanha[] = [
     tetoEmissaoAtivo: false, tetoEmissaoPts: "",
     color: "bg-pink-500",
   },
+  {
+    ...DEFAULTS,
+    id: "CMP-008", codigo: "BEMVINDO", nome: "Bônus de Cadastro", status: "ativa",
+    descricao: "Pontos concedidos uma única vez quando o membro entra no programa — não depende de pedido.",
+    gatilhoTipo: "evento", gatilhoEvento: "cadastro",
+    segmento: "todos", periodoInicio: "01/01/2026", periodoFim: "31/12/2026",
+    taxaTipo: "fixo", taxaValor: "50", moedaCampanha: "Pontos",
+    color: "bg-teal-500",
+  },
 ];
 
 // ── Persistência (localStorage — sem back-end neste protótipo) ───────────────
@@ -207,7 +233,10 @@ const KEY = "motor_pontos_campanhas";
 export function getCampanhas(): Campanha[] {
   try {
     const stored = localStorage.getItem(KEY);
-    return stored ? JSON.parse(stored) : SEED;
+    if (!stored) return SEED;
+    const parsed: Partial<Campanha>[] = JSON.parse(stored);
+    // preenche campos que não existiam ainda quando a campanha foi salva (evita crash/tela em branco)
+    return parsed.map((c) => ({ ...DEFAULTS, ...c }) as Campanha);
   } catch {
     return SEED;
   }

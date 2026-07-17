@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, User, ShieldCheck, Sparkles, Boxes, Building2,
   ChevronDown, ChevronsLeft, ChevronsRight,
   Package, Trophy, History, ScrollText,
-  Palette, Webhook, Share2, Sliders, Wallet,
+  Palette, Webhook, Sliders, Wallet,
 } from "lucide-react";
 
 // ── Tenants ───────────────────────────────────────────────────────────────────
@@ -61,7 +61,6 @@ const MENU: MenuItem[] = [
   { section: "Operação" },
   { to: "/campanhas", label: "Minhas Campanhas", icon: Sparkles },
   { to: "/membros/extrato", label: "Membros e movimentações", icon: Users },
-  { to: "/indicacoes",        label: "Indicações",        icon: Share2       },
   {
     label: "Catálogos e produtos", icon: Boxes,
     group: [
