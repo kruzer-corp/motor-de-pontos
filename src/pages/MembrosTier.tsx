@@ -1,76 +1,290 @@
 import { useState } from "react";
-import { Badge, Button, Card, CardContent, PageHeader, Pill, Switch, Tabs, TabsContent, TabsList, TabsTrigger, toast } from "@kruzer/ds";
-import { ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
-import { MOEDA } from "../config/programa";
+import {
+  Badge, Button, Card, Input, Label, PageHeader,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Switch, Tabs, TabsContent, TabsList, TabsTrigger, toast,
+} from "@kruzer/ds";
+import { Pencil, Plus, Trash2, X } from "lucide-react";
+import { getMoedas } from "../config/moedas";
 
-const MOEDAS_OPCOES = ["Pontos", "Cashback", "Milhas", "Créditos"] as const;
-type MoedaOpcao = typeof MOEDAS_OPCOES[number];
+// ── Tipos ─────────────────────────────────────────────────────────────────────
 
-const MOEDA_ABREV: Record<MoedaOpcao, string> = {
-  Pontos:   "pts",
-  Cashback: "R$",
-  Milhas:   "mi",
-  Créditos: "cr",
+type Tier = {
+  id: string; nome: string; cor: string;
+  limiarMin: string; limiarMax: string; multiplicador: string;
+  beneficios: string[];
 };
 
-type CriteriaOp = "gte" | "lte" | "eq" | "in";
-type Criterion  = { field: string; label: string; op: CriteriaOp; value: string };
-type Segment    = { id: string; name: string; description: string; active: boolean; members: number; criteria: Criterion[]; color: string };
-type Tier       = { id: string; name: string; color: string; dotColor: string; minUnidade: number; maxUnidade: number | null; multiplier: number; benefits: string[]; members: number };
+type TierProduto = {
+  id: string; nome: string; cor: string; taxa: string; bonus: string; descricao: string;
+};
 
-// ── Dados ─────────────────────────────────────────────────────────────────────
+type CriterioOp = "gte" | "lte" | "eq" | "in";
+type Criterio = { campo: string; operador: CriterioOp; valor: string };
+type Segmento = { id: string; nome: string; descricao: string; ativo: boolean; criterios: Criterio[] };
 
-const TIERS_MEMBRO: Tier[] = [
-  { id: "diamante", name: "Diamante", color: "bg-violet-50 border-violet-200", dotColor: "bg-violet-500", minUnidade: 50000, maxUnidade: null,  multiplier: 3,   members: 228,  benefits: ["Multiplicador 3× em todas as compras", "Acesso prioritário ao catálogo de resgate", "Suporte dedicado", "Frete grátis ilimitado", "Acesso antecipado a campanhas"] },
-  { id: "ouro",     name: "Ouro",     color: "bg-amber-50  border-amber-200",  dotColor: "bg-amber-400",  minUnidade: 20000, maxUnidade: 49999, multiplier: 2,   members: 352,  benefits: ["Multiplicador 2× em todas as compras", "Frete grátis em compras acima de R$ 150", "Acesso ao catálogo premium", "Suporte prioritário"] },
-  { id: "prata",    name: "Prata",    color: "bg-slate-50  border-slate-200",  dotColor: "bg-slate-400",  minUnidade: 5000,  maxUnidade: 19999, multiplier: 1.5, members: 649,  benefits: ["Multiplicador 1,5× em compras elegíveis", "Frete grátis em compras acima de R$ 250", "Acesso a ofertas exclusivas"] },
-  { id: "bronze",   name: "Bronze",   color: "bg-orange-50 border-orange-200", dotColor: "bg-orange-400", minUnidade: 0,     maxUnidade: 4999,  multiplier: 1,   members: 1261, benefits: ["Acúmulo base da campanha ativa", "Acesso ao catálogo padrão de resgate"] },
+type SegmentoProduto = { id: string; nome: string; cor: string; taxa: string; bonus: string };
+
+const OP_LABEL: Record<CriterioOp, string> = { gte: "≥", lte: "≤", eq: "=", in: "em" };
+const CAMPOS_CRITERIO = [
+  { value: "tier", label: "Tier" },
+  { value: "dias_no_programa", label: "Dias no programa" },
+  { value: "compras_90d", label: "Compras (90d)" },
+  { value: "dias_sem_compra", label: "Dias sem compra" },
 ];
 
-const TIERS_PRODUTO = [
-  { tier: "Especial", color: "bg-violet-50 border-violet-200", dot: "bg-violet-500", taxa: "15", bonus: "5",  descricao: "Produtos estratégicos com incentivo máximo." },
-  { tier: "Ouro",     color: "bg-amber-50  border-amber-200",  dot: "bg-amber-400",  taxa: "10", bonus: "3",  descricao: "Produtos de alto valor com bom incentivo." },
-  { tier: "Prata",    color: "bg-slate-50  border-slate-200",  dot: "bg-slate-400",  taxa: "5",  bonus: "2",  descricao: "Produtos com incentivo moderado." },
-  { tier: "Bronze",   color: "bg-orange-50 border-orange-200", dot: "bg-orange-400", taxa: "1",  bonus: null, descricao: "Produtos com incentivo base." },
-];
+function novoId(prefix: string) {
+  return `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}
 
-const SEGMENTS_MEMBRO: Segment[] = [
-  { id: "SEG-001", name: "Premium",            color: "bg-violet-100 text-violet-700",   active: true,  members: 312, description: "Membros de alto valor com histórico de compras frequentes.",    criteria: [{ field: "tier", label: "Tier", op: "in", value: "Diamante, Ouro" }, { field: "orders_last_90d", label: "Compras (90d)", op: "gte", value: "3" }] },
-  { id: "SEG-002", name: "Fidelidade",          color: "bg-sky-100 text-sky-700",         active: true,  members: 641, description: "Membros ativos com mais de 6 meses no programa.",              criteria: [{ field: "days_in_program", label: "Dias no programa", op: "gte", value: "180" }] },
-  { id: "SEG-003", name: "Frete Grátis",        color: "bg-emerald-100 text-emerald-700", active: true,  members: 428, description: "Membros elegíveis para benefício de frete grátis por segmento.", criteria: [{ field: "tier", label: "Tier", op: "in", value: "Ouro, Prata" }] },
-  { id: "SEG-004", name: "Em Risco",            color: "bg-red-100 text-red-700",         active: true,  members: 187, description: "Membros que não compraram nos últimos 60 dias.",                criteria: [{ field: "days_since_last_order", label: "Dias sem compra", op: "gte", value: "60" }] },
-  { id: "SEG-005", name: "Básico",              color: "bg-slate-100 text-slate-700",     active: true,  members: 872, description: "Membros recentes ou com baixa atividade.",                      criteria: [{ field: "tier", label: "Tier", op: "in", value: "Bronze" }] },
-  { id: "SEG-006", name: "Novos (últimos 30d)", color: "bg-amber-100 text-amber-700",     active: false, members: 43,  description: "Membros cadastrados nos últimos 30 dias.",                      criteria: [{ field: "days_in_program", label: "Dias no programa", op: "lte", value: "30" }] },
-];
+// ── Modal: Tier (Membros) ──────────────────────────────────────────────────────
 
-const SEGMENTS_PRODUTO = [
-  { id: "CL-001", nome: "Eletrônicos",      cor: "#6366f1", taxa: "3", bonus: "20", campanhas: 2 },
-  { id: "CL-002", nome: "Eletrodomésticos", cor: "#f59e0b", taxa: "2", bonus: "10", campanhas: 1 },
-  { id: "CL-003", nome: "Beleza",           cor: "#ec4899", taxa: "1", bonus: "5",  campanhas: 0 },
-  { id: "CL-004", nome: "Esportes",         cor: "#10b981", taxa: "2", bonus: "15", campanhas: 1 },
-];
+function TierModal({ initial, onSave, onClose }: { initial?: Tier; onSave: (t: Tier) => void; onClose: () => void }) {
+  const [d, setD] = useState<Omit<Tier, "id">>(initial ?? { nome: "", cor: "#6366f1", limiarMin: "", limiarMax: "", multiplicador: "1", beneficios: [] });
+  const upd = <K extends keyof typeof d>(k: K, v: (typeof d)[K]) => setD((p) => ({ ...p, [k]: v }));
 
-const OP_LABEL: Record<CriteriaOp, string> = { gte: "≥", lte: "≤", eq: "=", in: "em" };
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-background rounded-xl shadow-2xl w-full max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-lg font-semibold">{initial ? "Editar tier" : "Novo tier"}</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="size-4" /></button>
+        </div>
 
-// ── Componente ────────────────────────────────────────────────────────────────
+        <div className="space-y-1.5">
+          <Label className="text-sm">Nome <span className="text-destructive">*</span></Label>
+          <Input value={d.nome} onChange={(e) => upd("nome", e.target.value)} placeholder="Ex: Ouro" />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-sm">Cor</Label>
+          <div className="flex items-center gap-2 rounded-md border border-input px-3 py-2">
+            <input type="color" value={d.cor} onChange={(e) => upd("cor", e.target.value)} className="h-6 w-6 rounded cursor-pointer border-0 bg-transparent p-0" />
+            <span className="flex-1 text-sm text-muted-foreground">{d.cor}</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-sm">Limiar mínimo <span className="text-destructive">*</span></Label>
+            <Input type="number" value={d.limiarMin} onChange={(e) => upd("limiarMin", e.target.value)} placeholder="Ex: 0" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm">Limiar máximo</Label>
+            <Input type="number" value={d.limiarMax} onChange={(e) => upd("limiarMax", e.target.value)} placeholder="Sem limite" />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-sm">Multiplicador</Label>
+          <Input type="number" step="0.1" value={d.multiplicador} onChange={(e) => upd("multiplicador", e.target.value)} placeholder="Ex: 1.5" />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-sm">Benefícios</Label>
+          <div className="space-y-1.5">
+            {d.beneficios.map((b, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <Input value={b} onChange={(e) => upd("beneficios", d.beneficios.map((x, xi) => xi === i ? e.target.value : x))} placeholder="Ex: Frete grátis" />
+                <button onClick={() => upd("beneficios", d.beneficios.filter((_, xi) => xi !== i))} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive shrink-0"><Trash2 className="size-3.5" /></button>
+              </div>
+            ))}
+          </div>
+          <button onClick={() => upd("beneficios", [...d.beneficios, ""])} className="text-xs text-primary hover:underline">+ adicionar benefício</button>
+        </div>
+
+        <Button className="w-full" disabled={!d.nome || !d.limiarMin} onClick={() => onSave({ ...d, id: initial?.id ?? novoId("TIER") })}>
+          Salvar tier
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Modal: Tier de Produto ─────────────────────────────────────────────────────
+
+function TierProdutoModal({ initial, onSave, onClose }: { initial?: TierProduto; onSave: (t: TierProduto) => void; onClose: () => void }) {
+  const [d, setD] = useState<Omit<TierProduto, "id">>(initial ?? { nome: "", cor: "#6366f1", taxa: "", bonus: "", descricao: "" });
+  const upd = <K extends keyof typeof d>(k: K, v: (typeof d)[K]) => setD((p) => ({ ...p, [k]: v }));
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-background rounded-xl shadow-2xl w-full max-w-md p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-lg font-semibold">{initial ? "Editar tier de produto" : "Novo tier de produto"}</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="size-4" /></button>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-sm">Nome <span className="text-destructive">*</span></Label>
+          <Input value={d.nome} onChange={(e) => upd("nome", e.target.value)} placeholder="Ex: Especial" />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-sm">Cor</Label>
+          <div className="flex items-center gap-2 rounded-md border border-input px-3 py-2">
+            <input type="color" value={d.cor} onChange={(e) => upd("cor", e.target.value)} className="h-6 w-6 rounded cursor-pointer border-0 bg-transparent p-0" />
+            <span className="flex-1 text-sm text-muted-foreground">{d.cor}</span>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-sm">Taxa base <span className="text-destructive">*</span></Label>
+            <Input type="number" value={d.taxa} onChange={(e) => upd("taxa", e.target.value)} placeholder="Ex: 5" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm">Bônus (%)</Label>
+            <Input type="number" value={d.bonus} onChange={(e) => upd("bonus", e.target.value)} placeholder="Opcional" />
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-sm">Descrição</Label>
+          <Input value={d.descricao} onChange={(e) => upd("descricao", e.target.value)} placeholder="Ex: Produtos estratégicos com incentivo máximo." />
+        </div>
+        <Button className="w-full" disabled={!d.nome || !d.taxa} onClick={() => onSave({ ...d, id: initial?.id ?? novoId("TPROD") })}>
+          Salvar tier de produto
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Modal: Segmento (Membros) ──────────────────────────────────────────────────
+
+function SegmentoModal({ initial, onSave, onClose }: { initial?: Segmento; onSave: (s: Segmento) => void; onClose: () => void }) {
+  const [d, setD] = useState<Omit<Segmento, "id">>(initial ?? { nome: "", descricao: "", ativo: true, criterios: [] });
+  const upd = <K extends keyof typeof d>(k: K, v: (typeof d)[K]) => setD((p) => ({ ...p, [k]: v }));
+
+  function updCriterio(i: number, patch: Partial<Criterio>) {
+    upd("criterios", d.criterios.map((c, ci) => ci === i ? { ...c, ...patch } : c));
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-background rounded-xl shadow-2xl w-full max-w-lg p-6 space-y-4 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-lg font-semibold">{initial ? "Editar segmento" : "Novo segmento"}</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="size-4" /></button>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-sm">Nome <span className="text-destructive">*</span></Label>
+          <Input value={d.nome} onChange={(e) => upd("nome", e.target.value)} placeholder="Ex: Em Risco" />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-sm">Descrição</Label>
+          <Input value={d.descricao} onChange={(e) => upd("descricao", e.target.value)} placeholder="Ex: Membros sem compra nos últimos 60 dias." />
+        </div>
+        <div className="flex items-center justify-between">
+          <Label className="text-sm">Ativo</Label>
+          <Switch checked={d.ativo} onCheckedChange={(v) => upd("ativo", v)} size="sm" />
+        </div>
+        <div className="space-y-2">
+          <Label className="text-sm">Critérios</Label>
+          <div className="space-y-2">
+            {d.criterios.map((c, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <Select value={c.campo} onValueChange={(v) => updCriterio(i, { campo: v })}>
+                  <SelectTrigger className="flex-1"><SelectValue placeholder="Campo" /></SelectTrigger>
+                  <SelectContent>
+                    {CAMPOS_CRITERIO.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={c.operador} onValueChange={(v) => updCriterio(i, { operador: v as CriterioOp })}>
+                  <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(OP_LABEL) as CriterioOp[]).map((op) => <SelectItem key={op} value={op}>{OP_LABEL[op]}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Input className="flex-1" value={c.valor} onChange={(e) => updCriterio(i, { valor: e.target.value })} placeholder="Valor" />
+                <button onClick={() => upd("criterios", d.criterios.filter((_, ci) => ci !== i))} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive shrink-0"><Trash2 className="size-3.5" /></button>
+              </div>
+            ))}
+          </div>
+          <button onClick={() => upd("criterios", [...d.criterios, { campo: CAMPOS_CRITERIO[0].value, operador: "gte", valor: "" }])} className="text-xs text-primary hover:underline">
+            + adicionar critério
+          </button>
+        </div>
+        <Button className="w-full" disabled={!d.nome} onClick={() => onSave({ ...d, id: initial?.id ?? novoId("SEG") })}>
+          Salvar segmento
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Modal: Segmentação de Produto ───────────────────────────────────────────────
+
+function SegmentoProdutoModal({ initial, onSave, onClose }: { initial?: SegmentoProduto; onSave: (s: SegmentoProduto) => void; onClose: () => void }) {
+  const [d, setD] = useState<Omit<SegmentoProduto, "id">>(initial ?? { nome: "", cor: "#6366f1", taxa: "", bonus: "" });
+  const upd = <K extends keyof typeof d>(k: K, v: (typeof d)[K]) => setD((p) => ({ ...p, [k]: v }));
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-background rounded-xl shadow-2xl w-full max-w-md p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-lg font-semibold">{initial ? "Editar segmentação" : "Nova segmentação"}</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="size-4" /></button>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-sm">Nome <span className="text-destructive">*</span></Label>
+          <Input value={d.nome} onChange={(e) => upd("nome", e.target.value)} placeholder="Ex: Eletrônicos" />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-sm">Cor</Label>
+          <div className="flex items-center gap-2 rounded-md border border-input px-3 py-2">
+            <input type="color" value={d.cor} onChange={(e) => upd("cor", e.target.value)} className="h-6 w-6 rounded cursor-pointer border-0 bg-transparent p-0" />
+            <span className="flex-1 text-sm text-muted-foreground">{d.cor}</span>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-sm">Taxa <span className="text-destructive">*</span></Label>
+            <Input type="number" value={d.taxa} onChange={(e) => upd("taxa", e.target.value)} placeholder="Ex: 3" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm">Bônus (%)</Label>
+            <Input type="number" value={d.bonus} onChange={(e) => upd("bonus", e.target.value)} placeholder="Opcional" />
+          </div>
+        </div>
+        <Button className="w-full" disabled={!d.nome || !d.taxa} onClick={() => onSave({ ...d, id: initial?.id ?? novoId("SEGP") })}>
+          Salvar segmentação
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Empty state genérico ────────────────────────────────────────────────────────
+
+function AddCard({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="w-full rounded-lg border border-dashed border-border py-6 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors">
+      {label}
+    </button>
+  );
+}
+
+// ── Página ──────────────────────────────────────────────────────────────────────
 
 export default function MembrosTier() {
-  const [expanded, setExpanded] = useState<string | null>("diamante");
-  const [moedaRef, setMoedaRef] = useState<MoedaOpcao>(MOEDA.nome as MoedaOpcao ?? "Pontos");
-  const [segments, setSegments] = useState(SEGMENTS_MEMBRO);
+  const moedaAtiva = getMoedas().find((m) => m.ativo) ?? getMoedas()[0];
 
-  const toggleSeg = (id: string) =>
-    setSegments(prev => prev.map(s => s.id === id ? { ...s, active: !s.active } : s));
+  const [tiers, setTiers] = useState<Tier[]>([]);
+  const [tierModal, setTierModal] = useState<Tier | null | "new">(null);
 
-  const total = TIERS_MEMBRO.reduce((a, t) => a + t.members, 0);
-  const abrev = MOEDA_ABREV[moedaRef] ?? moedaRef.toLowerCase().slice(0, 3);
+  const [tiersProduto, setTiersProduto] = useState<TierProduto[]>([]);
+  const [tierProdutoModal, setTierProdutoModal] = useState<TierProduto | null | "new">(null);
+
+  const [segmentos, setSegmentos] = useState<Segmento[]>([]);
+  const [segmentoModal, setSegmentoModal] = useState<Segmento | null | "new">(null);
+
+  const [segmentosProduto, setSegmentosProduto] = useState<SegmentoProduto[]>([]);
+  const [segmentoProdutoModal, setSegmentoProdutoModal] = useState<SegmentoProduto | null | "new">(null);
 
   return (
     <div className="space-y-5">
       <PageHeader
         title="Tier e Segmentação"
         path={[{ label: "Configuração" }]}
-        description="Configure níveis e grupos para membros e produtos — usados em campanhas e no catálogo."
+        description="Defina os níveis e grupos do zero — usados em elegibilidade de campanha."
       />
 
       <Tabs defaultValue="tiers">
@@ -83,155 +297,86 @@ export default function MembrosTier() {
         <TabsContent value="tiers" className="mt-5 space-y-8">
 
           {/* Tiers · Membros */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-semibold">Membros</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Níveis de progressão com base no saldo acumulado.</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Níveis de progressão com base no saldo acumulado, em {moedaAtiva.nome.toLowerCase()}.</p>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-muted-foreground">Moeda:</span>
-                  <div className="flex gap-1">
-                    {MOEDAS_OPCOES.map(m => (
-                      <button key={m} type="button" onClick={() => setMoedaRef(m)}
-                        className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
-                          moedaRef === m
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border text-muted-foreground hover:border-primary/40"
-                        }`}>
-                        {m}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <Button variant="outline" size="sm">
-                  <Pencil className="size-3.5 mr-1.5" />Editar limiares
-                </Button>
-              </div>
+              <Button size="sm" onClick={() => setTierModal("new")}><Plus className="size-3.5 mr-1.5" />Novo tier</Button>
             </div>
-
-            <Card className="p-4">
-              <div className="text-xs text-muted-foreground mb-2">Distribuição atual — {total.toLocaleString("pt-BR")} membros</div>
-              <div className="flex h-2.5 rounded-full overflow-hidden gap-0.5">
-                {TIERS_MEMBRO.map(t => (
-                  <div key={t.id} className={t.dotColor} style={{ width: `${(t.members / total) * 100}%` }} title={`${t.name}: ${t.members}`} />
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-4 mt-3">
-                {TIERS_MEMBRO.map(t => (
-                  <div key={t.id} className="flex items-center gap-1.5 text-xs">
-                    <span className={`h-2 w-2 rounded-full ${t.dotColor}`} />
-                    <span>{t.name}</span>
-                    <span className="text-muted-foreground">{Math.round((t.members / total) * 100)}%</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-
-            <div className="space-y-2">
-              {TIERS_MEMBRO.map(tier => {
-                const isOpen = expanded === tier.id;
-                return (
-                  <Card key={tier.id} className={`overflow-hidden border ${tier.color}`}>
-                    <button
-                      className="flex w-full items-center gap-4 px-5 py-4 text-left hover:bg-black/5 transition-colors"
-                      onClick={() => setExpanded(isOpen ? null : tier.id)}
-                    >
-                      <span className={`h-3 w-3 rounded-full shrink-0 ${tier.dotColor}`} />
+            {tiers.length === 0 ? (
+              <AddCard label="Nenhum tier cadastrado — clique para adicionar" onClick={() => setTierModal("new")} />
+            ) : (
+              <div className="space-y-2">
+                {tiers.map((tier) => (
+                  <Card key={tier.id} className="overflow-hidden">
+                    <div className="flex items-center gap-4 px-5 py-4">
+                      <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: tier.cor }} />
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold">{tier.name}</div>
+                        <div className="font-semibold">{tier.nome}</div>
                         <div className="text-xs text-muted-foreground">
-                          {tier.minUnidade.toLocaleString("pt-BR")} {abrev}
-                          {tier.maxUnidade ? ` → ${tier.maxUnidade.toLocaleString("pt-BR")} ${abrev}` : " em diante"}
-                          {" · "}multiplicador {tier.multiplier}×
+                          {Number(tier.limiarMin).toLocaleString("pt-BR")} {moedaAtiva.simbolo}
+                          {tier.limiarMax ? ` → ${Number(tier.limiarMax).toLocaleString("pt-BR")} ${moedaAtiva.simbolo}` : " em diante"}
+                          {" · "}multiplicador {tier.multiplicador}×
+                          {tier.beneficios.length > 0 ? ` · ${tier.beneficios.length} benefício(s)` : ""}
                         </div>
                       </div>
-                      <Badge variant="secondary">{tier.members.toLocaleString("pt-BR")} membros</Badge>
-                      {isOpen
-                        ? <ChevronDown className="size-4 text-muted-foreground shrink-0" />
-                        : <ChevronRight className="size-4 text-muted-foreground shrink-0" />
-                      }
-                    </button>
-                    {isOpen && (
-                      <CardContent className="border-t border-border/50 pt-4 pb-5 space-y-4">
-                        <div className="grid gap-4 sm:grid-cols-3">
-                          <div className="rounded-xl bg-background/60 p-3 text-center">
-                            <div className="text-xs text-muted-foreground">Limiar mínimo</div>
-                            <div className="text-xl font-bold mt-0.5">{tier.minUnidade.toLocaleString("pt-BR")}</div>
-                            <div className="text-xs text-muted-foreground">{moedaRef.toLowerCase()}</div>
-                          </div>
-                          <div className="rounded-xl bg-background/60 p-3 text-center">
-                            <div className="text-xs text-muted-foreground">Limiar máximo</div>
-                            <div className="text-xl font-bold mt-0.5">{tier.maxUnidade ? tier.maxUnidade.toLocaleString("pt-BR") : "∞"}</div>
-                            <div className="text-xs text-muted-foreground">{moedaRef.toLowerCase()}</div>
-                          </div>
-                          <div className="rounded-xl bg-background/60 p-3 text-center">
-                            <div className="text-xs text-muted-foreground">Multiplicador</div>
-                            <div className="text-xl font-bold mt-0.5">{tier.multiplier}×</div>
-                            <div className="text-xs text-muted-foreground">sobre a base</div>
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Benefícios</div>
-                          <ul className="space-y-1.5">
-                            {tier.benefits.map(b => (
-                              <li key={b} className="flex items-start gap-2 text-sm">
-                                <span className={`mt-1.5 h-1.5 w-1.5 rounded-full shrink-0 ${tier.dotColor}`} />
-                                {b}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </CardContent>
-                    )}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={() => setTierModal(tier)} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil className="size-3.5" /></button>
+                        <button onClick={() => { setTiers((p) => p.filter((t) => t.id !== tier.id)); toast.success(`${tier.nome} removido`); }} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive"><Trash2 className="size-3.5" /></button>
+                      </div>
+                    </div>
                   </Card>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="border-t border-border" />
 
           {/* Tiers · Produtos */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-semibold">Produtos</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Níveis de incentivo que definem a taxa base e bônus por categoria de produto.</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Níveis de incentivo que definem taxa base e bônus por categoria de produto.</p>
               </div>
-              <Button variant="outline" size="sm">
-                <Pencil className="size-3.5 mr-1.5" />Editar taxas
-              </Button>
+              <Button size="sm" onClick={() => setTierProdutoModal("new")}><Plus className="size-3.5 mr-1.5" />Novo tier de produto</Button>
             </div>
-            <div className="space-y-2">
-              {TIERS_PRODUTO.map(({ tier, color, dot, taxa, bonus, descricao }) => (
-                <Card key={tier} className={`overflow-hidden border ${color}`}>
-                  <div className="flex items-center gap-4 px-5 py-4">
-                    <span className={`h-3 w-3 rounded-full shrink-0 ${dot}`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold">{tier}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{descricao}</p>
-                    </div>
-                    <div className="flex items-center gap-6 shrink-0 text-sm">
-                      <div className="text-right">
-                        <p className="text-xs text-muted-foreground">Taxa base</p>
-                        <p className="font-semibold tabular-nums">{taxa} / R$1</p>
+            {tiersProduto.length === 0 ? (
+              <AddCard label="Nenhum tier de produto cadastrado — clique para adicionar" onClick={() => setTierProdutoModal("new")} />
+            ) : (
+              <div className="space-y-2">
+                {tiersProduto.map((tier) => (
+                  <Card key={tier.id} className="overflow-hidden">
+                    <div className="flex items-center gap-4 px-5 py-4">
+                      <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: tier.cor }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold">{tier.nome}</p>
+                        {tier.descricao && <p className="text-xs text-muted-foreground mt-0.5">{tier.descricao}</p>}
                       </div>
-                      {bonus && (
+                      <div className="flex items-center gap-6 shrink-0 text-sm">
                         <div className="text-right">
-                          <p className="text-xs text-muted-foreground">Bônus</p>
-                          <p className="font-semibold text-emerald-600 tabular-nums">+{bonus}%</p>
+                          <p className="text-xs text-muted-foreground">Taxa base</p>
+                          <p className="font-semibold tabular-nums">{tier.taxa} / R$1</p>
                         </div>
-                      )}
+                        {tier.bonus && (
+                          <div className="text-right">
+                            <p className="text-xs text-muted-foreground">Bônus</p>
+                            <p className="font-semibold text-emerald-600 tabular-nums">+{tier.bonus}%</p>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={() => setTierProdutoModal(tier)} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil className="size-3.5" /></button>
+                        <button onClick={() => { setTiersProduto((p) => p.filter((t) => t.id !== tier.id)); toast.success(`${tier.nome} removido`); }} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive"><Trash2 className="size-3.5" /></button>
+                      </div>
                     </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Cada campanha pode sobrescrever a taxa e bônus individualmente no wizard.
-            </p>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
 
         </TabsContent>
@@ -246,34 +391,41 @@ export default function MembrosTier() {
                 <h2 className="text-sm font-semibold">Membros</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">Grupos de membros definidos por critérios — usados em campanhas e comunicações.</p>
               </div>
-              <Button size="sm"><Plus className="size-3.5 mr-1.5" />Novo segmento</Button>
+              <Button size="sm" onClick={() => setSegmentoModal("new")}><Plus className="size-3.5 mr-1.5" />Novo segmento</Button>
             </div>
-            {segments.map(seg => (
-              <Card key={seg.id} className={!seg.active ? "opacity-60" : ""}>
-                <div className="flex items-start justify-between gap-4 px-5 py-4">
-                  <div className="flex-1 min-w-0 space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${seg.color}`}>{seg.name}</span>
-                      <Badge variant="secondary">{seg.members.toLocaleString("pt-BR")} membros</Badge>
+            {segmentos.length === 0 ? (
+              <AddCard label="Nenhum segmento cadastrado — clique para adicionar" onClick={() => setSegmentoModal("new")} />
+            ) : (
+              segmentos.map((seg) => (
+                <Card key={seg.id} className={!seg.ativo ? "opacity-60" : ""}>
+                  <div className="flex items-start justify-between gap-4 px-5 py-4">
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="secondary">{seg.nome}</Badge>
+                        {!seg.ativo && <span className="text-xs text-muted-foreground">Inativo</span>}
+                      </div>
+                      {seg.descricao && <p className="text-sm text-muted-foreground">{seg.descricao}</p>}
+                      {seg.criterios.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {seg.criterios.map((c, i) => (
+                            <span key={i} className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs">
+                              <span className="text-muted-foreground">{CAMPOS_CRITERIO.find((f) => f.value === c.campo)?.label ?? c.campo}</span>
+                              <span className="font-semibold">{OP_LABEL[c.operador]}</span>
+                              <span>{c.valor}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <p className="text-sm text-muted-foreground">{seg.description}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {seg.criteria.map((c, i) => (
-                        <span key={i} className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs">
-                          <span className="text-muted-foreground">{c.label}</span>
-                          <span className="font-semibold">{OP_LABEL[c.op]}</span>
-                          <span>{c.value}</span>
-                        </span>
-                      ))}
+                    <div className="flex items-center gap-2 shrink-0 pt-0.5">
+                      <button onClick={() => setSegmentoModal(seg)} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil className="size-3.5" /></button>
+                      <Switch checked={seg.ativo} onCheckedChange={(v) => setSegmentos((p) => p.map((s) => s.id === seg.id ? { ...s, ativo: v } : s))} size="sm" />
+                      <button onClick={() => { setSegmentos((p) => p.filter((s) => s.id !== seg.id)); toast.success(`${seg.nome} removido`); }} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive"><Trash2 className="size-3.5" /></button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0 pt-0.5">
-                    <Button variant="ghost" size="sm"><Pencil className="size-3.5" /></Button>
-                    <Switch checked={seg.active} onCheckedChange={() => toggleSeg(seg.id)} size="sm" />
-                  </div>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              ))
+            )}
           </div>
 
           <div className="border-t border-border" />
@@ -285,55 +437,91 @@ export default function MembrosTier() {
                 <h2 className="text-sm font-semibold">Produtos</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">Grupos de produtos reutilizáveis entre campanhas.</p>
               </div>
-              <Button size="sm"><Plus className="size-3.5 mr-1.5" />Nova segmentação</Button>
+              <Button size="sm" onClick={() => setSegmentoProdutoModal("new")}><Plus className="size-3.5 mr-1.5" />Nova segmentação</Button>
             </div>
-            <div className="rounded-lg border border-border bg-card overflow-hidden">
-              <table className="min-w-full text-sm">
-                <thead className="bg-muted/20 border-b border-border">
-                  <tr className="text-left text-muted-foreground">
-                    {["Segmentação", "Taxa base", "Bônus", "Campanhas usando", ""].map(h => (
-                      <th key={h} className="px-4 py-3 text-xs font-medium whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {SEGMENTS_PRODUTO.map(cl => (
-                    <tr key={cl.id} className="hover:bg-muted/20">
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-2">
-                          <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: cl.cor }} />
-                          <span className="font-medium">{cl.nome}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3.5 tabular-nums">{cl.taxa} / R$1</td>
-                      <td className="px-4 py-3.5 tabular-nums text-emerald-600">+{cl.bonus}%</td>
-                      <td className="px-4 py-3.5">
-                        {cl.campanhas > 0
-                          ? <Pill color="muted" variant="soft" size="sm">{cl.campanhas} campanha{cl.campanhas > 1 ? "s" : ""}</Pill>
-                          : <span className="text-xs text-muted-foreground">Nenhuma</span>
-                        }
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-1 justify-end">
-                          <Button variant="ghost" size="sm"><Pencil className="size-3.5" /></Button>
-                          {cl.campanhas === 0 && (
-                            <button
-                              className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive transition-colors"
-                              onClick={() => toast.success(`${cl.nome} removida`)}>
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
+            {segmentosProduto.length === 0 ? (
+              <AddCard label="Nenhuma segmentação cadastrada — clique para adicionar" onClick={() => setSegmentoProdutoModal("new")} />
+            ) : (
+              <div className="rounded-lg border border-border bg-card overflow-hidden">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-muted/20 border-b border-border">
+                    <tr className="text-left text-muted-foreground">
+                      {["Segmentação", "Taxa", "Bônus", ""].map((h) => (
+                        <th key={h} className="px-4 py-3 text-xs font-medium whitespace-nowrap">{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {segmentosProduto.map((sp) => (
+                      <tr key={sp.id} className="hover:bg-muted/20">
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-2">
+                            <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: sp.cor }} />
+                            <span className="font-medium">{sp.nome}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5 tabular-nums">{sp.taxa} / R$1</td>
+                        <td className="px-4 py-3.5 tabular-nums text-emerald-600">{sp.bonus ? `+${sp.bonus}%` : <span className="text-muted-foreground">—</span>}</td>
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-1 justify-end">
+                            <button onClick={() => setSegmentoProdutoModal(sp)} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil className="size-3.5" /></button>
+                            <button onClick={() => { setSegmentosProduto((p) => p.filter((s) => s.id !== sp.id)); toast.success(`${sp.nome} removida`); }} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive"><Trash2 className="size-3.5" /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
         </TabsContent>
       </Tabs>
+
+      {tierModal !== null && (
+        <TierModal
+          initial={tierModal === "new" ? undefined : tierModal}
+          onClose={() => setTierModal(null)}
+          onSave={(t) => {
+            setTiers((p) => tierModal === "new" ? [...p, t] : p.map((x) => x.id === t.id ? t : x));
+            setTierModal(null);
+          }}
+        />
+      )}
+
+      {tierProdutoModal !== null && (
+        <TierProdutoModal
+          initial={tierProdutoModal === "new" ? undefined : tierProdutoModal}
+          onClose={() => setTierProdutoModal(null)}
+          onSave={(t) => {
+            setTiersProduto((p) => tierProdutoModal === "new" ? [...p, t] : p.map((x) => x.id === t.id ? t : x));
+            setTierProdutoModal(null);
+          }}
+        />
+      )}
+
+      {segmentoModal !== null && (
+        <SegmentoModal
+          initial={segmentoModal === "new" ? undefined : segmentoModal}
+          onClose={() => setSegmentoModal(null)}
+          onSave={(s) => {
+            setSegmentos((p) => segmentoModal === "new" ? [...p, s] : p.map((x) => x.id === s.id ? s : x));
+            setSegmentoModal(null);
+          }}
+        />
+      )}
+
+      {segmentoProdutoModal !== null && (
+        <SegmentoProdutoModal
+          initial={segmentoProdutoModal === "new" ? undefined : segmentoProdutoModal}
+          onClose={() => setSegmentoProdutoModal(null)}
+          onSave={(s) => {
+            setSegmentosProduto((p) => segmentoProdutoModal === "new" ? [...p, s] : p.map((x) => x.id === s.id ? s : x));
+            setSegmentoProdutoModal(null);
+          }}
+        />
+      )}
     </div>
   );
 }

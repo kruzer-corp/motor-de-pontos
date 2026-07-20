@@ -4,158 +4,29 @@ import {
   Button, Input, Label, PageHeader, Select, SelectContent,
   SelectItem, SelectTrigger, SelectValue, Switch, toast,
 } from "@kruzer/ds";
-import { CheckCircle2, ChevronDown, ChevronUp, Plus, Pencil, Trash2, Upload, X, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { CheckCircle2, Upload, X, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { MOEDA } from "../config/programa";
 import { FILIAIS } from "../config/filiais";
-import { SEGMENTOS, TIERS } from "../config/segmentacao";
-import { getMoedasAtivas } from "../config/moedas";
+import { TIERS } from "../config/segmentacao";
 import { renderCrumbLink } from "../lib/crumbLink";
 import {
-  type Classificacao, type Cluster, type Form, type Campanha,
+  type Form, type Campanha,
   DEFAULTS, getCampanha, upsertCampanha, novoIdCampanha,
 } from "../lib/campanhas";
+import { getProdutos } from "../lib/produtos";
 
 // ── Steps ─────────────────────────────────────────────────────────────────────
+// Acúmulo, resgate e multiplicadores são sempre definidos na Mecânica do Programa —
+// a campanha só decide elegibilidade (quem/o quê/quando participa).
 
 const STEPS = [
   { num: 1, label: "Detalhes" },
   { num: 2, label: "Fontes" },
   { num: 3, label: "Elegibilidade" },
   { num: 4, label: "Produtos" },
-  { num: 5, label: "Grupos de regras" },
-  { num: 6, label: "Limites" },
-  { num: 7, label: "Multiplicadores" },
-  { num: 8, label: "Revisão" },
+  { num: 5, label: "Limites" },
+  { num: 6, label: "Revisão" },
 ];
-
-// ── Form state ────────────────────────────────────────────────────────────────
-
-// ── Classificação ────────────────────────────────────────────────────────────
-
-const CLASSIF_DEFAULTS: Omit<Classificacao, "id"> = {
-  nome: "", cor: "#6366f1", pontosPorReal: "", temBonus: true, bonus: "",
-};
-
-function ClassificacaoModal({
-  initial, onSave, onClose,
-}: {
-  initial?: Classificacao;
-  onSave: (c: Classificacao) => void;
-  onClose: () => void;
-}) {
-  const [d, setD] = useState<Omit<Classificacao, "id">>(
-    initial ? { nome: initial.nome, cor: initial.cor, pontosPorReal: initial.pontosPorReal, temBonus: initial.temBonus, bonus: initial.bonus }
-            : { ...CLASSIF_DEFAULTS }
-  );
-
-  const upd = (k: keyof typeof d, v: string | boolean) =>
-    setD((prev) => ({ ...prev, [k]: v }));
-
-  const nomePrev  = d.nome  || "Sem nome";
-  const ptosPrev  = d.pontosPorReal || "0";
-  const bonusPrev = d.temBonus ? (d.bonus || "0%") : "0%";
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-background rounded-xl shadow-2xl w-full max-w-md p-6 space-y-5" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between gap-3">
-          <h2 className="text-xl font-semibold leading-snug">Defina as características da sua classificação</h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground mt-0.5 shrink-0">
-            <span className="text-lg leading-none">×</span>
-          </button>
-        </div>
-
-        {/* Nome */}
-        <div className="space-y-1.5">
-          <Label className="text-sm">Nome<span className="text-destructive">*</span></Label>
-          <Input value={d.nome} onChange={(e) => upd("nome", e.target.value)} placeholder="Digite o nome para essa classificação" />
-        </div>
-
-        {/* Cor */}
-        <div className="space-y-1.5">
-          <Label className="text-sm">Cor<span className="text-destructive">*</span></Label>
-          <div className="flex items-center gap-2 rounded-md border border-input px-3 py-2">
-            <input
-              type="color" value={d.cor}
-              onChange={(e) => upd("cor", e.target.value)}
-              className="h-6 w-6 rounded cursor-pointer border-0 bg-transparent p-0"
-            />
-            <span className="flex-1 text-sm text-muted-foreground">{d.cor}</span>
-            <span className="text-muted-foreground text-xs">🎨</span>
-          </div>
-        </div>
-
-        {/* Moeda por real gasto */}
-        <div className="space-y-1.5">
-          <Label className="text-sm">Quantidade de {MOEDA.nome.toLowerCase()} por real gasto<span className="text-destructive">*</span></Label>
-          <div className="relative">
-            <Input
-              type="number" value={d.pontosPorReal}
-              onChange={(e) => upd("pontosPorReal", e.target.value)}
-              placeholder={`Digite a quantidade de ${MOEDA.nome.toLowerCase()}`}
-              className="pr-9"
-            />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
-          </div>
-        </div>
-
-        {/* Tem bônus */}
-        <div className="space-y-2">
-          <Label className="text-sm">Deseja que tenha bônus para essa campanha?<span className="text-muted-foreground ml-1 text-xs">**</span></Label>
-          <div className="flex gap-6">
-            {[true, false].map((v) => (
-              <label key={String(v)} className="flex items-center gap-2 cursor-pointer text-sm">
-                <input
-                  type="radio" name="temBonus"
-                  checked={d.temBonus === v}
-                  onChange={() => upd("temBonus", v)}
-                  className="accent-foreground h-4 w-4"
-                />
-                {v ? "Sim" : "Não"}
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {/* Percentual de bônus */}
-        {d.temBonus && (
-          <div className="space-y-1.5">
-            <Label className="text-sm">Porcentagem de bônus<span className="text-muted-foreground ml-1 text-xs">**</span></Label>
-            <div className="relative">
-              <Input
-                type="number" value={d.bonus}
-                onChange={(e) => upd("bonus", e.target.value)}
-                placeholder="Digite o valor em bônus"
-                className="pr-9"
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
-            </div>
-          </div>
-        )}
-
-        {/* Exemplo prático */}
-        <div className="rounded-lg bg-muted/40 px-4 py-3 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground">Exemplo prático</p>
-          <p className="text-sm leading-relaxed">
-            Para a classificação{" "}
-            <span className="font-semibold text-primary">"{nomePrev}"</span>, serão concedidos{" "}
-            <span className="font-semibold text-primary">"{ptosPrev}"</span> {MOEDA.abrev} por real gasto, com um bônus de{" "}
-            <span className="font-semibold text-primary">"{d.temBonus ? bonusPrev : "0%"}"</span>{" "}
-            sobre o valor de cada produto incentivado do pedido.
-          </p>
-        </div>
-
-        <Button
-          className="w-full"
-          disabled={!d.nome || !d.pontosPorReal}
-          onClick={() => onSave({ ...d, id: initial?.id ?? String(Date.now()) })}
-        >
-          Salvar classificação
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 // ── Form state ────────────────────────────────────────────────────────────────
 
@@ -204,156 +75,7 @@ const FONTES_DISPONIVEIS = [
   },
 ];
 
-// ── Cluster (grupo de regras) ────────────────────────────────────────────────
-
-const CLUSTER_DEFAULTS: Omit<Cluster, "id"> = {
-  nome: "", segmento: "todos", tiers: [], fontes: [], categoria: "todas",
-  resultadoTipo: "taxa", resultadoValor: "",
-};
-
-function ClusterModal({
-  initial, onSave, onClose,
-}: {
-  initial?: Cluster;
-  onSave: (c: Cluster) => void;
-  onClose: () => void;
-}) {
-  const [d, setD] = useState<Omit<Cluster, "id">>(
-    initial ? { nome: initial.nome, segmento: initial.segmento, tiers: initial.tiers, fontes: initial.fontes, categoria: initial.categoria, resultadoTipo: initial.resultadoTipo, resultadoValor: initial.resultadoValor }
-            : { ...CLUSTER_DEFAULTS }
-  );
-
-  const upd = <K extends keyof typeof d>(k: K, v: (typeof d)[K]) =>
-    setD((prev) => ({ ...prev, [k]: v }));
-
-  const categorias = Array.from(new Set(PRODUTOS_CATALOGO.map((p) => p.categoria)));
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-background rounded-xl shadow-2xl w-full max-w-md p-6 space-y-5 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between gap-3">
-          <h2 className="text-xl font-semibold leading-snug">Defina o grupo de regras</h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground mt-0.5 shrink-0">
-            <span className="text-lg leading-none">×</span>
-          </button>
-        </div>
-
-        {/* Nome */}
-        <div className="space-y-1.5">
-          <Label className="text-sm">Nome<span className="text-destructive">*</span></Label>
-          <Input value={d.nome} onChange={(e) => upd("nome", e.target.value)} placeholder="Ex: VIP em Eletrônicos" />
-        </div>
-
-        {/* Condições */}
-        <div className="space-y-3 rounded-lg border border-border p-3">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Condições — todas precisam bater</p>
-
-          <div className="space-y-1.5">
-            <Label className="text-xs">Segmento</Label>
-            <Select value={d.segmento} onValueChange={(v) => upd("segmento", v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos os membros</SelectItem>
-                {SEGMENTOS.map((s) => (
-                  <SelectItem key={s.id} value={s.nome}>{s.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className="text-xs">Tier</Label>
-            <div className="flex flex-wrap gap-2">
-              {TIERS.map((t) => {
-                const sel = d.tiers.includes(t.id);
-                return (
-                  <button key={t.id} type="button"
-                    onClick={() => upd("tiers", sel ? d.tiers.filter((id) => id !== t.id) : [...d.tiers, t.id])}
-                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
-                      sel ? t.corChip + " ring-1 ring-offset-1 ring-primary/40" : "border-border text-muted-foreground bg-background hover:border-primary/40"
-                    }`}>
-                    {t.nome}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-xs text-muted-foreground">Sem seleção = vale para todos os tiers.</p>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className="text-xs">Fonte</Label>
-            <div className="flex flex-wrap gap-2">
-              {FONTES_DISPONIVEIS.map((f) => {
-                const sel = d.fontes.includes(f.id);
-                return (
-                  <button key={f.id} type="button"
-                    onClick={() => upd("fontes", sel ? d.fontes.filter((id) => id !== f.id) : [...d.fontes, f.id])}
-                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                      sel ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground bg-background hover:border-primary/40"
-                    }`}>
-                    {f.icon} {f.nome}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-xs text-muted-foreground">Sem seleção = vale para todas as fontes.</p>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className="text-xs">Categoria de produto</Label>
-            <Select value={d.categoria} onValueChange={(v) => upd("categoria", v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todas">Todas as categorias</SelectItem>
-                {categorias.map((c) => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {/* Resultado */}
-        <div className="space-y-3 rounded-lg border border-border p-3">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Resultado quando as condições baterem</p>
-          <div className="flex gap-2">
-            {([["taxa", "Taxa por R$1"], ["multiplicador", "Multiplicador"]] as const).map(([v, label]) => (
-              <button key={v} type="button" onClick={() => upd("resultadoTipo", v)}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                  d.resultadoTipo === v ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:border-primary/40"
-                }`}>
-                {label}
-              </button>
-            ))}
-          </div>
-          <Input type="number" value={d.resultadoValor} onChange={(e) => upd("resultadoValor", e.target.value)}
-            placeholder={d.resultadoTipo === "multiplicador" ? "Ex: 2" : "Ex: 3"} />
-        </div>
-
-        <Button
-          className="w-full"
-          disabled={!d.nome || !d.resultadoValor}
-          onClick={() => onSave({ ...d, id: initial?.id ?? String(Date.now()) })}
-        >
-          Salvar grupo de regras
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 // ── Form state ────────────────────────────────────────────────────────────────
-
-const PRODUTOS_CATALOGO = [
-  { id: "SKU-001", nome: "Smart TV 50\"",     categoria: "Eletrônicos",  sku: "TV-50-4K"    },
-  { id: "SKU-002", nome: "Air Fryer XL",      categoria: "Eletrodomésticos", sku: "AIRFRY-XL" },
-  { id: "SKU-003", nome: "Fone Bluetooth",    categoria: "Eletrônicos",  sku: "FONE-BT-02"  },
-  { id: "SKU-004", nome: "Kit Skincare",      categoria: "Beleza",       sku: "KIT-SKIN-01" },
-  { id: "SKU-005", nome: "Tênis Running",     categoria: "Esportes",     sku: "TEN-RUN-42"  },
-  { id: "SKU-006", nome: "Cafeteira Premium", categoria: "Eletrodomésticos", sku: "CAFE-PRE-01" },
-  { id: "SKU-007", nome: "Mochila Executiva", categoria: "Acessórios",   sku: "MOCH-EXE-01" },
-  { id: "SKU-008", nome: "Livro de Receitas", categoria: "Livros",       sku: "LIV-REC-01"  },
-];
 
 const STATUS_PEDIDO = [
   "Aprovado", "Faturado", "Em separação", "Entregue",
@@ -395,10 +117,10 @@ function Stepper({ current, steps }: { current: number; steps: typeof STEPS }) {
   );
 }
 
-// Steps 2 (Fontes), 4 (Produtos) e 5 (Grupos de regras) só existem pra campanha por pedido —
+// Steps 2 (Fontes) e 4 (Produtos) só existem pra campanha por pedido —
 // não fazem sentido quando a campanha pontua por evento (sem compra/venda envolvida).
 function stepsVisiveis(gatilhoTipo: "pedido" | "evento") {
-  return gatilhoTipo === "evento" ? STEPS.filter((s) => ![2, 4, 5].includes(s.num)) : STEPS;
+  return gatilhoTipo === "evento" ? STEPS.filter((s) => ![2, 4].includes(s.num)) : STEPS;
 }
 
 function proximoStep(atual: number, direcao: 1 | -1, gatilhoTipo: "pedido" | "evento"): number {
@@ -441,8 +163,8 @@ export default function CampanhasNova() {
   const existente = id ? getCampanha(id) : undefined;
   const editando = !!existente;
   const jaPublicada = editando && existente!.status !== "rascunho" && existente!.status !== "agendada";
-  const moedasAtivas = getMoedasAtivas();
   const [campanhaId] = useState(() => existente?.id ?? novoIdCampanha());
+  const PRODUTOS_CATALOGO = getProdutos().filter((p) => p.status === "ativo");
 
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<Form>(existente ?? DEFAULTS);
@@ -450,8 +172,6 @@ export default function CampanhasNova() {
   const [publicarModo, setPublicarModo] = useState<"agora" | "agendar">("agora");
   const [dataAgendada, setDataAgendada] = useState("");
   const [agendado, setAgendado] = useState(false);
-  const [classifModal,   setClassifModal]   = useState<Classificacao | null | "new">(null);
-  const [clusterModal,   setClusterModal]   = useState<Cluster | null | "new">(null);
   const [importOpen,   setImportOpen]   = useState(false);
   const [importStep,   setImportStep]   = useState<"upload" | "status">("upload");
   const [importFile,   setImportFile]   = useState<File | null>(null);
@@ -493,16 +213,6 @@ export default function CampanhasNova() {
 
   const set = (key: keyof Form, value: Form[keyof Form]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
-
-  function moverCluster(idx: number, dir: -1 | 1) {
-    setForm((prev) => {
-      const lista = [...prev.clusters];
-      const alvo = idx + dir;
-      if (alvo < 0 || alvo >= lista.length) return prev;
-      [lista[idx], lista[alvo]] = [lista[alvo], lista[idx]];
-      return { ...prev, clusters: lista };
-    });
-  }
 
   const canContinue = () => {
     if (step === 1) return !!form.nome;
@@ -615,16 +325,13 @@ export default function CampanhasNova() {
               <div className="grid grid-cols-2 gap-3">
                 {([
                   ["pedido", "Em pedidos elegíveis", "Pontua a cada compra/venda que bater com as regras desta campanha."],
-                  ["evento", "Em outro evento (sem pedido)", "Pontua quando um evento específico acontece — cadastro, aniversário, indicação, avaliação etc."],
+                  ["evento", "Na entrada no programa", "Pontua quando o membro se cadastra no programa (boas-vindas) — sem depender de compra/venda."],
                 ] as const).map(([value, label, desc]) => (
                   <label key={value} className={`flex flex-col gap-1 rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
                     form.gatilhoTipo === value ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
                   }`}>
                     <input type="radio" name="gatilhoTipo" value={value} checked={form.gatilhoTipo === value}
-                      onChange={() => {
-                        set("gatilhoTipo", value);
-                        if (value === "evento") { set("taxaTipo", "fixo"); set("multAlvo", "membro"); }
-                      }} className="sr-only" />
+                      onChange={() => set("gatilhoTipo", value)} className="sr-only" />
                     <span className="text-sm font-semibold">{label}</span>
                     <span className="text-xs text-muted-foreground">{desc}</span>
                   </label>
@@ -633,38 +340,10 @@ export default function CampanhasNova() {
             </Field>
 
             {form.gatilhoTipo === "evento" && (
-              <Field label="Qual evento concede os pontos?">
-                <Select value={form.gatilhoEvento} onValueChange={(v) => set("gatilhoEvento", v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cadastro">Cadastro no programa</SelectItem>
-                    <SelectItem value="aniversario">Aniversário do membro</SelectItem>
-                    <SelectItem value="indicacao">Indicação confirmada</SelectItem>
-                    <SelectItem value="avaliacao">Avaliação/pesquisa enviada</SelectItem>
-                    <SelectItem value="outro">Outro (definido por integração)</SelectItem>
-                  </SelectContent>
-                </Select>
-                {form.gatilhoEvento !== "cadastro" && (
-                  <p className="text-xs text-amber-600 mt-1.5">
-                    Hoje só "Cadastro no programa" já dispara automaticamente neste protótipo — os demais ficam configurados aqui, mas ainda sem a fonte do evento conectada.
-                  </p>
-                )}
-              </Field>
+              <div className="rounded-md bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
+                Único evento possível hoje além de pedido: entrada do membro no programa (boas-vindas).
+              </div>
             )}
-
-            <Field label="Segmento de membros elegíveis" hint="Lista sincronizada com Configuração → Tier e Segmentação.">
-              <Select value={form.segmento} onValueChange={(v) => set("segmento", v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um segmento" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos os membros</SelectItem>
-                  {SEGMENTOS.map((s) => (
-                    <SelectItem key={s.id} value={s.nome}>{s.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
 
             <Field label="Tier elegível" hint="Deixe sem seleção para valer para todos os tiers.">
               <div className="flex flex-wrap gap-2">
@@ -812,99 +491,33 @@ export default function CampanhasNova() {
         {step === 3 && (
           <div className="space-y-7">
             <div className="mb-6">
-              <h3 className="text-lg font-semibold">Elegibilidade e moeda</h3>
+              <h3 className="text-lg font-semibold">Elegibilidade</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Defina como esta campanha pontua — taxa base, quando concede e quando anula.
+                {form.gatilhoTipo === "pedido"
+                  ? "Defina quando esta campanha concede e quando anula — a taxa de acúmulo é sempre a da Mecânica do Programa."
+                  : "Defina o bônus fixo concedido quando o evento acontece."}
               </p>
             </div>
 
-            {/* ── Pontuação base ── */}
-            <div className="rounded-lg border border-border overflow-hidden">
-              <div className="px-4 py-3 bg-muted/30 border-b border-border">
-                <p className="text-sm font-semibold">Pontuação base <span className="text-xs text-muted-foreground font-normal ml-1">quanto o membro ganha por ação elegível</span></p>
-              </div>
-              <div className="px-4 py-4 space-y-4">
-                {/* Moeda da campanha */}
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Moeda desta campanha</Label>
-                  <div className="flex gap-2 flex-wrap">
-                    {moedasAtivas.map((m) => (
-                      <button key={m.id} type="button"
-                        onClick={() => set("moedaCampanha", m.nome)}
-                        className={`rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${
-                          form.moedaCampanha === m.nome
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border text-muted-foreground hover:border-primary/40"
-                        }`}
-                      >
-                        {m.nome}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Selecione qual moeda esta campanha credita ao membro ao completar uma ação elegível — lista sincronizada com as moedas ativas em Configuração → Mecânica do Programa.
-                  </p>
+            {form.gatilhoTipo === "evento" && (
+              <div className="rounded-lg border border-border overflow-hidden">
+                <div className="px-4 py-3 bg-muted/30 border-b border-border">
+                  <p className="text-sm font-semibold">Bônus do evento <span className="text-xs text-muted-foreground font-normal ml-1">valor fixo — única exceção à regra de acúmulo do programa</span></p>
                 </div>
-
-                {/* Tipo */}
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tipo de cálculo</Label>
-                  {form.gatilhoTipo === "evento" && (
-                    <p className="text-xs text-muted-foreground">Gatilho por evento só aceita valor fixo — não há valor de compra pra calcular taxa ou multiplicador.</p>
-                  )}
-                  <div className="grid grid-cols-3 gap-2">
-                    {(form.gatilhoTipo === "evento"
-                      ? [{ value: "fixo", label: `Valor fixo`, hint: `Ex: 500 ${MOEDA.abrev} no evento` }]
-                      : [
-                          { value: "taxa",         label: `Taxa por R$1`,         hint: `Ex: 1 ${MOEDA.abrev}/R$1` },
-                          { value: "fixo",         label: `Valor fixo`,           hint: `Ex: 500 ${MOEDA.abrev} por ação` },
-                          { value: "multiplicador",label: `Multiplicador`,        hint: `Ex: 2× a taxa do programa base` },
-                        ]
-                    ).map(({ value, label, hint }) => (
-                      <label key={value} className={`flex flex-col gap-0.5 rounded-lg border px-3 py-2.5 cursor-pointer transition-colors ${
-                        form.taxaTipo === value ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
-                      }`}>
-                        <input type="radio" name="taxaTipo" value={value} checked={form.taxaTipo === value}
-                          onChange={() => set("taxaTipo", value)} className="sr-only" />
-                        <span className="text-xs font-semibold">{label}</span>
-                        <span className="text-[10px] text-muted-foreground">{hint}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                {/* Valor */}
-                <div className="flex items-center gap-3">
-                  <div className="space-y-1 flex-1 max-w-xs">
-                    <Label className="text-xs">
-                      {form.taxaTipo === "taxa" ? `${form.moedaCampanha} por R$1` :
-                       form.taxaTipo === "fixo" ? `${form.moedaCampanha} por ação` : "Multiplicador (×)"}
-                    </Label>
+                <div className="px-4 py-4 space-y-3">
+                  <div className="space-y-1 max-w-xs">
+                    <Label className="text-xs">{MOEDA.nome} por evento</Label>
                     <Input type="number" value={form.taxaValor} onChange={(e) => set("taxaValor", e.target.value)}
-                      placeholder={form.taxaTipo === "multiplicador" ? "Ex: 2" : "Ex: 1"} />
+                      placeholder="Ex: 50" />
                   </div>
-                  {form.taxaTipo === "taxa" && (
-                    <div className="space-y-1 flex-1 max-w-xs">
-                      <Label className="text-xs">Arredondamento de fração</Label>
-                      <Select value={form.arredondamento} onValueChange={(v) => set("arredondamento", v)}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="baixo">Para baixo (conservador)</SelectItem>
-                          <SelectItem value="cima">Para cima (favorável ao membro)</SelectItem>
-                          <SelectItem value="proximo">Mais próximo</SelectItem>
-                        </SelectContent>
-                      </Select>
+                  {form.taxaValor && (
+                    <div className="rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                      Cada ocorrência do evento credita {Number(form.taxaValor).toLocaleString("pt-BR")} {MOEDA.nome.toLowerCase()} ao membro.
                     </div>
                   )}
                 </div>
-                {form.taxaValor && (
-                  <div className="rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                    {form.taxaTipo === "taxa" && `Compra de R$100 → ${(Number(form.taxaValor) * 100).toLocaleString("pt-BR")} ${form.moedaCampanha}`}
-                    {form.taxaTipo === "fixo" && `Cada ação elegível credita ${Number(form.taxaValor).toLocaleString("pt-BR")} ${form.moedaCampanha} independente do valor`}
-                    {form.taxaTipo === "multiplicador" && `Aplica ${form.taxaValor}× sobre a taxa definida no Programa Base`}
-                  </div>
-                )}
               </div>
-            </div>
+            )}
 
             {form.gatilhoTipo === "pedido" ? (
               <>
@@ -977,47 +590,8 @@ export default function CampanhasNova() {
             <div className="mb-6">
               <h3 className="text-lg font-semibold">Produtos da campanha</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Defina as categorias de produtos e selecione quais itens participam desta campanha.
+                Selecione quais itens participam desta campanha.
               </p>
-            </div>
-
-            {/* Classificações */}
-            <div className="rounded-lg border border-border overflow-hidden">
-              <div className="px-4 py-3 bg-muted/30 border-b border-border flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold">Classificações</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Categorias com taxas de {MOEDA.nome.toLowerCase()} específicas por grupo de produto.
-                  </p>
-                </div>
-                <Button size="sm" variant="outline" onClick={() => setClassifModal("new")}>
-                  <Plus className="h-3.5 w-3.5 mr-1.5" />Adicionar
-                </Button>
-              </div>
-              <div className="px-4 py-4">
-                {form.classificacoes.length === 0 ? (
-                  <button onClick={() => setClassifModal("new")}
-                    className="w-full rounded-lg border border-dashed border-border py-5 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors">
-                    Nenhuma classificação — clique para adicionar
-                  </button>
-                ) : (
-                  <div className="space-y-2">
-                    {form.classificacoes.map((c) => (
-                      <div key={c.id} className="flex items-center gap-3 rounded-lg border border-border px-4 py-3">
-                        <div className="h-4 w-4 rounded-full shrink-0" style={{ backgroundColor: c.cor }} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium">{c.nome}</p>
-                          <p className="text-xs text-muted-foreground">{c.pontosPorReal} {MOEDA.abrev}/R$1{c.temBonus && c.bonus ? ` · bônus ${c.bonus}%` : ""}</p>
-                        </div>
-                        <div className="flex gap-1 shrink-0">
-                          <button onClick={() => setClassifModal(c)} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button>
-                          <button onClick={() => set("classificacoes", form.classificacoes.filter((x) => x.id !== c.id))} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
 
             {/* Produtos elegíveis */}
@@ -1032,6 +606,26 @@ export default function CampanhasNova() {
                 </Button>
               </div>
               <div className="px-4 py-4 space-y-3">
+                <div className="space-y-1.5">
+                  <p className="text-xs text-muted-foreground">Marcar todos de uma categoria:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {Array.from(new Set(PRODUTOS_CATALOGO.map((p) => p.categoria))).map((cat) => {
+                      const idsCategoria = PRODUTOS_CATALOGO.filter((p) => p.categoria === cat).map((p) => p.id);
+                      const todosSelecionados = idsCategoria.every((id) => form.produtosElegiveis.includes(id));
+                      return (
+                        <button key={cat} type="button"
+                          onClick={() => set("produtosElegiveis", todosSelecionados
+                            ? form.produtosElegiveis.filter((id) => !idsCategoria.includes(id))
+                            : Array.from(new Set([...form.produtosElegiveis, ...idsCategoria])))}
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                            todosSelecionados ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/40"
+                          }`}>
+                          {cat} ({idsCategoria.length})
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
                 <div className="rounded-md border border-input overflow-hidden">
                   {PRODUTOS_CATALOGO.map((p) => {
                     const selecionado = form.produtosElegiveis.includes(p.id);
@@ -1052,106 +646,42 @@ export default function CampanhasNova() {
                 )}
               </div>
             </div>
-          </div>
-        )}
 
-        {/* ── Step 5: Grupos de regras ── */}
-        {step === 5 && (
-          <div className="space-y-7">
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold">Grupos de regras</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Opcional. Divida esta campanha em grupos com condições e resultados próprios — útil quando taxas diferentes se aplicam a públicos ou produtos diferentes dentro da mesma campanha.
-              </p>
-            </div>
-
-            {/* Estratégia de avaliação */}
+            {/* Exceções de categoria */}
             <div className="rounded-lg border border-border overflow-hidden">
               <div className="px-4 py-3 bg-muted/30 border-b border-border">
-                <p className="text-sm font-semibold">Estratégia de avaliação <span className="text-xs text-muted-foreground font-normal ml-1">o que fazer quando mais de um grupo bate na mesma transação</span></p>
-              </div>
-              <div className="px-4 py-4 space-y-3">
-                {[
-                  { value: "primeira",    label: "Primeira que casar",  desc: "Os grupos são avaliados na ordem da lista abaixo — o primeiro que bater vence, os demais são ignorados." },
-                  { value: "acumula",     label: "Todas se acumulam",   desc: "Aplica o resultado de todos os grupos que baterem, somando os efeitos." },
-                  { value: "maior_valor", label: "Maior valor vence",   desc: "Entre os grupos que baterem, só vale o de maior taxa/multiplicador." },
-                ].map(({ value, label, desc }) => (
-                  <label key={value} className="flex items-start gap-3 cursor-pointer">
-                    <input type="radio" name="clustersEstrategia" value={value} checked={form.clustersEstrategia === value}
-                      onChange={() => set("clustersEstrategia", value)} className="mt-1 accent-primary" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{label}</p>
-                      <p className="text-xs text-muted-foreground">{desc}</p>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Lista de grupos */}
-            <div className="rounded-lg border border-border overflow-hidden">
-              <div className="px-4 py-3 bg-muted/30 border-b border-border flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold">Grupos configurados</p>
-                  {form.clustersEstrategia === "primeira" && form.clusters.length > 1 && (
-                    <p className="text-xs text-muted-foreground mt-0.5">Ordem de prioridade — use as flechas para reordenar.</p>
-                  )}
-                </div>
-                <Button size="sm" variant="outline" onClick={() => setClusterModal("new")}>
-                  <Plus className="h-3.5 w-3.5 mr-1.5" />Adicionar grupo
-                </Button>
+                <p className="text-sm font-semibold">Exceções de categoria</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Categorias marcadas aqui não geram {MOEDA.nome.toLowerCase()} nesta campanha, mesmo se o produto estiver no catálogo.
+                </p>
               </div>
               <div className="px-4 py-4">
-                {form.clusters.length === 0 ? (
-                  <button onClick={() => setClusterModal("new")}
-                    className="w-full rounded-lg border border-dashed border-border py-5 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors">
-                    Nenhum grupo — clique para adicionar (opcional)
-                  </button>
-                ) : (
-                  <div className="space-y-2">
-                    {form.clusters.map((cl, idx) => (
-                      <div key={cl.id} className="flex items-center gap-3 rounded-lg border border-border px-4 py-3">
-                        {form.clustersEstrategia === "primeira" && (
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">{idx + 1}</span>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium">{cl.nome}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {cl.segmento !== "todos" ? cl.segmento : "Todos"}
-                            {cl.tiers.length > 0 ? ` · ${TIERS.filter((t) => cl.tiers.includes(t.id)).map((t) => t.nome).join(", ")}` : ""}
-                            {cl.fontes.length > 0 ? ` · ${cl.fontes.length} fonte(s)` : ""}
-                            {cl.categoria !== "todas" ? ` · ${cl.categoria}` : ""}
-                            {" → "}
-                            {cl.resultadoValor}{cl.resultadoTipo === "multiplicador" ? "×" : ` ${MOEDA.abrev}/R$1`}
-                          </p>
-                        </div>
-                        {form.clustersEstrategia === "primeira" && form.clusters.length > 1 && (
-                          <div className="flex flex-col shrink-0">
-                            <button disabled={idx === 0} onClick={() => moverCluster(idx, -1)}
-                              className="p-0.5 rounded hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent text-muted-foreground">
-                              <ChevronUp className="h-3.5 w-3.5" />
-                            </button>
-                            <button disabled={idx === form.clusters.length - 1} onClick={() => moverCluster(idx, 1)}
-                              className="p-0.5 rounded hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent text-muted-foreground">
-                              <ChevronDown className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        )}
-                        <div className="flex gap-1 shrink-0">
-                          <button onClick={() => setClusterModal(cl)} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button>
-                          <button onClick={() => set("clusters", form.clusters.filter((x) => x.id !== cl.id))} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                <div className="flex flex-wrap gap-2">
+                  {Array.from(new Set(PRODUTOS_CATALOGO.map((p) => p.categoria))).map((cat) => {
+                    const sel = form.categoriasExcluidas.includes(cat);
+                    return (
+                      <button key={cat} type="button"
+                        onClick={() => set("categoriasExcluidas", sel
+                          ? form.categoriasExcluidas.filter((c) => c !== cat)
+                          : [...form.categoriasExcluidas, cat])}
+                        className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                          sel ? "bg-rose-100 text-rose-700 border-rose-200 ring-1 ring-offset-1 ring-primary/40" : "border-border text-muted-foreground bg-background hover:border-primary/40"
+                        }`}>
+                        {cat}
+                      </button>
+                    );
+                  })}
+                </div>
+                {form.categoriasExcluidas.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-3">{form.categoriasExcluidas.length} categoria(s) excluída(s)</p>
                 )}
               </div>
             </div>
           </div>
         )}
 
-        {/* ── Step 6: Limites e vigência ── */}
-        {step === 6 && (
+        {/* ── Step 5: Limites e vigência ── */}
+        {step === 5 && (
           <div className="space-y-6">
             <div className="mb-6">
               <h3 className="text-lg font-semibold">Limites e vigência</h3>
@@ -1318,277 +848,11 @@ export default function CampanhasNova() {
               </div>
             )}
 
-            {/* Aprovação de resgates */}
-            <div className="rounded-lg border border-border overflow-hidden">
-              <div className="px-4 py-3 bg-muted/30 border-b border-border">
-                <p className="text-sm font-semibold">Aprovação de resgates</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Define se os resgates desta campanha precisam de revisão manual ou são aprovados automaticamente.</p>
-              </div>
-              <div className="px-4 py-4 space-y-4">
-                {/* Manual vs Automática */}
-                <div className="grid grid-cols-2 gap-3">
-                  {([
-                    ["manual",     "Manual",     "Analista revisa e aprova cada solicitação individualmente."],
-                    ["automatica", "Automática", "Aprovação imediata ao atingir as condições abaixo."],
-                  ] as const).map(([v, label, desc]) => (
-                    <label key={v} className={`flex flex-col gap-1 rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
-                      form.aprovacaoTipo === v ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
-                    }`}>
-                      <input type="radio" name="aprovacaoTipo" value={v}
-                        checked={form.aprovacaoTipo === v}
-                        onChange={() => set("aprovacaoTipo", v)} className="sr-only" />
-                      <span className="text-sm font-semibold">{label}</span>
-                      <span className="text-xs text-muted-foreground">{desc}</span>
-                    </label>
-                  ))}
-                </div>
-
-                {/* Condições — só visíveis se automática */}
-                {form.aprovacaoTipo === "automatica" && (
-                  <div className="rounded-lg border border-border bg-muted/20 px-4 py-4 space-y-4">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Condições para aprovação automática</p>
-
-                    {/* Tipo de resgate */}
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium">Tipo de resgate elegível</p>
-                      <div className="flex flex-col gap-1.5">
-                        {[
-                          ["voucher_digital", "🎟️ Voucher digital"],
-                          ["produto_fisico",  "📦 Produto físico"],
-                          ["credito_conta",   "💳 Crédito em conta"],
-                        ].map(([val, label]) => (
-                          <label key={val} className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" className="accent-primary h-4 w-4"
-                              checked={(form.aprovacaoTiposResgate as string[]).includes(val)}
-                              onChange={() => {
-                                const atual = form.aprovacaoTiposResgate as string[];
-                                set("aprovacaoTiposResgate", atual.includes(val)
-                                  ? atual.filter(x => x !== val)
-                                  : [...atual, val]);
-                              }} />
-                            <span className="text-sm">{label}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Valor máximo */}
-                    <div className="space-y-1.5">
-                      <p className="text-sm font-medium">Valor máximo do resgate</p>
-                      <p className="text-xs text-muted-foreground">Resgates acima desse valor vão para aprovação manual. Deixe em branco para sem limite.</p>
-                      <div className="flex items-center gap-2 max-w-xs">
-                        <Input type="number" value={form.aprovacaoValorMax}
-                          onChange={e => set("aprovacaoValorMax", e.target.value)}
-                          placeholder="Ex: 500" />
-                        <span className="text-sm text-muted-foreground shrink-0">{form.moedaCampanha}</span>
-                      </div>
-                    </div>
-
-                    {/* Tiers */}
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium">Tiers elegíveis para aprovação automática</p>
-                      <div className="flex flex-wrap gap-2">
-                        {[
-                          { tier: "Bronze",   color: "bg-orange-100 text-orange-700 border-orange-200" },
-                          { tier: "Prata",    color: "bg-slate-100 text-slate-600 border-slate-200"   },
-                          { tier: "Ouro",     color: "bg-amber-100 text-amber-700 border-amber-200"   },
-                          { tier: "Diamante", color: "bg-violet-100 text-violet-700 border-violet-200"},
-                        ].map(({ tier, color }) => {
-                          const sel = (form.aprovacaoTiers as string[]).includes(tier);
-                          return (
-                            <button key={tier} type="button"
-                              onClick={() => {
-                                const atual = form.aprovacaoTiers as string[];
-                                set("aprovacaoTiers", sel ? atual.filter(x => x !== tier) : [...atual, tier]);
-                              }}
-                              className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
-                                sel ? color + " ring-1 ring-offset-1 ring-primary/40" : "border-border text-muted-foreground bg-background hover:border-primary/40"
-                              }`}>
-                              {tier}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Regras de resgate */}
-            <div className="rounded-lg border border-border overflow-hidden">
-              <div className="px-4 py-3 bg-muted/30 border-b border-border">
-                <p className="text-sm font-semibold">Regras de resgate</p>
-                <p className="text-xs text-muted-foreground mt-0.5">O que esta campanha libera pra troca, e com que limite.</p>
-              </div>
-              <div className="px-4 py-4 space-y-4">
-                {/* Saldo mínimo */}
-                <div className="space-y-1.5">
-                  <p className="text-sm font-medium">Saldo mínimo para resgatar</p>
-                  <div className="flex items-center gap-2 max-w-xs">
-                    <Input type="number" value={form.resgateSaldoMinimo} onChange={(e) => set("resgateSaldoMinimo", e.target.value)} placeholder="Sem mínimo" />
-                    <span className="text-sm text-muted-foreground shrink-0">{form.moedaCampanha}</span>
-                  </div>
-                </div>
-
-                {/* Limite de resgate */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium">Limite de resgates por membro</p>
-                    <p className="text-xs text-muted-foreground">Quantas vezes um membro pode resgatar recompensas desta campanha.</p>
-                  </div>
-                  <Switch size="sm" checked={form.resgateLimiteAtivo} onCheckedChange={(v) => set("resgateLimiteAtivo", v)} />
-                </div>
-                {form.resgateLimiteAtivo && (
-                  <div className="flex items-center gap-3">
-                    <Input type="number" value={form.resgateLimitePts} onChange={(e) => set("resgateLimitePts", e.target.value)} placeholder="Ex: 1" className="w-24" min={1} />
-                    <span className="text-sm text-muted-foreground shrink-0">vezes por</span>
-                    <Select value={form.resgateLimiteEscopo} onValueChange={(v) => set("resgateLimiteEscopo", v)}>
-                      <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="mes">Mês</SelectItem>
-                        <SelectItem value="campanha">Vigência da campanha</SelectItem>
-                        <SelectItem value="ilimitado">Ilimitado</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                {/* Produtos vinculados */}
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Produtos vinculados pra resgate</p>
-                  <p className="text-xs text-muted-foreground">Deixe em branco para liberar todo o catálogo.</p>
-                  <div className="rounded-md border border-input overflow-hidden">
-                    {PRODUTOS_CATALOGO.map((p) => {
-                      const sel = (form.resgateProdutosVinculados as string[]).includes(p.id);
-                      return (
-                        <label key={p.id} className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/40 border-b border-border last:border-0">
-                          <input type="checkbox" className="accent-primary h-4 w-4 shrink-0" checked={sel}
-                            onChange={() => set("resgateProdutosVinculados", sel
-                              ? (form.resgateProdutosVinculados as string[]).filter((id) => id !== p.id)
-                              : [...(form.resgateProdutosVinculados as string[]), p.id])} />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm">{p.nome}</p>
-                            <p className="text-xs text-muted-foreground">{p.categoria} · {p.sku}</p>
-                          </div>
-                        </label>
-                      );
-                    })}
-                  </div>
-                  {(form.resgateProdutosVinculados as string[]).length > 0 && (
-                    <p className="text-xs text-muted-foreground">{(form.resgateProdutosVinculados as string[]).length} produto(s) vinculado(s)</p>
-                  )}
-                </div>
-              </div>
-            </div>
-
           </div>
         )}
 
-        {/* ── Step 7: Multiplicadores ── */}
-        {step === 7 && (
-          <div className="space-y-6">
-            <div className="text-center mb-8">
-              <h3 className="text-lg font-semibold">Multiplicadores</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Aplique um fator extra sobre os {MOEDA.nome.toLowerCase()} desta campanha.
-              </p>
-            </div>
-
-            {/* Alvo do multiplicador */}
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Este fator se aplica a</p>
-              {form.gatilhoTipo === "evento" && (
-                <p className="text-xs text-muted-foreground">Gatilho por evento não envolve produto — só multiplicador por tier.</p>
-              )}
-              <div className={`grid gap-3 ${form.gatilhoTipo === "evento" ? "grid-cols-1" : "grid-cols-2"}`}>
-                {(form.gatilhoTipo === "evento"
-                  ? [{ value: "membro", label: "Membro", desc: "Fator por tier — Bronze, Prata, Ouro, Diamante" }]
-                  : [
-                      { value: "membro",  label: "Membro",  desc: "Fator por tier — Bronze, Prata, Ouro, Diamante" },
-                      { value: "produto", label: "Produto", desc: "Fator por produto ou categoria elegível" },
-                    ]
-                ).map(({ value, label, desc }) => (
-                  <label key={value} className={`flex flex-col gap-1 rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
-                    form.multAlvo === value ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
-                  }`}>
-                    <input type="radio" name="multAlvo" value={value} checked={form.multAlvo === value}
-                      onChange={() => set("multAlvo", value)} className="sr-only" />
-                    <span className="text-sm font-semibold">{label}</span>
-                    <span className="text-xs text-muted-foreground">{desc}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Multiplicadores por tier */}
-            {form.multAlvo === "membro" && (
-              <div className="space-y-3">
-                <p className="text-xs text-muted-foreground">Os valores abaixo sobrescrevem os multiplicadores globais da Mecânica do Programa para esta campanha.</p>
-                {[
-                  { key: "multBronze",   tier: "Bronze",   color: "bg-orange-100 text-orange-700" },
-                  { key: "multPrata",    tier: "Prata",    color: "bg-slate-100 text-slate-700" },
-                  { key: "multOuro",     tier: "Ouro",     color: "bg-amber-100 text-amber-700" },
-                  { key: "multDiamante", tier: "Diamante", color: "bg-violet-100 text-violet-700" },
-                ].map(({ key, tier, color }) => (
-                  <div key={key} className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-3.5">
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${color}`}>{tier}</span>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        className="w-28 text-right"
-                        value={(form as unknown as Record<string, string>)[key]}
-                        onChange={(e) => set(key as keyof Form, e.target.value)}
-                        min={1} step={0.25}
-                      />
-                      <span className="text-sm text-muted-foreground shrink-0">×</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Multiplicadores por produto */}
-            {form.multAlvo === "produto" && (() => {
-              const lista = form.produtosElegiveis.length > 0
-                ? PRODUTOS_CATALOGO.filter((p) => form.produtosElegiveis.includes(p.id))
-                : PRODUTOS_CATALOGO;
-              return (
-                <div className="space-y-3">
-                  <p className="text-xs text-muted-foreground">
-                    {form.produtosElegiveis.length > 0
-                      ? "Defina o fator para cada produto elegível selecionado na campanha."
-                      : "Nenhum produto específico selecionado — exibindo todos os produtos do catálogo."}
-                  </p>
-                  {lista.map((p) => {
-                    const val = (form.multProdutos as Record<string, string>)[p.id] ?? "1";
-                    return (
-                      <div key={p.id} className="flex items-center gap-4 rounded-lg border border-border px-4 py-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium">{p.nome}</p>
-                          <p className="text-xs text-muted-foreground">{p.categoria} · {p.sku}</p>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Input
-                            type="number"
-                            className="w-24 text-right"
-                            value={val}
-                            onChange={(e) => set("multProdutos", { ...(form.multProdutos as Record<string, string>), [p.id]: e.target.value })}
-                            min={1} step={0.25}
-                          />
-                          <span className="text-sm text-muted-foreground">×</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })()}
-          </div>
-        )}
-
-        {/* ── Step 8: Revisão ── */}
-        {step === 8 && (
+        {/* ── Step 6: Revisão ── */}
+        {step === 6 && (
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h3 className="text-lg font-semibold">Revise antes de publicar</h3>
@@ -1605,7 +869,6 @@ export default function CampanhasNova() {
                 <ReviewRow label="Código"   value={form.codigo} />
                 <ReviewRow label="Nome"     value={form.nome || "—"} />
                 <ReviewRow label="Descrição" value={form.descricao || "—"} />
-                <ReviewRow label="Segmento" value={form.segmento} />
                 <ReviewRow label="Tier elegível" value={
                   form.tiersElegiveis.length === 0
                     ? "Todos os tiers"
@@ -1632,16 +895,15 @@ export default function CampanhasNova() {
 
             <div className="rounded-lg border border-border bg-card overflow-hidden">
               <div className="px-5 py-3 border-b border-border bg-muted/30">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Elegibilidade e moeda</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Elegibilidade</p>
               </div>
               <div className="px-5">
                 <ReviewRow
-                  label="Pontuação base"
+                  label="Pontuação"
                   value={
-                    !form.taxaValor ? "—" :
-                    form.taxaTipo === "taxa" ? `${form.taxaValor} ${form.moedaCampanha}/R$1` :
-                    form.taxaTipo === "fixo" ? `${form.taxaValor} ${form.moedaCampanha} por ação` :
-                    `${form.taxaValor}× a taxa do programa base`
+                    form.gatilhoTipo === "evento"
+                      ? (form.taxaValor ? `${form.taxaValor} ${MOEDA.nome.toLowerCase()} por evento (bônus fixo)` : "—")
+                      : "Definida pela Mecânica do Programa"
                   }
                 />
                 {form.gatilhoTipo === "pedido" && (
@@ -1665,12 +927,6 @@ export default function CampanhasNova() {
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Produtos da campanha</p>
                 </div>
                 <div className="px-5">
-                  {form.classificacoes.length > 0 && (
-                    <ReviewRow
-                      label="Classificações"
-                      value={form.classificacoes.map((c) => c.nome).join(", ")}
-                    />
-                  )}
                   <ReviewRow
                     label="Produtos elegíveis"
                     value={
@@ -1679,30 +935,8 @@ export default function CampanhasNova() {
                         : PRODUTOS_CATALOGO.filter((p) => form.produtosElegiveis.includes(p.id)).map((p) => p.nome).join(", ")
                     }
                   />
-                </div>
-              </div>
-            )}
-
-            {form.gatilhoTipo === "pedido" && (
-              <div className="rounded-lg border border-border bg-card overflow-hidden">
-                <div className="px-5 py-3 border-b border-border bg-muted/30">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Grupos de regras</p>
-                </div>
-                <div className="px-5">
-                  {form.clusters.length === 0 ? (
-                    <ReviewRow label="Grupos" value="Nenhum — campanha usa a regra única" />
-                  ) : (
-                    <>
-                      <ReviewRow label="Estratégia" value={
-                        { primeira: "Primeira que casar", acumula: "Todas se acumulam", maior_valor: "Maior valor vence" }[form.clustersEstrategia]
-                      } />
-                      {form.clusters.map((cl, idx) => (
-                        <ReviewRow key={cl.id}
-                          label={form.clustersEstrategia === "primeira" ? `${idx + 1}. ${cl.nome}` : cl.nome}
-                          value={`${cl.resultadoValor}${cl.resultadoTipo === "multiplicador" ? "×" : ` ${MOEDA.abrev}/R$1`}`}
-                        />
-                      ))}
-                    </>
+                  {form.categoriasExcluidas.length > 0 && (
+                    <ReviewRow label="Exceções de categoria" value={form.categoriasExcluidas.join(", ")} />
                   )}
                 </div>
               </div>
@@ -1725,46 +959,13 @@ export default function CampanhasNova() {
                 {form.gatilhoTipo === "pedido" && (
                   <ReviewRow label="Cancelamento" value={{ estornar_tudo: "Estornar tudo", estornar_proporcional: "Estorno proporcional", manter: "Manter pontos" }[form.cancelamentoPolicy]} />
                 )}
-                <ReviewRow label="Aprovação de resgates" value={
-                  form.aprovacaoTipo === "manual"
-                    ? "Manual"
-                    : `Automática — ${(form.aprovacaoTiposResgate as string[]).length} tipo(s)${form.aprovacaoValorMax ? ` · até ${form.aprovacaoValorMax} ${form.moedaCampanha}` : ""} · tiers: ${(form.aprovacaoTiers as string[]).join(", ") || "nenhum"}`
-                } />
-                <ReviewRow label="Saldo mínimo p/ resgate" value={form.resgateSaldoMinimo ? `${form.resgateSaldoMinimo} ${form.moedaCampanha}` : "Sem mínimo"} />
-                <ReviewRow label="Limite de resgate" value={
-                  form.resgateLimiteAtivo && form.resgateLimitePts
-                    ? `${form.resgateLimitePts}× por ${{ mes: "mês", campanha: "vigência da campanha", ilimitado: "—" }[form.resgateLimiteEscopo]}`
-                    : "Sem limite"
-                } />
-                <ReviewRow label="Produtos vinculados" value={
-                  (form.resgateProdutosVinculados as string[]).length === 0
-                    ? "Todo o catálogo"
-                    : PRODUTOS_CATALOGO.filter((p) => (form.resgateProdutosVinculados as string[]).includes(p.id)).map((p) => p.nome).join(", ")
-                } />
               </div>
             </div>
 
-            <div className="rounded-lg border border-border bg-card overflow-hidden">
-              <div className="px-5 py-3 border-b border-border bg-muted/30">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Multiplicadores</p>
-              </div>
-              <div className="px-5">
-                <ReviewRow label="Alvo" value={form.multAlvo === "membro" ? "Membro (por tier)" : "Produto (por categoria)"} />
-                {form.multAlvo === "membro" && (
-                  [["Bronze", form.multBronze], ["Prata", form.multPrata], ["Ouro", form.multOuro], ["Diamante", form.multDiamante]].map(([tier, v]) => (
-                    <ReviewRow key={tier} label={tier} value={`${v}×`} />
-                  ))
-                )}
-                {form.multAlvo === "produto" && (() => {
-                  const lista = form.produtosElegiveis.length > 0
-                    ? PRODUTOS_CATALOGO.filter((p) => form.produtosElegiveis.includes(p.id))
-                    : PRODUTOS_CATALOGO;
-                  return lista.map((p) => (
-                    <ReviewRow key={p.id} label={p.nome}
-                      value={`${(form.multProdutos as Record<string, string>)[p.id] ?? "1"}×`} />
-                  ));
-                })()}
-              </div>
+            <div className="rounded-lg border border-border bg-muted/20 px-5 py-3.5">
+              <p className="text-xs text-muted-foreground">
+                Regras de acúmulo e resgate (taxa, multiplicador por tier, aprovação) são sempre as definidas em Configuração → Mecânica do Programa — esta campanha só decide elegibilidade.
+              </p>
             </div>
 
             {!jaPublicada && (
@@ -1944,38 +1145,6 @@ export default function CampanhasNova() {
           </div>
         )}
 
-        {/* ── Modal de classificação ── */}
-        {classifModal !== null && (
-          <ClassificacaoModal
-            initial={classifModal === "new" ? undefined : classifModal}
-            onClose={() => setClassifModal(null)}
-            onSave={(c) => {
-              set("classificacoes",
-                classifModal === "new"
-                  ? [...form.classificacoes, c]
-                  : form.classificacoes.map((x) => x.id === c.id ? c : x)
-              );
-              setClassifModal(null);
-            }}
-          />
-        )}
-
-        {/* ── Modal de grupo de regras ── */}
-        {clusterModal !== null && (
-          <ClusterModal
-            initial={clusterModal === "new" ? undefined : clusterModal}
-            onClose={() => setClusterModal(null)}
-            onSave={(c) => {
-              set("clusters",
-                clusterModal === "new"
-                  ? [...form.clusters, c]
-                  : form.clusters.map((x) => x.id === c.id ? c : x)
-              );
-              setClusterModal(null);
-            }}
-          />
-        )}
-
         {/* ── Navigation ── */}
         <div className="flex gap-3 mt-10 pt-6 border-t border-border">
           <Button
@@ -1985,7 +1154,7 @@ export default function CampanhasNova() {
           >
             Voltar
           </Button>
-          {step < 8 ? (
+          {step < 6 ? (
             <Button
               className="flex-1"
               disabled={!canContinue()}
@@ -2007,7 +1176,7 @@ export default function CampanhasNova() {
             </Button>
           )}
         </div>
-        {step < 7 && (
+        {step < 6 && (
           <p className="text-center mt-3">
             <button
               className="text-xs text-muted-foreground hover:text-foreground underline"

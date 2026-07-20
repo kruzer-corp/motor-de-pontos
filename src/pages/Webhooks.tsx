@@ -102,7 +102,7 @@ const INTEGRATIONS: Integration[] = [
     direction: "bidirecional",
     enables: "Loyalty visível no contexto de vendas B2B",
     platforms: ["Salesforce", "HubSpot", "Dynamics", "Pipedrive"],
-    status: "disponível",
+    status: "configurado",
   },
   {
     id: "INT-004",

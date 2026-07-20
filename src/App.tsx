@@ -71,7 +71,7 @@ export default function App() {
 
       {/* ── Admin (analista) ── */}
       <Route element={<AppLayout />}>
-        <Route index element={<Navigate to="/resgates" replace />} />
+        <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="config" element={<Config />} />
         <Route path="mecanica" element={<MecanicaPrograma />} />

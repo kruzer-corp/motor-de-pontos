@@ -1,4 +1,6 @@
 import { getCampanhas } from "./campanhas";
+import { getMecanica } from "./mecanica";
+import { MOEDA } from "../config/programa";
 
 // ── Fonte única de dados de membro — usada pela listagem e pelo detalhe ──────
 
@@ -284,9 +286,15 @@ function dataParaTimestamp(d: string): number {
   return new Date(ano ?? 0, (mes ?? 1) - 1, dia ?? 1).getTime();
 }
 
+// Taxa, arredondamento, multiplicador por tier e moeda são sempre da Mecânica do Programa —
+// a campanha só filtra elegibilidade (vigência, fonte, segmento, tier, status do pedido).
 export function avaliarEventosMembro(membro: Membro): EventoDiagnostico[] {
   const agora = Date.now();
-  const campanhasAtivas = getCampanhas().filter((c) => c.status === "ativa");
+  const campanhasAtivas = getCampanhas().filter((c) => c.status === "ativa" && c.gatilhoTipo === "pedido");
+  const mecanica = getMecanica();
+  const multPorTier: Record<Tier, number> = {
+    Bronze: mecanica.multBronze, Prata: mecanica.multPrata, Ouro: mecanica.multOuro, Diamante: mecanica.multDiamante,
+  };
 
   return membro.eventos.map((ev) => {
     for (const c of campanhasAtivas) {
@@ -300,14 +308,18 @@ export function avaliarEventosMembro(membro: Membro): EventoDiagnostico[] {
       if (c.tiersElegiveis.length > 0 && !c.tiersElegiveis.includes(membro.tier.toLowerCase())) continue;
       if (!c.statusConceder[ev.statusPedido]) continue;
 
-      const taxa = Number(c.taxaValor) || 0;
-      const pontos = c.taxaTipo === "fixo" ? Math.round(taxa) : Math.round(ev.valorCompra * taxa);
-      const abrev = ABREV_MOEDA[c.moedaCampanha] ?? "pts";
+      const mult = multPorTier[membro.tier] ?? 1;
+      const brutos = ev.valorCompra * mecanica.pontosPorReal * mult;
+      const pontos = mecanica.arredondamento === "cima" ? Math.ceil(brutos)
+        : mecanica.arredondamento === "proximo" ? Math.round(brutos)
+        : Math.floor(brutos);
+      const moeda = MOEDA.nome;
+      const abrev = ABREV_MOEDA[moeda] ?? MOEDA.abrev;
       return {
         ...ev,
         resultado: "pontuado" as const,
-        motivo: `Elegível — campanha "${c.nome}" ativa · status "${ev.statusPedido}" concede pontos · taxa ${c.taxaTipo === "fixo" ? `${taxa} fixo` : `${taxa}pt/R$1`}`,
-        campanhaNome: c.nome, pontosGerados: pontos, moedaGerada: c.moedaCampanha, abrevGerado: abrev,
+        motivo: `Elegível — campanha "${c.nome}" ativa · status "${ev.statusPedido}" concede pontos · ${mecanica.pontosPorReal}pt/R$1 × ${mult}× (tier ${membro.tier}, Mecânica do Programa)`,
+        campanhaNome: c.nome, pontosGerados: pontos, moedaGerada: moeda, abrevGerado: abrev,
       };
     }
     return {
@@ -329,18 +341,15 @@ export function creditarEventosAcumulo(membroId: string, resultados: EventoDiagn
   }
 }
 
-// Campanhas com gatilho por evento (não por pedido) — cadastro, aniversário, indicação, avaliação etc.
-// Hoje só "cadastro" tem a origem do evento de fato conectada neste protótipo; os demais ficam
-// configuráveis na campanha, mas ainda dependem de uma fonte de evento real (ex: data de aniversário,
-// confirmação de indicação) que não existe ainda no cadastro do membro.
+// Campanhas com gatilho por evento (não por pedido) — hoje o único evento possível é a
+// entrada do membro no programa (cadastro/boas-vindas).
 export function creditarBonusEventos(membro: Membro): void {
   const campanhas = getCampanhas().filter((c) => c.status === "ativa" && c.gatilhoTipo === "evento");
   for (const c of campanhas) {
-    if (c.gatilhoEvento !== "cadastro") continue; // demais eventos: sem fonte real ainda, não credita
     const pontos = Number(c.taxaValor) || 0;
     if (pontos <= 0) continue;
     registrarTransacaoSaldo(membro.id, {
-      moeda: c.moedaCampanha, abrev: ABREV_MOEDA[c.moedaCampanha] ?? "pts", delta: pontos,
+      moeda: MOEDA.nome, abrev: ABREV_MOEDA[MOEDA.nome] ?? MOEDA.abrev, delta: pontos,
       descricao: `Bônus de cadastro — campanha "${c.nome}"`, tipo: "acumulo",
       refId: `EVT-CADASTRO-${c.id}-${membro.id}`,
     });

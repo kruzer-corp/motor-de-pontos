@@ -4,8 +4,8 @@ import { cn, TooltipProvider } from "@kruzer/ds";
 import {
   LayoutDashboard, Users, User, ShieldCheck, Sparkles, Boxes, Building2,
   ChevronDown, ChevronsLeft, ChevronsRight,
-  Package, Trophy, History, ScrollText,
-  Palette, Webhook, Sliders, Wallet,
+  Trophy, History, ScrollText, Share2,
+  Palette, Webhook, Sliders,
 } from "lucide-react";
 
 // ── Tenants ───────────────────────────────────────────────────────────────────
@@ -60,29 +60,27 @@ const MENU: MenuItem[] = [
   // ── OPERAÇÃO ───────────────────────────────────────────────────────────────
   { section: "Operação" },
   { to: "/campanhas", label: "Minhas Campanhas", icon: Sparkles },
-  { to: "/membros/extrato", label: "Membros e movimentações", icon: Users },
+  { to: "/membros/extrato", label: "Membros e Extratos", icon: Users },
+  { to: "/indicacoes", label: "Indicações", icon: Share2 },
   {
     label: "Catálogos e produtos", icon: Boxes,
     group: [
-      { to: "/catalogo-produtos", label: "Produtos elegíveis" },
+      { to: "/catalogo-produtos",    label: "Produtos incentivados" },
+      { to: "/catalogo",             label: "Produtos (1P/3P)" },
+      { to: "/catalogo/grupos",      label: "Grupos" },
+      { to: "/catalogo/atualizacao", label: "Atualização" },
     ],
   },
 
-  // ── CONFIGURAÇÃO ───────────────────────────────────────────────────────────
-  { section: "Configuração" },
+  // ── CONFIGURAÇÃO DO PROGRAMA ───────────────────────────────────────────────
+  { section: "Configuração do Programa" },
   { to: "/mecanica",       label: "Mecânica do Programa", icon: Sliders },
-  { to: "/carteiras",      label: "Carteiras (múltiplas moedas)", icon: Wallet },
-  { to: "/usuarios",       label: "Usuários & Papéis",  icon: User      },
   { to: "/canais-filiais", label: "Canais e Filiais",   icon: Building2 },
+  { to: "/usuarios",       label: "Usuários & Papéis",  icon: User      },
   { to: "/membros/tier", label: "Tier e Segmentação", icon: ShieldCheck },
-  {
-    label: "Catálogo", icon: Package,
-    group: [
-      { to: "/catalogo",        label: "Produtos" },
-      { to: "/catalogo/grupos", label: "Grupos" },
-    ],
-  },
 
+  // ── CONFIGURAÇÃO — MARCA, COMUNICAÇÃO E JURÍDICO ──────────────────────────
+  { section: "Marca, Comunicação e Jurídico" },
   { to: "/webhooks", label: "Conectividade",       icon: Webhook },
   {
     label: "Conteúdo & Aparência", icon: Palette,

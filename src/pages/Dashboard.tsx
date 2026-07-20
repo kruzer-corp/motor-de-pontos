@@ -8,7 +8,7 @@ import {
   ChartTooltipContent, type ChartConfig, Pill, Table, TableBody, TableCell,
   TableHead, TableHeader, TableRow,
 } from "@kruzer/ds";
-import { Sparkles, ShieldCheck, Gift, X, ChevronRight, CheckCircle2, ArrowUpRight, ArrowDownRight, TrendingUp } from "lucide-react";
+import { Sparkles, ShieldCheck, Gift, Sliders, Building2, X, ChevronRight, CheckCircle2, ArrowUpRight, ArrowDownRight, TrendingUp } from "lucide-react";
 import { MOEDA } from "../config/programa";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -17,15 +17,33 @@ type Period = "7d" | "30d" | "90d" | "12m";
 type DrillKey = "emitidos" | "resgatados" | "crescimento";
 
 // ── Onboarding ────────────────────────────────────────────────────────────────
+// Ordem reflete a jornada real de configuração: mecânica → canais → tiers → catálogo → campanha.
 
 const SETUP_STEPS = [
-  { id: "campaign", icon: Sparkles,   title: "Crie sua primeira campanha",         desc: "Escolha um modelo e configure em menos de 5 minutos.",    href: "/campanhas/nova", cta: "Criar campanha",    color: "bg-violet-50 border-violet-200",  iconColor: "text-violet-600 bg-violet-100" },
-  { id: "tiers",    icon: ShieldCheck, title: "Configure os tiers",                desc: "Defina limiares de pontos e benefícios por nível.",        href: "/membros/tier",   cta: "Configurar tiers",  color: "bg-amber-50 border-amber-200",    iconColor: "text-amber-600 bg-amber-100"  },
-  { id: "catalog",  icon: Gift,        title: "Adicione recompensas ao catálogo",  desc: "Cadastre os primeiros produtos para os membros resgatarem.", href: "/catalogo",       cta: "Abrir catálogo",    color: "bg-emerald-50 border-emerald-200",iconColor: "text-emerald-600 bg-emerald-100" },
+  { id: "mecanica", icon: Sliders,     title: "Configure a mecânica do programa",  desc: "Taxa de acúmulo, multiplicador por tier e regras de resgate.", href: "/mecanica",       cta: "Configurar mecânica", color: "bg-sky-50 border-sky-200",        iconColor: "text-sky-600 bg-sky-100"      },
+  { id: "canais",   icon: Building2,   title: "Cadastre canais e filiais",         desc: "Defina onde as vendas e eventos do programa acontecem.",       href: "/canais-filiais", cta: "Configurar canais",   color: "bg-blue-50 border-blue-200",      iconColor: "text-blue-600 bg-blue-100"    },
+  { id: "tiers",    icon: ShieldCheck, title: "Configure os tiers",                desc: "Defina limiares de pontos e benefícios por nível.",            href: "/membros/tier",   cta: "Configurar tiers",    color: "bg-amber-50 border-amber-200",    iconColor: "text-amber-600 bg-amber-100"  },
+  { id: "produtos", icon: TrendingUp,  title: "Cadastre produtos incentivados",    desc: "Defina quais produtos geram pontos quando comprados.",        href: "/catalogo-produtos", cta: "Configurar produtos", color: "bg-teal-50 border-teal-200",      iconColor: "text-teal-600 bg-teal-100"    },
+  { id: "catalog",  icon: Gift,        title: "Adicione recompensas ao catálogo",  desc: "Cadastre os primeiros produtos para os membros resgatarem.",  href: "/catalogo",       cta: "Abrir catálogo",      color: "bg-emerald-50 border-emerald-200",iconColor: "text-emerald-600 bg-emerald-100" },
+  { id: "campaign", icon: Sparkles,    title: "Crie sua primeira campanha",        desc: "Escolha um modelo e configure em menos de 5 minutos.",         href: "/campanhas/nova", cta: "Criar campanha",      color: "bg-violet-50 border-violet-200",  iconColor: "text-violet-600 bg-violet-100" },
 ];
 
+const ONBOARDING_KEY = "motor_pontos_onboarding_done";
+
+function getOnboardingDone(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(ONBOARDING_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+function saveOnboardingDone(ids: string[]) {
+  localStorage.setItem(ONBOARDING_KEY, JSON.stringify(ids));
+}
+
 function OnboardingCard({ onDismiss }: { onDismiss: () => void }) {
-  const [done, setDone] = useState<string[]>([]);
+  const [done, setDone] = useState<string[]>(() => getOnboardingDone());
   const allDone = done.length === SETUP_STEPS.length;
   return (
     <Card className="border-primary/20 bg-primary/5 overflow-hidden">
@@ -45,7 +63,7 @@ function OnboardingCard({ onDismiss }: { onDismiss: () => void }) {
           <div className="h-1.5 rounded-full bg-primary transition-all" style={{ width: `${(done.length / SETUP_STEPS.length) * 100}%` }} />
         </div>
       </div>
-      <div className="grid gap-3 px-5 pb-5 sm:grid-cols-3">
+      <div className="grid gap-3 px-5 pb-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {SETUP_STEPS.map((step) => {
           const Icon = step.icon;
           const isDone = done.includes(step.id);
@@ -64,7 +82,7 @@ function OnboardingCard({ onDismiss }: { onDismiss: () => void }) {
                   <Button asChild size="sm" className="h-7 text-xs flex-1">
                     <Link to={step.href}>{step.cta} <ChevronRight className="size-3 ml-1" /></Link>
                   </Button>
-                  <button onClick={() => setDone(p => [...p, step.id])} className="text-xs text-muted-foreground hover:text-foreground underline">já fiz</button>
+                  <button onClick={() => setDone(p => { const next = [...p, step.id]; saveOnboardingDone(next); return next; })} className="text-xs text-muted-foreground hover:text-foreground underline">já fiz</button>
                 </div>
               )}
             </div>

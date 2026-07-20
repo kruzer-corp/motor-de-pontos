@@ -1,24 +1,6 @@
-import { MOEDA } from "../config/programa";
-
 // ── Tipos compartilhados entre a listagem (Minhas Campanhas) e o wizard ───────
 
 export type CampStatus = "ativa" | "pausada" | "agendada" | "rascunho" | "encerrada" | "arquivada";
-
-export type Classificacao = {
-  id: string; nome: string; cor: string;
-  pontosPorReal: string; temBonus: boolean; bonus: string;
-};
-
-export type Cluster = {
-  id: string;
-  nome: string;
-  segmento: string;
-  tiers: string[];
-  fontes: string[];
-  categoria: string;
-  resultadoTipo: "taxa" | "multiplicador";
-  resultadoValor: string;
-};
 
 export type Form = {
   codigo: string; nome: string; descricao: string; segmento: string;
@@ -26,24 +8,18 @@ export type Form = {
   periodoInicio: string; periodoFim: string;
   // Gatilho — o que dispara a pontuação desta campanha
   gatilhoTipo: "pedido" | "evento";
-  gatilhoEvento: string; // usado quando gatilhoTipo === "evento": cadastro, aniversario, indicacao, avaliacao, outro
+  gatilhoEvento: string; // usado quando gatilhoTipo === "evento" — hoje só existe "cadastro" (entrada no programa)
+  // Valor fixo do bônus — única pontuação definida na campanha (só usada quando gatilhoTipo === "evento").
+  // Acúmulo por pedido, multiplicador por tier e resgate são sempre definidos na Mecânica do Programa.
+  taxaValor: string;
   fontes: Record<string, boolean>;
   pdvEscopo: "todas" | "especificas";
   pdvFiliais: string[];
-  // Pontuação base da campanha
-  moedaCampanha: string;
-  taxaTipo: "taxa" | "fixo" | "multiplicador";
-  taxaValor: string;
-  arredondamento: "baixo" | "cima" | "proximo";
   statusConceder: Record<string, boolean>;
   diasCreditado: string;
   statusAnular: Record<string, boolean>;
-  classificacoes: Classificacao[];
-  moedas: Record<string, { ativo: boolean; valor: string }>;
   produtosElegiveis: string[];
-  // Grupos de regras
-  clusters: Cluster[];
-  clustersEstrategia: "primeira" | "acumula" | "maior_valor";
+  categoriasExcluidas: string[]; // categorias de produto que NÃO geram pontos nesta campanha
   // Limites e vigência
   liberacaoTipo: "imediato" | "dias";
   liberacaoDias: string;
@@ -56,19 +32,6 @@ export type Form = {
   tetoEmissaoAtivo: boolean;
   tetoEmissaoPts: string;
   cancelamentoPolicy: "estornar_tudo" | "estornar_proporcional" | "manter";
-  aprovacaoTipo: "manual" | "automatica";
-  aprovacaoTiposResgate: string[];
-  aprovacaoValorMax: string;
-  aprovacaoTiers: string[];
-  // Regras de resgate — o que essa campanha libera pra troca, e com que limite
-  resgateSaldoMinimo: string;
-  resgateLimiteAtivo: boolean;
-  resgateLimitePts: string;
-  resgateLimiteEscopo: "mes" | "campanha" | "ilimitado";
-  resgateProdutosVinculados: string[];
-  multAlvo: "membro" | "produto";
-  multBronze: string; multPrata: string; multOuro: string; multDiamante: string;
-  multProdutos: Record<string, string>;
 };
 
 export const DEFAULTS: Form = {
@@ -77,17 +40,15 @@ export const DEFAULTS: Form = {
   periodoInicio: "", periodoFim: "",
   gatilhoTipo: "pedido",
   gatilhoEvento: "cadastro",
+  taxaValor: "",
   fontes: { portal: true, pdv: true, ecommerce: false, marketplace: false },
   pdvEscopo: "todas",
   pdvFiliais: [],
-  moedaCampanha: MOEDA.nome, taxaTipo: "taxa", taxaValor: "", arredondamento: "baixo",
   statusConceder: { Aprovado: false, Faturado: false, "Em separação": false, Entregue: false, Concluído: false, Cancelado: false, Devolvido: false, Recusado: false },
   diasCreditado: "",
   statusAnular:   { Aprovado: false, Faturado: false, "Em separação": false, Entregue: false, Concluído: false, Cancelado: false, Devolvido: false, Recusado: false },
-  classificacoes: [],
   produtosElegiveis: [],
-  clusters: [],
-  clustersEstrategia: "primeira",
+  categoriasExcluidas: [],
   liberacaoTipo: "imediato",
   liberacaoDias: "7",
   expiracaoTipo: "herdar",
@@ -99,24 +60,6 @@ export const DEFAULTS: Form = {
   tetoEmissaoAtivo: false,
   tetoEmissaoPts: "",
   cancelamentoPolicy: "estornar_tudo",
-  aprovacaoTipo: "automatica",
-  aprovacaoTiposResgate: ["voucher_digital"],
-  aprovacaoValorMax: "",
-  aprovacaoTiers: ["Bronze", "Prata", "Ouro", "Diamante"],
-  resgateSaldoMinimo: "",
-  resgateLimiteAtivo: false,
-  resgateLimitePts: "",
-  resgateLimiteEscopo: "mes",
-  resgateProdutosVinculados: [],
-  moedas: {
-    Pontos:   { ativo: true,  valor: "" },
-    Cashback: { ativo: false, valor: "" },
-    Milhas:   { ativo: false, valor: "" },
-    Créditos: { ativo: false, valor: "" },
-  },
-  multAlvo: "membro",
-  multBronze: "1", multPrata: "1.25", multOuro: "1.5", multDiamante: "2",
-  multProdutos: {},
 };
 
 export type Campanha = Form & {
@@ -135,9 +78,8 @@ const SEED: Campanha[] = [
     descricao: "Pontos na primeira compra de cada novo membro.",
     segmento: "todos", periodoInicio: "01/01/2026", periodoFim: "31/12/2026",
     fontes: { portal: true, pdv: true, ecommerce: true, marketplace: false },
+    categoriasExcluidas: ["Voucher"],
     statusConceder: { Aprovado: false, Faturado: false, "Em separação": false, Entregue: true, Concluído: true, Cancelado: false, Devolvido: false, Recusado: false },
-    taxaTipo: "taxa", taxaValor: "1", moedaCampanha: "Pontos",
-    multAlvo: "membro", multBronze: "1", multPrata: "1", multOuro: "1", multDiamante: "1",
     limiteAtivo: true, limitePts: "500", limiteEscopo: "membro_campanha",
     tetoEmissaoAtivo: false, tetoEmissaoPts: "",
     color: "bg-emerald-500",
@@ -148,8 +90,6 @@ const SEED: Campanha[] = [
     descricao: "2× pontos em todos os pedidos feitos no mês de aniversário do membro.",
     segmento: "todos", periodoInicio: "01/01/2026", periodoFim: "31/12/2026",
     fontes: { portal: true, pdv: true, ecommerce: true, marketplace: false },
-    taxaTipo: "taxa", taxaValor: "2", moedaCampanha: "Pontos",
-    multAlvo: "membro", multBronze: "1", multPrata: "1", multOuro: "1", multDiamante: "1",
     limiteAtivo: true, limitePts: "2000", limiteEscopo: "membro_campanha",
     tetoEmissaoAtivo: false, tetoEmissaoPts: "",
     color: "bg-violet-500",
@@ -160,8 +100,6 @@ const SEED: Campanha[] = [
     descricao: "Campanha sazonal com multiplicadores por tier e teto de emissão.",
     segmento: "todos", periodoInicio: "01/07/2026", periodoFim: "31/08/2026",
     fontes: { portal: true, pdv: false, ecommerce: true, marketplace: true },
-    taxaTipo: "taxa", taxaValor: "1", moedaCampanha: "Pontos",
-    multAlvo: "membro", multBronze: "1", multPrata: "1.25", multOuro: "1.5", multDiamante: "2",
     limiteAtivo: false, limitePts: "", limiteEscopo: "membro_campanha",
     tetoEmissaoAtivo: true, tetoEmissaoPts: "500000",
     color: "bg-sky-500",
@@ -173,8 +111,6 @@ const SEED: Campanha[] = [
     segmento: "todos", periodoInicio: "27/11/2026", periodoFim: "30/11/2026",
     agendadaPara: "27/11/2026 00:00",
     fontes: { portal: true, pdv: true, ecommerce: true, marketplace: false },
-    taxaTipo: "taxa", taxaValor: "3", moedaCampanha: "Pontos",
-    multAlvo: "membro", multBronze: "1", multPrata: "1.25", multOuro: "1.5", multDiamante: "2",
     limiteAtivo: true, limitePts: "4000", limiteEscopo: "membro_campanha",
     tetoEmissaoAtivo: true, tetoEmissaoPts: "800000",
     color: "bg-indigo-500",
@@ -185,8 +121,6 @@ const SEED: Campanha[] = [
     descricao: "Pontos extras para afiliados com compras recorrentes pelo PDV.",
     segmento: "arquiteto", periodoInicio: "", periodoFim: "",
     fontes: { portal: false, pdv: true, ecommerce: false, marketplace: false },
-    taxaTipo: "taxa", taxaValor: "1.5", moedaCampanha: "Pontos",
-    multAlvo: "membro", multBronze: "1", multPrata: "1.25", multOuro: "1.5", multDiamante: "2",
     limiteAtivo: true, limitePts: "3000", limiteEscopo: "membro_dia",
     tetoEmissaoAtivo: true, tetoEmissaoPts: "200000",
     color: "bg-blue-500",
@@ -197,8 +131,6 @@ const SEED: Campanha[] = [
     descricao: "2× pontos em Eletrônicos durante todo o mês de junho.",
     segmento: "todos", periodoInicio: "01/06/2026", periodoFim: "30/06/2026",
     fontes: { portal: true, pdv: true, ecommerce: false, marketplace: false },
-    taxaTipo: "taxa", taxaValor: "2", moedaCampanha: "Pontos",
-    multAlvo: "membro", multBronze: "1", multPrata: "1.25", multOuro: "1.5", multDiamante: "2",
     limiteAtivo: true, limitePts: "5000", limiteEscopo: "membro_campanha",
     tetoEmissaoAtivo: true, tetoEmissaoPts: "300000",
     color: "bg-amber-500",
@@ -209,8 +141,6 @@ const SEED: Campanha[] = [
     descricao: "Pontos em dobro para compras de presente no Dia das Mães.",
     segmento: "todos", periodoInicio: "05/05/2025", periodoFim: "12/05/2025",
     fontes: { portal: true, pdv: false, ecommerce: true, marketplace: false },
-    taxaTipo: "taxa", taxaValor: "2", moedaCampanha: "Pontos",
-    multAlvo: "membro", multBronze: "1", multPrata: "1", multOuro: "1", multDiamante: "1",
     limiteAtivo: false, limitePts: "", limiteEscopo: "membro_campanha",
     tetoEmissaoAtivo: false, tetoEmissaoPts: "",
     color: "bg-pink-500",
@@ -221,7 +151,7 @@ const SEED: Campanha[] = [
     descricao: "Pontos concedidos uma única vez quando o membro entra no programa — não depende de pedido.",
     gatilhoTipo: "evento", gatilhoEvento: "cadastro",
     segmento: "todos", periodoInicio: "01/01/2026", periodoFim: "31/12/2026",
-    taxaTipo: "fixo", taxaValor: "50", moedaCampanha: "Pontos",
+    taxaValor: "50",
     color: "bg-teal-500",
   },
 ];

@@ -11,7 +11,7 @@ import {
 import { AlertTriangle, Ban, FileCheck, FileCheck2, MoreHorizontal, Package, Pencil, RotateCcw, Upload, CheckCheck, UserCircle } from "lucide-react";
 import { CustomTag } from "../components/CustomTag";
 import { TIPO_RESGATE_LABEL, TIPO_RESGATE_ICON } from "../config/resgateLifecycle";
-import { getCampanha } from "../lib/campanhas";
+import { getMecanica } from "../lib/mecanica";
 import { registrarTransacaoSaldo } from "../lib/membros";
 
 // ── Fluxo Documental ──────────────────────────────────────────────────────────
@@ -298,14 +298,15 @@ export const ORDERS: Order[] = [
 ];
 
 // ── Aprovação automática ──────────────────────────────────────────────────────
-// Conecta a config "Aprovação de resgates" do wizard de campanhas à fila real.
+// Conecta a config "Aprovação de resgates" da Mecânica do Programa à fila real —
+// a aprovação nunca é definida por campanha.
 
 export function deveAprovarAutomaticamente(order: Order): boolean {
   if (order.tipoResgate === "credito_conta") return false; // sempre exige documento (RPA/NF)
-  const campanha = getCampanha(order.campanhaId);
-  if (!campanha || campanha.aprovacaoTipo !== "automatica") return false;
-  if (campanha.aprovacaoValorMax && order.valorTotal > Number(campanha.aprovacaoValorMax)) return false;
-  if (campanha.aprovacaoTiers.length > 0 && !campanha.aprovacaoTiers.includes(order.memberTier)) return false;
+  const mecanica = getMecanica();
+  if (mecanica.aprovacaoTipo !== "automatica") return false;
+  if (mecanica.aprovacaoValorMax && order.valorTotal > Number(mecanica.aprovacaoValorMax)) return false;
+  if (mecanica.aprovacaoTiers.length > 0 && !mecanica.aprovacaoTiers.includes(order.memberTier)) return false;
   return true;
 }
 
