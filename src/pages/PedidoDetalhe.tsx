@@ -10,6 +10,7 @@ import { renderCrumbLink } from "../lib/crumbLink";
 import type { OrderStatus, Order } from "./Pedidos";
 import { LIFECYCLE_POR_TIPO, TIPO_RESGATE_LABEL, TIPO_RESGATE_ICON, proximoStatus } from "../config/resgateLifecycle";
 import { registrarTransacaoSaldo } from "../lib/membros";
+import { ehV1 } from "../lib/versao";
 
 // ── Lifecycle definition ──────────────────────────────────────────────────────
 
@@ -112,7 +113,7 @@ export default function PedidoDetalhe() {
   const navigate = useNavigate();
 
   // Local state copy so we can mutate status in the prototype
-  const [orders, setOrders] = useState<Order[]>(() => aplicarAprovacaoAutomatica(ORDERS));
+  const [orders, setOrders] = useState<Order[]>(() => (ehV1() ? [] : aplicarAprovacaoAutomatica(ORDERS)));
   const [confirmApprove,  setConfirmApprove]  = useState(false);
   const [confirmAdvance,  setConfirmAdvance]  = useState(false);
   const [confirmReject,   setConfirmReject]   = useState(false);

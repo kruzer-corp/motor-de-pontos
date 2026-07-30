@@ -4,7 +4,6 @@ import {
 } from "@kruzer/ds";
 import { FileText, Package } from "lucide-react";
 import { MOEDA } from "../config/programa";
-import { CustomTag } from "../components/CustomTag";
 
 function gerarPDF(o: Orcamento) {
   const html = `<!DOCTYPE html>
@@ -124,7 +123,7 @@ export default function Orcamentos() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={<span className="flex items-center gap-2">Orçamentos <CustomTag /></span>}
+        title="Orçamentos"
         path={[{ label: "Operação" }]}
         description="Orçamentos de resgate solicitados pelos membros via portal."
       />

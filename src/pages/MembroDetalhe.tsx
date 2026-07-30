@@ -11,7 +11,7 @@ import { ArrowLeft, ArrowDownLeft, ArrowUpRight, Clock, Plus, X, CheckCircle2, X
 import { renderCrumbLink } from "../lib/crumbLink";
 import {
   getMembro, upsertMembro, registrarTransacaoSaldo,
-  avaliarEventosMembro, creditarEventosAcumulo, creditarBonusEventos,
+  avaliarEventosMembro, creditarEventosAcumulo,
   MOEDA_COR, agruparSaldosPorMoeda, type Tier,
 } from "../lib/membros";
 
@@ -91,13 +91,10 @@ export default function MembroDetalhe() {
   const [bloqueioMotivo, setBloqueioMotivo] = useState("");
   const [bloqueioSaving, setBloqueioSaving] = useState(false);
 
-  // Roda o motor de acúmulo uma vez, na montagem — credita os eventos elegíveis e os bônus de cadastro no ledger real.
+  // Roda o motor de acúmulo uma vez, na montagem — credita os eventos elegíveis (compra, cadastro, indicação) no ledger real.
   useState(() => {
     const m = getMembro(id) ?? getMembro("1");
-    if (m) {
-      creditarEventosAcumulo(m.id, avaliarEventosMembro(m));
-      creditarBonusEventos(m);
-    }
+    if (m) creditarEventosAcumulo(m.id, avaliarEventosMembro(m));
     return null;
   });
 

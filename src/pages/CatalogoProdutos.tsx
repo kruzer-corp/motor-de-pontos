@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { Link } from "react-router-dom";
 import {
   Avatar, AvatarFallback, Button, EmptyState, FormDrawer,
   Input, Label, PageHeader, Pill, SearchInput,
@@ -6,15 +7,19 @@ import {
   toast,
 } from "@kruzer/ds";
 import {
-  AlertCircle, Archive, CheckCircle, Clock, Download, ExternalLink,
-  LayoutGrid, List, Package, Pencil, Plus, RotateCcw, ShieldCheck, TrendingUp, Trash2, Upload, X, XCircle,
+  Archive, CheckCircle, Clock, Download, ExternalLink, Layers,
+  LayoutGrid, List, Package, Pencil, Plus, RotateCcw, ShieldCheck, TrendingUp, Trash2, X,
 } from "lucide-react";
 import { MOEDA } from "../config/programa";
-import { getCampanhas } from "../lib/campanhas";
 import {
-  type Produto, type ProdutoStatus, type CampanhaParticipante, type HistoricoEvento,
-  CATEGORIAS, getProdutos, saveProdutos,
+  type Produto, type ProdutoStatus, type CampanhaParticipante, type HistoricoEvento, type ModeloVenda,
+  CATEGORIAS, MODELO_VENDA_LABEL, getProdutos, saveProdutos,
 } from "../lib/produtos";
+import { getTiersProduto } from "../lib/tiersProduto";
+import {
+  type GrupoProdutos, getGruposProdutos, saveGruposProdutos,
+} from "../lib/gruposProdutos";
+import { GrupoModal } from "../components/GrupoModal";
 
 // ── Detalhe do produto (panel lateral) ───────────────────────────────────────
 
@@ -30,11 +35,11 @@ const CAMP_STATUS_PILL: Record<CampanhaParticipante["status"], "success" | "mute
   ativa: "success", encerrada: "muted", rascunho: "warning",
 };
 
-const PRODUTO_STATUS_PILL: Record<ProdutoStatus, "success" | "warning" | "muted"> = {
-  ativo: "success", pendente: "warning", arquivado: "muted",
+const PRODUTO_STATUS_PILL: Record<ProdutoStatus, "success" | "warning" | "muted" | "primary"> = {
+  ativo: "success", pendente: "warning", processando: "primary", arquivado: "muted",
 };
 const PRODUTO_STATUS_LABEL: Record<ProdutoStatus, string> = {
-  ativo: "Ativo", pendente: "Pendente", arquivado: "Arquivado",
+  ativo: "Ativo", pendente: "Pendente", processando: "Processando", arquivado: "Arquivado",
 };
 
 function ProdutoDetalhe({ produto, onClose, onEditar, onArquivar, onAprovar }: {
@@ -200,13 +205,13 @@ function ProdutoDetalhe({ produto, onClose, onEditar, onArquivar, onAprovar }: {
         <div className="px-5 py-3 border-t border-border shrink-0 flex justify-between items-center">
           <p className="text-xs text-muted-foreground">Cadastrado em {produto.criadoEm}</p>
           <div className="flex items-center gap-2">
-            {produto.status === "pendente" && (
+            {(produto.status === "pendente" || produto.status === "processando") && (
               <button onClick={onAprovar}
                 className="flex items-center gap-1.5 text-xs font-medium rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 px-3 py-1.5 transition-colors">
                 <CheckCircle className="h-3.5 w-3.5" />Aprovar produto
               </button>
             )}
-            {produto.status !== "pendente" && (
+            {produto.status !== "pendente" && produto.status !== "processando" && (
               <button onClick={onArquivar}
                 className={`flex items-center gap-1.5 text-xs font-medium rounded-lg border px-3 py-1.5 transition-colors ${
                   produto.status === "ativo"
@@ -226,186 +231,23 @@ function ProdutoDetalhe({ produto, onClose, onEditar, onArquivar, onAprovar }: {
 
 // ── Import modal ──────────────────────────────────────────────────────────────
 
-function ImportModal({ onClose, onConfirm }: { onClose: () => void; onConfirm: (produtos: Produto[]) => void }) {
-  const [step, setStep] = useState<"upload" | "processando" | "status">("upload");
-  const [progresso, setProgresso] = useState(0);
-  const [result, setResult] = useState<{
-    encontrados: Produto[]; naoEncontrados: string[];
-    excecoes: { produto: Produto; campanhas: string[] }[];
-  } | null>(null);
-
-  function processarArquivo(file: File) {
-    setStep("processando");
-    setProgresso(0);
-    const avanco = setInterval(() => {
-      setProgresso(p => Math.min(p + 8 + Math.random() * 10, 90));
-    }, 150);
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
-      const tokens = text.split(/[\n\r,;\t]+/).map(s => s.trim().replace(/['"]/g, "").toUpperCase()).filter(Boolean);
-      const encontrados = getProdutos().filter(p => tokens.includes(p.sku.toUpperCase()));
-      const skusEncontrados = new Set(encontrados.map(p => p.sku.toUpperCase()));
-      const naoEncontrados = tokens.filter(t => t.length > 2 && !skusEncontrados.has(t));
-
-      const campanhasAtivas = getCampanhas().filter(c => c.status === "ativa");
-      const excecoes = encontrados
-        .map(p => ({
-          produto: p,
-          campanhas: campanhasAtivas.filter(c => c.categoriasExcluidas.includes(p.categoria)).map(c => c.nome),
-        }))
-        .filter(x => x.campanhas.length > 0);
-
-      clearInterval(avanco);
-      setProgresso(100);
-      setTimeout(() => {
-        setResult({ encontrados, naoEncontrados: Array.from(new Set(naoEncontrados)), excecoes });
-        setStep("status");
-      }, 400);
-    };
-    reader.readAsText(file);
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-6" onClick={onClose}>
-      <div className="bg-background rounded-xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden max-h-[85vh]" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
-          <div>
-            <p className="text-sm font-bold">Importar produtos em lote</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {step === "upload" ? "Faça upload de um arquivo Excel ou CSV com os SKUs"
-                : step === "processando" ? "Processando arquivo…" : "Status da importação"}
-            </p>
-          </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
-        </div>
-        <div className="overflow-y-auto flex-1">
-          {step === "upload" && (
-            <div className="p-5 space-y-4">
-              <label className="flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-border bg-muted/30 px-6 py-10 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors">
-                <Upload className="h-8 w-8 text-muted-foreground" />
-                <div className="text-center">
-                  <p className="text-sm font-medium">Arraste o arquivo aqui ou clique para selecionar</p>
-                  <p className="text-xs text-muted-foreground mt-1">Excel (.xlsx, .xls) ou CSV — coluna com os SKUs</p>
-                </div>
-                <input type="file" accept=".csv,.xlsx,.xls,.txt" className="hidden"
-                  onChange={e => { const f = e.target.files?.[0]; if (f) processarArquivo(f); }} />
-              </label>
-              <div className="rounded-lg bg-muted/40 px-4 py-3 space-y-2">
-                <p className="text-xs font-semibold text-muted-foreground">Formato esperado</p>
-                <div className="font-mono text-xs bg-background border border-border rounded px-3 py-2 space-y-0.5">
-                  <p className="text-muted-foreground">SKU</p><p>TV-50-4K</p><p>FONE-BT-02</p>
-                </div>
-              </div>
-            </div>
-          )}
-          {step === "processando" && (
-            <div className="p-5 py-12 flex flex-col items-center gap-4">
-              <Upload className="h-8 w-8 text-muted-foreground animate-pulse" />
-              <div className="w-full space-y-1.5">
-                <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                  <div className="h-full rounded-full bg-primary transition-all duration-150" style={{ width: `${progresso}%` }} />
-                </div>
-                <p className="text-xs text-center text-muted-foreground">{Math.round(progresso)}%</p>
-              </div>
-            </div>
-          )}
-          {step === "status" && result && (
-            <div className="p-5 space-y-4">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-center">
-                  <p className="text-xl font-bold text-emerald-700">{result.encontrados.length}</p>
-                  <p className="text-xs text-emerald-600 mt-0.5">Encontrados</p>
-                </div>
-                <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-center">
-                  <p className="text-xl font-bold text-rose-700">{result.naoEncontrados.length}</p>
-                  <p className="text-xs text-rose-600 mt-0.5">Não encontrados</p>
-                </div>
-                <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-center">
-                  <p className="text-xl font-bold">{result.encontrados.length + result.naoEncontrados.length}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Total</p>
-                </div>
-              </div>
-              {result.excecoes.length > 0 && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 space-y-1.5">
-                  <p className="text-xs font-semibold text-amber-800 flex items-center gap-1.5">
-                    <AlertCircle className="h-3.5 w-3.5" />Exceção de categoria encontrada
-                  </p>
-                  {result.excecoes.map(({ produto, campanhas }) => (
-                    <p key={produto.id} className="text-xs text-amber-700">
-                      <span className="font-medium">{produto.nome}</span> ({produto.categoria}) — categoria excluída em: {campanhas.join(", ")}
-                    </p>
-                  ))}
-                  <p className="text-[11px] text-amber-700/80">Esses produtos ainda serão importados como Pendente, para revisão manual antes de aprovar.</p>
-                </div>
-              )}
-              {result.encontrados.length > 0 && (
-                <div className="space-y-1.5">
-                  <p className="text-xs font-semibold text-emerald-700 flex items-center gap-1.5"><CheckCircle className="h-3.5 w-3.5" />Encontrados</p>
-                  <div className="rounded-lg border border-emerald-200 overflow-hidden">
-                    {result.encontrados.map((p, i) => (
-                      <div key={p.id} className={`flex items-center gap-3 px-3 py-2.5 text-xs ${i < result.encontrados.length - 1 ? "border-b border-emerald-100" : ""}`}>
-                        <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                        <span className="flex-1 font-medium">{p.nome}</span>
-                        <span className="font-mono text-muted-foreground">{p.sku}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {result.naoEncontrados.length > 0 && (
-                <div className="space-y-1.5">
-                  <p className="text-xs font-semibold text-rose-700 flex items-center gap-1.5"><XCircle className="h-3.5 w-3.5" />Não encontrados</p>
-                  <div className="rounded-lg border border-rose-200 overflow-hidden">
-                    {result.naoEncontrados.map((sku, i) => (
-                      <div key={sku} className={`flex items-center gap-3 px-3 py-2.5 text-xs ${i < result.naoEncontrados.length - 1 ? "border-b border-rose-100" : ""}`}>
-                        <XCircle className="h-3.5 w-3.5 text-rose-400 shrink-0" />
-                        <span className="font-mono text-rose-700">{sku}</span>
-                      </div>
-                    ))}
-                  </div>
-                  {result.encontrados.length > 0 && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3" />Apenas os produtos encontrados serão adicionados.
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="flex gap-2 px-5 py-4 border-t border-border shrink-0">
-          {step === "upload" && <Button variant="outline" className="flex-1" onClick={onClose}>Cancelar</Button>}
-          {step === "status" && (
-            <>
-              <Button variant="outline" onClick={() => setStep("upload")}>Voltar</Button>
-              <Button className="flex-1" disabled={!result || result.encontrados.length === 0}
-                onClick={() => { if (result) { onConfirm(result.encontrados); onClose(); } }}>
-                Confirmar {result && result.encontrados.length > 0 ? `${result.encontrados.length} produto(s)` : ""}
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function CatalogoProdutos() {
   const [produtos, setProdutos] = useState<Produto[]>(() => getProdutos());
   useEffect(() => { saveProdutos(produtos); }, [produtos]);
+  const [grupos, setGrupos] = useState<GrupoProdutos[]>(() => getGruposProdutos());
+  useEffect(() => { saveGruposProdutos(grupos); }, [grupos]);
+  const [grupoModal, setGrupoModal] = useState<GrupoProdutos | null | "new">(null);
   const [search, setSearch]     = useState("");
   const [filtroCategoria, setFiltroCategoria] = useState<string>("todas");
   const [filtroStatus,    setFiltroStatus]    = useState<ProdutoStatus | "todos">("todos");
-  const [importOpen,  setImportOpen]  = useState(false);
+  const [filtroModelo,    setFiltroModelo]    = useState<ModeloVenda | "todos">("todos");
   const [detalheId,   setDetalheId]   = useState<string | null>(null);
   const [excluirId,   setExcluirId]   = useState<string | null>(null);
-  const [visualizacao, setVisualizacao] = useState<"lista" | "agrupado">("lista");
+  const [visualizacao, setVisualizacao] = useState<"lista" | "agrupado" | "grupos">("lista");
 
-  // Drawer — novo/editar
+  // Drawer — editar (cadastro de produto novo fica na Biblioteca)
   const [drawerOpen,  setDrawerOpen]  = useState(false);
   const [saving,      setSaving]      = useState(false);
   const [editandoId,  setEditandoId]  = useState<string | null>(null);
@@ -413,32 +255,56 @@ export default function CatalogoProdutos() {
   const [formNome,    setFormNome]    = useState("");
   const [formCategoria, setFormCategoria] = useState("");
   const [formPreco,   setFormPreco]   = useState("");
+  const [formTierProdutoId, setFormTierProdutoId] = useState("");
+  const [formModeloVenda, setFormModeloVenda] = useState<ModeloVenda | "">("");
+
+  const tiersProduto = getTiersProduto();
 
   const filtered = useMemo(() => produtos.filter(p => {
     const matchSearch    = !search || p.nome.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase());
     const matchCategoria = filtroCategoria === "todas" || p.categoria === filtroCategoria;
     const matchStatus    = filtroStatus === "todos" || p.status === filtroStatus;
-    return matchSearch && matchCategoria && matchStatus;
-  }), [produtos, search, filtroCategoria, filtroStatus]);
+    const matchModelo    = filtroModelo === "todos" || p.modeloVenda === filtroModelo;
+    return matchSearch && matchCategoria && matchStatus && matchModelo;
+  }), [produtos, search, filtroCategoria, filtroStatus, filtroModelo]);
 
   const produtoDetalhe = detalheId ? produtos.find(p => p.id === detalheId) ?? null : null;
 
   const agrupados = useMemo(() => {
-    const grupos = new Map<string, Produto[]>();
+    const porCategoria = new Map<string, Produto[]>();
     for (const p of filtered) {
-      const lista = grupos.get(p.categoria) ?? [];
+      const lista = porCategoria.get(p.categoria) ?? [];
       lista.push(p);
-      grupos.set(p.categoria, lista);
+      porCategoria.set(p.categoria, lista);
     }
     return CATEGORIAS
-      .filter(c => grupos.has(c))
-      .map(c => ({ categoria: c, produtos: grupos.get(c)! }));
+      .filter(c => porCategoria.has(c))
+      .map(c => ({ categoria: c, produtos: porCategoria.get(c)! }));
   }, [filtered]);
 
+  const agrupadosPorGrupo = useMemo(() => {
+    return grupos
+      .map((g) => ({ grupo: g, produtos: filtered.filter((p) => g.produtosIds.includes(p.id)) }))
+      .filter((x) => x.produtos.length > 0);
+  }, [filtered, grupos]);
+
+  function salvarGrupo(g: GrupoProdutos) {
+    setGrupos((prev) => (grupoModal === "new" ? [...prev, g] : prev.map((x) => (x.id === g.id ? g : x))));
+    setGrupoModal(null);
+  }
+
+  function excluirGrupo(id: string) {
+    setGrupos((prev) => prev.filter((g) => g.id !== id));
+    toast.success("Grupo removido");
+    setGrupoModal(null);
+  }
+
   function exportarCSV() {
-    const headers = ["SKU", "Nome", "Categoria", "Preço", "Status", "Criado em", "Campanhas vinculadas", `${MOEDA.nome} total gerado`];
+    const headers = ["SKU", "Nome", "Categoria", "Tier de produto", "Modelo de venda", "Preço", "Status", "Criado em", "Campanhas vinculadas", `${MOEDA.nome} total gerado`];
     const rows = filtered.map(p => [
       p.sku, p.nome, p.categoria,
+      tiersProduto.find(t => t.id === p.tierProdutoId)?.nome ?? "",
+      p.modeloVenda ?? "",
       p.preco.toLocaleString("pt-BR", { minimumFractionDigits: 2 }),
       PRODUTO_STATUS_LABEL[p.status],
       p.criadoEm,
@@ -453,22 +319,17 @@ export default function CatalogoProdutos() {
     toast.success("Planilha exportada");
   }
 
-  function abrirNovo() { setEditandoId(null); setFormSku(""); setFormNome(""); setFormCategoria(""); setFormPreco(""); setDrawerOpen(true); }
-  function abrirEditar(p: Produto) { setEditandoId(p.id); setFormSku(p.sku); setFormNome(p.nome); setFormCategoria(p.categoria); setFormPreco(String(p.preco || "")); setDrawerOpen(true); }
-  function fecharDrawer() { setDrawerOpen(false); setEditandoId(null); setFormSku(""); setFormNome(""); setFormCategoria(""); setFormPreco(""); }
+  function abrirEditar(p: Produto) { setEditandoId(p.id); setFormSku(p.sku); setFormNome(p.nome); setFormCategoria(p.categoria); setFormPreco(String(p.preco || "")); setFormTierProdutoId(p.tierProdutoId ?? ""); setFormModeloVenda(p.modeloVenda ?? ""); setDrawerOpen(true); }
+  function fecharDrawer() { setDrawerOpen(false); setEditandoId(null); setFormSku(""); setFormNome(""); setFormCategoria(""); setFormPreco(""); setFormTierProdutoId(""); setFormModeloVenda(""); }
 
   async function handleSave() {
-    if (!formSku || !formNome || !formCategoria) return;
+    if (!editandoId || !formSku || !formNome || !formCategoria) return;
     setSaving(true);
     await new Promise(r => setTimeout(r, 400));
-    if (editandoId) {
-      setProdutos(prev => prev.map(p => p.id === editandoId ? { ...p, sku: formSku, nome: formNome, categoria: formCategoria, preco: Number(formPreco.replace(",", ".")) || 0 } : p));
-      toast.success("Produto atualizado");
-    } else {
-      const novo: Produto = { id: `SKU-${String(produtos.length + 1).padStart(3, "0")}`, sku: formSku, nome: formNome, categoria: formCategoria, preco: Number(formPreco.replace(",", ".")) || 0, status: "ativo", campanhasVinculadas: [], criadoEm: new Date().toLocaleDateString("pt-BR"), campanhas: [], pedidos: [], historico: [{ data: new Date().toLocaleDateString("pt-BR"), evento: "Produto cadastrado", detalhe: "Adicionado ao catálogo", tipo: "criado" }] };
-      setProdutos(prev => [novo, ...prev]);
-      toast.success(`${formNome} adicionado ao catálogo`);
-    }
+    const tierProdutoId = formTierProdutoId || undefined;
+    const modeloVenda = formModeloVenda || undefined;
+    setProdutos(prev => prev.map(p => p.id === editandoId ? { ...p, sku: formSku, nome: formNome, categoria: formCategoria, preco: Number(formPreco.replace(",", ".")) || 0, tierProdutoId, modeloVenda } : p));
+    toast.success("Produto atualizado");
     setSaving(false);
     fecharDrawer();
   }
@@ -493,12 +354,6 @@ export default function CatalogoProdutos() {
     toast.success("Produto aprovado e habilitado no catálogo");
   }
 
-  function handleImportConfirm(importados: Produto[]) {
-    const novos = importados.filter(imp => !produtos.find(p => p.sku === imp.sku));
-    if (novos.length > 0) setProdutos(prev => [...novos.map(p => ({ ...p, status: "pendente" as ProdutoStatus, campanhasVinculadas: [] })), ...prev]);
-    toast.success(`${importados.length} produto(s) importado(s)`);
-  }
-
   function renderRow(p: Produto) {
     const totalMoeda = p.campanhas.reduce((a, c) => a + c.moedaGerada, 0);
     return (
@@ -517,6 +372,20 @@ export default function CatalogoProdutos() {
           </div>
         </td>
         <td className="px-4 py-3.5 text-sm text-muted-foreground whitespace-nowrap">{p.categoria}</td>
+        <td className="px-4 py-3.5 text-sm whitespace-nowrap">
+          {(() => {
+            const tier = tiersProduto.find(t => t.id === p.tierProdutoId);
+            return tier ? (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: tier.cor }} />
+                {tier.nome}
+              </span>
+            ) : <span className="text-muted-foreground">—</span>;
+          })()}
+        </td>
+        <td className="px-4 py-3.5 text-sm whitespace-nowrap">
+          {p.modeloVenda ?? <span className="text-muted-foreground">—</span>}
+        </td>
         <td className="px-4 py-3.5 text-sm whitespace-nowrap">
           {p.preco > 0 ? `R$ ${p.preco.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : <span className="text-muted-foreground">—</span>}
         </td>
@@ -545,13 +414,13 @@ export default function CatalogoProdutos() {
               className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
               <Pencil className="h-3.5 w-3.5" />
             </button>
-            {p.status === "pendente" && (
+            {(p.status === "pendente" || p.status === "processando") && (
               <button onClick={() => aprovar(p.id)} title="Aprovar"
                 className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-emerald-600 transition-colors">
                 <CheckCircle className="h-3.5 w-3.5" />
               </button>
             )}
-            {p.status !== "pendente" && (
+            {p.status !== "pendente" && p.status !== "processando" && (
               <button onClick={() => arquivar(p.id)}
                 title={p.status === "ativo" ? "Arquivar" : "Reativar"}
                 className={`p-1.5 rounded hover:bg-muted transition-colors ${p.status === "ativo" ? "text-muted-foreground hover:text-amber-600" : "text-muted-foreground hover:text-emerald-600"}`}>
@@ -579,17 +448,9 @@ export default function CatalogoProdutos() {
             produtos.some(p => p.status === "pendente") ? ` · ${produtos.filter(p => p.status === "pendente").length} pendente(s)` : ""
           } · ${produtos.length} no total`}
         actions={
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={exportarCSV}>
-              <Download className="mr-1.5 h-3.5 w-3.5" />Exportar planilha
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
-              <Upload className="mr-1.5 h-3.5 w-3.5" />Importar SKUs
-            </Button>
-            <Button size="sm" onClick={abrirNovo}>
-              <Plus className="mr-1.5 h-3.5 w-3.5" />Adicionar produto
-            </Button>
-          </div>
+          <Button size="sm" variant="outline" onClick={exportarCSV}>
+            <Download className="mr-1.5 h-3.5 w-3.5" />Exportar planilha
+          </Button>
         }
       />
 
@@ -597,7 +458,7 @@ export default function CatalogoProdutos() {
       <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-2.5">
         <TrendingUp className="h-4 w-4 text-primary shrink-0" />
         <p className="text-xs text-foreground">
-          Produto incentivado não é uma recompensa — é o item que <strong>gera pontos quando comprado</strong>. Ex: membro compra o produto X → acumula mais benefícios. Recompensas (o que o membro troca por pontos) ficam no Catálogo.
+          Produto incentivado não é uma recompensa — é o item que <strong>gera pontos quando comprado</strong>. Ex: membro compra o produto X → acumula mais benefícios. Recompensas (o que o membro troca por pontos) ficam no Catálogo. Pra cadastrar produto novo (manual, planilha ou integração), use a <Link to="/biblioteca" className="underline font-medium">Biblioteca</Link>.
         </p>
       </div>
 
@@ -607,6 +468,33 @@ export default function CatalogoProdutos() {
         <p className="text-xs text-muted-foreground">
           Acesso restrito a <strong className="text-foreground">Analista</strong> e <strong className="text-foreground">Master</strong> — visualize e administre todos os produtos incentivados do programa.
         </p>
+      </div>
+
+      {/* Grupos de Produtos */}
+      <div className="rounded-lg border border-border bg-card px-4 py-3 space-y-2.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+            <h2 className="text-sm font-semibold">Grupos de Produtos</h2>
+            <p className="text-xs text-muted-foreground">— agrupamento pra vitrine, não afeta regras.</p>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => setGrupoModal("new")}>
+            <Plus className="mr-1.5 h-3.5 w-3.5" />Novo grupo
+          </Button>
+        </div>
+        {grupos.length === 0 ? (
+          <p className="text-xs text-muted-foreground">Nenhum grupo criado ainda.</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {grupos.map((g) => (
+              <button key={g.id} onClick={() => setGrupoModal(g)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/30 hover:bg-muted px-3 py-1 text-xs font-medium transition-colors">
+                {g.nome}
+                <span className="text-muted-foreground/70">· {g.produtosIds.length}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="rounded-lg border border-border bg-card overflow-hidden">
@@ -630,7 +518,18 @@ export default function CatalogoProdutos() {
                 <SelectItem value="todos">Todos</SelectItem>
                 <SelectItem value="ativo">Ativos</SelectItem>
                 <SelectItem value="pendente">Pendentes</SelectItem>
+                <SelectItem value="processando">Processando</SelectItem>
                 <SelectItem value="arquivado">Arquivados</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-36 shrink-0">
+            <Select value={filtroModelo} onValueChange={v => setFiltroModelo(v as ModeloVenda | "todos")}>
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">1P e 3P</SelectItem>
+                <SelectItem value="1P">Só 1P</SelectItem>
+                <SelectItem value="3P">Só 3P</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -644,20 +543,24 @@ export default function CatalogoProdutos() {
               className={`p-1.5 rounded ${visualizacao === "agrupado" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
               <LayoutGrid className="h-3.5 w-3.5" />
             </button>
+            <button onClick={() => setVisualizacao("grupos")} title="Agrupado por Grupo de Produtos"
+              className={`p-1.5 rounded ${visualizacao === "grupos" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+              <Layers className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
 
         {filtered.length === 0 ? (
           <div className="p-10">
             <EmptyState icon={Package} title="Nenhum produto encontrado"
-              description="Ajuste os filtros ou adicione um novo produto ao catálogo." />
+              description="Ajuste os filtros ou cadastre produtos na Biblioteca." />
           </div>
         ) : visualizacao === "lista" ? (
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead className="bg-muted/20 border-b border-border">
                 <tr className="text-left text-muted-foreground">
-                  {["SKU", "Nome", "Categoria", "Preço", "Status", "Campanhas", `${MOEDA.nome} gerado`, ""].map(h => (
+                  {["SKU", "Nome", "Categoria", "Tier", "Modelo", "Preço", "Status", "Campanhas", `${MOEDA.nome} gerado`, ""].map(h => (
                     <th key={h} className="px-4 py-3 font-medium text-xs whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -667,7 +570,7 @@ export default function CatalogoProdutos() {
               </tbody>
             </table>
           </div>
-        ) : (
+        ) : visualizacao === "agrupado" ? (
           <div className="divide-y divide-border">
             {agrupados.map(({ categoria, produtos: produtosGrupo }) => (
               <div key={categoria} className="overflow-x-auto">
@@ -678,7 +581,36 @@ export default function CatalogoProdutos() {
                 <table className="min-w-full text-sm">
                   <thead className="bg-muted/20 border-b border-border">
                     <tr className="text-left text-muted-foreground">
-                      {["SKU", "Nome", "Categoria", "Preço", "Status", "Campanhas", `${MOEDA.nome} gerado`, ""].map(h => (
+                      {["SKU", "Nome", "Categoria", "Tier", "Modelo", "Preço", "Status", "Campanhas", `${MOEDA.nome} gerado`, ""].map(h => (
+                        <th key={h} className="px-4 py-3 font-medium text-xs whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {produtosGrupo.map(renderRow)}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </div>
+        ) : agrupadosPorGrupo.length === 0 ? (
+          <div className="p-10">
+            <EmptyState icon={Layers} title="Nenhum grupo com produtos ainda"
+              description="Crie um Grupo de Produtos acima e selecione quais produtos entram nele."
+              action={{ label: "Novo grupo", onClick: () => setGrupoModal("new") }} />
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {agrupadosPorGrupo.map(({ grupo, produtos: produtosGrupo }) => (
+              <div key={grupo.id} className="overflow-x-auto">
+                <div className="px-4 py-2.5 bg-muted/10 text-xs font-medium text-muted-foreground flex items-center gap-2">
+                  {grupo.nome}
+                  <span className="text-muted-foreground/70">· {produtosGrupo.length} produto(s)</span>
+                </div>
+                <table className="min-w-full text-sm">
+                  <thead className="bg-muted/20 border-b border-border">
+                    <tr className="text-left text-muted-foreground">
+                      {["SKU", "Nome", "Categoria", "Tier", "Modelo", "Preço", "Status", "Campanhas", `${MOEDA.nome} gerado`, ""].map(h => (
                         <th key={h} className="px-4 py-3 font-medium text-xs whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -692,6 +624,17 @@ export default function CatalogoProdutos() {
           </div>
         )}
       </div>
+
+      {/* Modal: Grupo de Produtos */}
+      {grupoModal !== null && (
+        <GrupoModal
+          initial={grupoModal === "new" ? undefined : grupoModal}
+          produtos={produtos}
+          onClose={() => setGrupoModal(null)}
+          onSave={salvarGrupo}
+          onExcluir={grupoModal !== "new" ? () => excluirGrupo(grupoModal.id) : undefined}
+        />
+      )}
 
       {/* Panel de detalhe */}
       {produtoDetalhe && (
@@ -734,20 +677,15 @@ export default function CatalogoProdutos() {
         );
       })()}
 
-      {/* Modal de importação */}
-      {importOpen && (
-        <ImportModal onClose={() => setImportOpen(false)} onConfirm={handleImportConfirm} />
-      )}
-
-      {/* Drawer — adicionar / editar */}
+      {/* Drawer — editar */}
       <FormDrawer
         open={drawerOpen}
         onOpenChange={v => { if (!v) fecharDrawer(); }}
-        title={editandoId ? "Editar produto" : "Adicionar produto"}
-        description={editandoId ? "Atualize os dados do produto no catálogo." : "Cadastre um novo produto elegível para acúmulo de moeda nas campanhas."}
+        title="Editar produto"
+        description="Atualize os dados do produto no catálogo."
         onSave={handleSave}
         saving={saving}
-        saveLabel={editandoId ? "Salvar alterações" : "Adicionar ao catálogo"}
+        saveLabel="Salvar alterações"
         saveDisabled={!formSku || !formNome || !formCategoria}
       >
         <div className="space-y-4">
@@ -771,6 +709,30 @@ export default function CatalogoProdutos() {
           <div className="space-y-1.5">
             <Label>Preço de referência (R$)</Label>
             <Input value={formPreco} onChange={e => setFormPreco(e.target.value.replace(/[^0-9.,]/g, ""))} placeholder="Ex: 199,90" inputMode="decimal" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Tier de produto</Label>
+            <Select value={formTierProdutoId || "nenhum"} onValueChange={v => setFormTierProdutoId(v === "nenhum" ? "" : v)}>
+              <SelectTrigger><SelectValue placeholder="Sem tier" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="nenhum">Sem tier</SelectItem>
+                {tiersProduto.map(t => <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {tiersProduto.length === 0 && (
+              <p className="text-xs text-muted-foreground">Nenhum tier cadastrado ainda — crie um na Biblioteca.</p>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <Label>Modelo de venda</Label>
+            <Select value={formModeloVenda || "nenhum"} onValueChange={v => setFormModeloVenda(v === "nenhum" ? "" : v as ModeloVenda)}>
+              <SelectTrigger><SelectValue placeholder="Não informado" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="nenhum">Não informado</SelectItem>
+                <SelectItem value="1P">{MODELO_VENDA_LABEL["1P"]}</SelectItem>
+                <SelectItem value="3P">{MODELO_VENDA_LABEL["3P"]}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </FormDrawer>

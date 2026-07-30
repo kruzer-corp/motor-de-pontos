@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Avatar, AvatarFallback, Button, EmptyState,
   FormDrawer, InfoNotice, Input, Label, PageHeader, Pill, SearchInput,
@@ -8,11 +8,14 @@ import {
   Tabs, TabsContent, TabsList, TabsTrigger,
   toast,
 } from "@kruzer/ds";
-import { ArrowUpRight, ArrowDownLeft, SlidersHorizontal, Clock, CheckCircle2, Ban, UserPlus, Users, X } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, SlidersHorizontal, Clock, CheckCircle2, Ban, Users, Pencil, X } from "lucide-react";
 import {
-  type Tier, type Segmento, type StatusMembro, type SaldoCampanha, type Membro, type Transacao,
+  type StatusMembro, type SaldoCampanha, type Membro, type Transacao,
   MOEDA_COR, agruparSaldosPorMoeda, getMembros, saveMembros, registrarTransacaoSaldo,
 } from "../lib/membros";
+import { getTiersMembro } from "../lib/tiers";
+import { getPapeisMembro } from "../lib/papeisMembro";
+import { getSegmentosMembro } from "../lib/segmentosMembro";
 
 // ── Config visual por tipo de movimentação (aba Movimentações) ───────────────
 
@@ -35,15 +38,7 @@ function parseData(d: string): number {
 // ── Aba Membros — saldo por moeda e ações de correção ─────────────────────────
 
 type Member = Membro;
-type Segment = Segmento;
 type Status = StatusMembro;
-
-const TIER_PILL: Record<Tier, "primary" | "warning" | "secondary" | "muted"> = {
-  Diamante: "primary", Ouro: "warning", Prata: "secondary", Bronze: "muted",
-};
-
-const TIERS:    Tier[]    = ["Diamante", "Ouro", "Prata", "Bronze"];
-const SEGMENTS: Segment[] = ["Premium", "Frete Grátis", "Fidelidade", "Básico"];
 
 function AbaMembros() {
   const navigate = useNavigate();
@@ -51,6 +46,7 @@ function AbaMembros() {
   const [members, setMembers] = useState<Member[]>(() => getMembros());
   const [search,  setSearch]  = useState("");
   const [tab,     setTab]     = useState<"todos" | "ativos" | "bloqueados">("todos");
+  const tiersMembro = getTiersMembro();
 
   function persist(next: Member[]) {
     setMembers(next);
@@ -85,8 +81,9 @@ function AbaMembros() {
     toast.success(`${m.nome} desbloqueado`);
   }
 
-  // ── Registrar membro ────────────────────────────────────────────────────────
+  // ── Registrar / editar membro ────────────────────────────────────────────────
   const [open,       setOpen]       = useState(false);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
   const [saving,     setSaving]     = useState(false);
   const [tipoPessoa, setTipoPessoa] = useState<"PF" | "PJ">("PF");
   const [name,       setName]       = useState("");
@@ -94,8 +91,11 @@ function AbaMembros() {
   const [email,      setEmail]      = useState("");
   const [documento,  setDocumento]  = useState("");
   const [phone,      setPhone]      = useState("");
-  const [tier,       setTier]       = useState<Tier | "">("");
-  const [segment,    setSegment]    = useState<Segment | "">();
+  const [tier,       setTier]       = useState<string>("");
+  const [segment,    setSegment]    = useState<string>("");
+  const [papel,      setPapel]      = useState<string>("");
+  const papeisMembro = getPapeisMembro();
+  const segmentosMembro = getSegmentosMembro();
 
   const filtered = useMemo(() => {
     const byTab = tab === "todos" ? members
@@ -139,57 +139,40 @@ function AbaMembros() {
   }
 
   function resetForm() {
+    setEditandoId(null);
     setTipoPessoa("PF"); setName(""); setRazaoSocial(""); setEmail("");
-    setDocumento(""); setPhone(""); setTier(""); setSegment("");
+    setDocumento(""); setPhone(""); setTier(""); setSegment(""); setPapel("");
+  }
+
+  function abrirEditar(m: Member) {
+    setEditandoId(m.id);
+    setTipoPessoa("PF"); setName(m.nome); setRazaoSocial("");
+    setEmail(m.email); setDocumento(m.cpf); setPhone(m.telefone);
+    setTier(m.tier); setSegment(m.segmento); setPapel(m.papel ?? "");
+    setOpen(true);
   }
 
   async function handleSave() {
-    if (!name || !email) return;
+    if (!editandoId || !name || !email) return;
     setSaving(true);
     await new Promise((r) => setTimeout(r, 500));
 
-    const initials = name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
-    const today = new Date().toLocaleDateString("pt-BR");
-
-    persist([
-      ...members,
-      {
-        id: String(members.length + 1),
-        nome: name,
-        initials,
-        cpf: documento,
-        email,
-        telefone: phone,
-        canal: "App",
-        saldos: [],
-        tier: (tier || "Bronze") as Tier,
-        segmento: (segment || "Básico") as Segment,
-        status: "ativo",
-        desde: today,
-        expiram30d: 0,
-        transacoes: [],
-        pedidos: [],
-        ajustes: [],
-      },
-    ]);
+    persist(members.map((m) => m.id === editandoId ? {
+      ...m, nome: name, email, cpf: documento, telefone: phone,
+      tier: tier || m.tier, segmento: segment || m.segmento,
+      papel: papel || undefined,
+    } : m));
+    toast.success(`${name} atualizado`);
 
     setOpen(false);
     resetForm();
     setSaving(false);
-    toast.success(`${name} cadastrado como membro`);
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <Button size="sm" onClick={() => setOpen(true)}>
-          <UserPlus className="mr-2 h-4 w-4" />
-          Registrar membro
-        </Button>
-      </div>
-
       <InfoNotice variant="info" title="Visão administrativa">
-        Membros não acessam esta interface. Eles participam do programa pelo canal próprio (loja, app ou dispositivo). Aqui você consulta e corrige o saldo (carteira) deles.
+        Membros não acessam esta interface. Eles participam do programa pelo canal próprio (loja, app ou dispositivo). Aqui você consulta e corrige o saldo (carteira) deles. Pra cadastrar membro novo (manual, planilha ou integração), use a <Link to="/biblioteca" className="underline font-medium">Biblioteca</Link>.
       </InfoNotice>
 
       <div className="rounded-lg border border-border bg-card overflow-hidden">
@@ -221,8 +204,7 @@ function AbaMembros() {
             <EmptyState
               icon={Users}
               title={search ? "Nenhum membro encontrado" : "Nenhum membro ainda"}
-              description={search ? "Tente buscar por outro nome ou segmento." : "Clique em \"Registrar membro\" para cadastrar o primeiro."}
-              action={!search ? { label: "Registrar membro", onClick: () => setOpen(true) } : undefined}
+              description={search ? "Tente buscar por outro nome ou segmento." : "Cadastre o primeiro na Biblioteca."}
             />
           </div>
         ) : (
@@ -283,13 +265,26 @@ function AbaMembros() {
                     )}
                   </td>
                   <td className="px-4 py-3.5">
-                    <Pill color={TIER_PILL[member.tier]} variant="soft" size="sm">{member.tier}</Pill>
+                    <span className="inline-flex items-center gap-1.5 text-sm">
+                      <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: tiersMembro.find((t) => t.nome === member.tier)?.cor ?? "#94a3b8" }} />
+                      {member.tier}
+                    </span>
                   </td>
-                  <td className="px-4 py-3.5 text-muted-foreground text-sm">{member.segmento}</td>
+                  <td className="px-4 py-3.5 text-muted-foreground text-sm">
+                    {member.segmento}
+                    {member.papel && <span className="ml-1.5 text-xs rounded-full bg-muted px-2 py-0.5">{member.papel}</span>}
+                  </td>
                   <td className="px-4 py-3.5 text-muted-foreground tabular-nums text-sm">{member.desde}</td>
                   <td className="px-4 py-3.5">
                     {member.status === "ativo" && (
                       <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => abrirEditar(member)}
+                          className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors whitespace-nowrap"
+                        >
+                          <Pencil className="h-3 w-3" />
+                          Editar
+                        </button>
                         <button
                           onClick={() => abrirAjuste(member)}
                           className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors whitespace-nowrap"
@@ -476,15 +471,15 @@ function AbaMembros() {
         </div>
       )}
 
-      {/* FormDrawer — Novo membro */}
+      {/* FormDrawer — editar membro */}
       <FormDrawer
         open={open}
         onOpenChange={(o) => { setOpen(o); if (!o) resetForm(); }}
-        title="Registrar membro"
-        description="Registre um participante no programa. As transações dele serão rastreadas automaticamente pelo canal."
+        title="Editar membro"
+        description="Atualize os dados do membro, inclusive tier e segmento."
         onSave={handleSave}
         saving={saving}
-        saveLabel="Cadastrar membro"
+        saveLabel="Salvar alterações"
         saveDisabled={!name || !email}
       >
         <div className="space-y-4">
@@ -537,22 +532,39 @@ function AbaMembros() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Tier inicial</Label>
-              <Select value={tier} onValueChange={(v) => setTier(v as Tier)}>
+              <Label>Tier</Label>
+              <Select value={tier} onValueChange={setTier}>
                 <SelectTrigger><SelectValue placeholder="Bronze" /></SelectTrigger>
-                <SelectContent>{TIERS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                <SelectContent>{tiersMembro.map((t) => <SelectItem key={t.id} value={t.nome}>{t.nome}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label>Segmento</Label>
-              <Select value={segment} onValueChange={(v) => setSegment(v as Segment)}>
-                <SelectTrigger><SelectValue placeholder="Básico" /></SelectTrigger>
-                <SelectContent>{SEGMENTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
+            {segmentosMembro.length > 0 && (
+              <div className="space-y-1.5">
+                <Label>Segmento</Label>
+                <Select value={segment || "nenhum"} onValueChange={(v) => setSegment(v === "nenhum" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="Sem segmento" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="nenhum">Sem segmento</SelectItem>
+                    {segmentosMembro.map((s) => <SelectItem key={s.id} value={s.nome}>{s.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <Label>Papel <span className="text-xs text-muted-foreground font-normal">(opcional — Biblioteca)</span></Label>
+            <Select value={papel || "nenhum"} onValueChange={(v) => setPapel(v === "nenhum" ? "" : v)}>
+              <SelectTrigger><SelectValue placeholder="Sem papel" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="nenhum">Sem papel</SelectItem>
+                {papeisMembro.map((p) => <SelectItem key={p.id} value={p.nome}>{p.nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {papeisMembro.length === 0 && <p className="text-xs text-muted-foreground">Nenhum papel cadastrado ainda — crie um em Biblioteca.</p>}
           </div>
         </div>
       </FormDrawer>
+
     </div>
   );
 }

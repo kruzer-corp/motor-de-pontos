@@ -9,10 +9,9 @@ import {
   toast,
 } from "@kruzer/ds";
 import { AlertTriangle, Ban, FileCheck, FileCheck2, MoreHorizontal, Package, Pencil, RotateCcw, Upload, CheckCheck, UserCircle } from "lucide-react";
-import { CustomTag } from "../components/CustomTag";
 import { TIPO_RESGATE_LABEL, TIPO_RESGATE_ICON } from "../config/resgateLifecycle";
-import { getMecanica } from "../lib/mecanica";
 import { registrarTransacaoSaldo } from "../lib/membros";
+import { ehV1 } from "../lib/versao";
 
 // ── Fluxo Documental ──────────────────────────────────────────────────────────
 
@@ -298,16 +297,11 @@ export const ORDERS: Order[] = [
 ];
 
 // ── Aprovação automática ──────────────────────────────────────────────────────
-// Conecta a config "Aprovação de resgates" da Mecânica do Programa à fila real —
-// a aprovação nunca é definida por campanha.
+// A configuração de aprovação de resgates foi removida da Mecânica do Programa
+// (pendente de redesenho) — todo resgate exige aprovação manual por enquanto.
 
-export function deveAprovarAutomaticamente(order: Order): boolean {
-  if (order.tipoResgate === "credito_conta") return false; // sempre exige documento (RPA/NF)
-  const mecanica = getMecanica();
-  if (mecanica.aprovacaoTipo !== "automatica") return false;
-  if (mecanica.aprovacaoValorMax && order.valorTotal > Number(mecanica.aprovacaoValorMax)) return false;
-  if (mecanica.aprovacaoTiers.length > 0 && !mecanica.aprovacaoTiers.includes(order.memberTier)) return false;
-  return true;
+export function deveAprovarAutomaticamente(_order: Order): boolean {
+  return false;
 }
 
 export function aplicarAprovacaoAutomatica(orders: Order[]): Order[] {
@@ -383,7 +377,7 @@ const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", curren
 export default function Pedidos() {
   const navigate = useNavigate();
   const [pageView, setPageView] = useState<"pedidos" | "documental">("pedidos");
-  const [orders, setOrders] = useState<Order[]>(() => aplicarAprovacaoAutomatica(ORDERS));
+  const [orders, setOrders] = useState<Order[]>(() => (ehV1() ? [] : aplicarAprovacaoAutomatica(ORDERS)));
   const [search, setSearch] = useState("");
   const [tab,    setTab]    = useState("todos");
 
@@ -429,7 +423,6 @@ export default function Pedidos() {
             }`}
           >
             {label}
-            {view === "documental" && <CustomTag className="scale-90" />}
           </button>
         ))}
       </div>

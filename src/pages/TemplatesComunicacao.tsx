@@ -5,6 +5,7 @@ import {
 import { ArrowLeft, Eye, Mail, MessageSquare, Pencil, Plus, RotateCcw, Save, Smartphone } from "lucide-react";
 import { renderCrumbLink } from "../lib/crumbLink";
 import { MOEDA } from "../config/programa";
+import { ehV1 } from "../lib/versao";
 
 type Canal  = "email" | "push" | "sms";
 type Evento = "boas_vindas" | "pontos_creditados" | "pontos_expirando" | "nivel_atingido" | "resgate_aprovado" | "manual";
@@ -367,7 +368,7 @@ const NEW_TEMPLATE: Template = {
 };
 
 export default function TemplatesComunicacao() {
-  const [templates, setTemplates] = useState<Template[]>(INITIAL);
+  const [templates, setTemplates] = useState<Template[]>(() => (ehV1() ? [] : INITIAL));
   const [editing,   setEditing]   = useState<Template | null>(null);
 
   function handleSave(t: Template) {

@@ -7,6 +7,7 @@ import {
 import { CalendarClock, Pencil, Plus, ShoppingCart, Target, Users, Zap, Star, ArchiveX } from "lucide-react";
 import { renderCrumbLink } from "../lib/crumbLink";
 import { MOEDA } from "../config/programa";
+import { ehV1 } from "../lib/versao";
 
 type MissaoStatus = "ativa" | "rascunho" | "encerrada";
 type MissaoTipo   = "frequencia" | "volume" | "indicacao" | "engajamento";
@@ -245,7 +246,7 @@ const FORM_DEFAULTS: FormState = {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function Missoes() {
-  const [missoes,  setMissoes]  = useState<Missao[]>(INITIAL);
+  const [missoes,  setMissoes]  = useState<Missao[]>(() => (ehV1() ? [] : INITIAL));
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [saving,     setSaving]     = useState(false);
   const [editId,     setEditId]     = useState<string | null>(null);

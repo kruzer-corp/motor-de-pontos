@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { renderCrumbLink } from "../lib/crumbLink";
 import { type Campanha, type CampStatus, getCampanhas, saveCampanhas } from "../lib/campanhas";
+import { GATILHO_LABEL } from "../lib/regras";
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -57,7 +58,7 @@ function CampRow({ c, onArchive, onUnarchive, onDuplicate, onPublish, onPause, o
   onDelete: (c: Campaign) => void;
 }) {
   const sp = STATUS_PILL[c.status];
-  const fontesAtivas = FONTE_META.filter(f => c.fontes[f.key]);
+  const fontesAtivas = FONTE_META.filter(f => c.canais.includes(f.key));
 
   return (
     <TableRow className={`[&>td]:py-3.5 ${c.status === "arquivada" ? "opacity-60" : ""}`}>
@@ -77,8 +78,8 @@ function CampRow({ c, onArchive, onUnarchive, onDuplicate, onPublish, onPause, o
       <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
         {c.periodoInicio ? `${c.periodoInicio} – ${c.periodoFim}` : "—"}
       </TableCell>
-      <TableCell className="text-xs text-muted-foreground capitalize">
-        {c.segmento !== "todos" ? c.segmento : "Todos"}
+      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+        {GATILHO_LABEL[c.gatilhoTipo]}
       </TableCell>
       <TableCell>
         {fontesAtivas.length > 0 ? (
@@ -274,8 +275,8 @@ export default function Campanhas() {
                 <TableHead>Campanha</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Vigência</TableHead>
-                <TableHead>Segmento</TableHead>
-                <TableHead>Fontes</TableHead>
+                <TableHead>Gatilho</TableHead>
+                <TableHead>Canais</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>

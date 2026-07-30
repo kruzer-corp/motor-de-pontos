@@ -5,7 +5,7 @@ import {
   SearchInput, Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
   toast,
 } from "@kruzer/ds";
-import { CustomTag } from "../components/CustomTag";
+import { ehV1 } from "../lib/versao";
 
 // ── Status compartilhado ───────────────────────────────────────────────────────
 
@@ -95,7 +95,7 @@ function AcoesCell({ status, onAprovar, onReprovar }: { status: IndicStatus; onA
 
 
 function TabVendas() {
-  const [indicacoes, setIndicacoes] = useState<IndicacaoVenda[]>(VENDAS_MOCK);
+  const [indicacoes, setIndicacoes] = useState<IndicacaoVenda[]>(() => (ehV1() ? [] : VENDAS_MOCK));
   const [query,      setQuery]      = useState("");
   const [filtroStatus, setFiltroStatus] = useState<IndicStatus | "todos">("todos");
 
@@ -138,7 +138,7 @@ function TabVendas() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3">
-        <InfoNotice variant="warning" title={<span className="flex items-center gap-2">Consulta de Indicação de Vendas <CustomTag /></span>}>
+        <InfoNotice variant="warning" title="Consulta de Indicação de Vendas">
           Funcionalidade específica do programa Fast PRO — arquitetos e vendedores que indicam vendas a clientes e recebem comissão ou pontos por conversão.
         </InfoNotice>
         <Button size="sm" variant="outline" className="shrink-0" onClick={exportarCSV}>

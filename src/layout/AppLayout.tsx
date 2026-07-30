@@ -5,8 +5,11 @@ import {
   LayoutDashboard, Users, User, ShieldCheck, Sparkles, Boxes, Building2,
   ChevronDown, ChevronsLeft, ChevronsRight,
   Trophy, History, ScrollText, Share2,
-  Palette, Webhook, Sliders,
+  Palette, Webhook, Sliders, Library,
 } from "lucide-react";
+import VersaoSwitcher from "../components/VersaoSwitcher";
+import { ehV1 } from "../lib/versao";
+import { onboardingCompleto } from "../lib/onboarding";
 
 // ── Tenants ───────────────────────────────────────────────────────────────────
 
@@ -75,6 +78,7 @@ const MENU: MenuItem[] = [
   // ── CONFIGURAÇÃO DO PROGRAMA ───────────────────────────────────────────────
   { section: "Configuração do Programa" },
   { to: "/mecanica",       label: "Mecânica do Programa", icon: Sliders },
+  { to: "/biblioteca",     label: "Biblioteca",           icon: Library },
   { to: "/canais-filiais", label: "Canais e Filiais",   icon: Building2 },
   { to: "/usuarios",       label: "Usuários & Papéis",  icon: User      },
   { to: "/membros/tier", label: "Tier e Segmentação", icon: ShieldCheck },
@@ -418,6 +422,20 @@ export default function AppLayout() {
   const [sidebarHover,     setSidebarHover]     = useState(false);
   const mode: TenantMode = "custom"; // admin sempre mostra tudo
   const visibleMenu = filterMenu(MENU, mode);
+  const location = useLocation();
+
+  // Canais e Filiais também é uma tela de apoio do onboarding — enquanto o
+  // primeiro acesso não estiver completo, ela mesma assume a moldura de tela
+  // cheia (sem sidebar). Fora do onboarding, segue com o layout normal.
+  const semChrome = location.pathname === "/canais-filiais" && ehV1() && !onboardingCompleto();
+
+  if (semChrome) {
+    return (
+      <TooltipProvider>
+        <Outlet />
+      </TooltipProvider>
+    );
+  }
 
   return (
     <TooltipProvider>
@@ -441,6 +459,8 @@ export default function AppLayout() {
           </div>
         </main>
       </div>
+
+      <VersaoSwitcher />
     </div>
     </TooltipProvider>
   );

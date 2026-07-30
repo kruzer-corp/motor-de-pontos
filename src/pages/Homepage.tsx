@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { CustomTag } from "../components/CustomTag";
 import { Card, CardHeader, CardTitle, CardContent, Button, Switch, Badge } from "@kruzer/ds";
 import { PanelTop, GripVertical, Pencil, Eye, X, ShoppingBag, Star, ChevronDown } from "lucide-react";
 
@@ -270,7 +269,7 @@ export default function Homepage() {
         <div className="flex items-center gap-3">
           <PanelTop className="size-5 text-muted-foreground" />
           <div>
-            <div className="flex items-center gap-2"><h2 className="text-lg font-semibold">Layout da Homepage</h2><CustomTag /></div>
+            <h2 className="text-lg font-semibold">Layout da Homepage</h2>
             <p className="text-sm text-muted-foreground">Gerencie seções e ordem de exibição.</p>
           </div>
         </div>

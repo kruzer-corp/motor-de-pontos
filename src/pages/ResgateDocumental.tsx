@@ -10,7 +10,6 @@ import {
   AvatarFallback,
 } from "@kruzer/ds";
 import { FileCheck, FileCheck2, Upload, AlertTriangle, CheckCheck } from "lucide-react";
-import { CustomTag } from "../components/CustomTag";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -301,7 +300,7 @@ export default function ResgateDocumental() {
       <div className="flex items-center gap-3">
         <FileCheck className="size-5 text-muted-foreground" />
         <div>
-          <div className="flex items-center gap-2"><h2 className="text-lg font-semibold">Fluxo Documental de Resgate</h2><CustomTag /></div>
+          <h2 className="text-lg font-semibold">Fluxo Documental de Resgate</h2>
           <p className="text-sm text-muted-foreground">
             Documentos enviados pelos membros via portal — revise e avance o pedido.
           </p>

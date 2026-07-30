@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { CustomTag } from "../components/CustomTag";
 import { Card, CardHeader, CardTitle, Button, Badge, Switch, Input } from "@kruzer/ds";
 import { Image, Plus, Pencil, Trash2, GripVertical, ExternalLink } from "lucide-react";
+import { ehV1 } from "../lib/versao";
 
 type BannerStatus = "ativo" | "agendado" | "expirado" | "rascunho";
 
@@ -103,7 +103,7 @@ const INITIAL_BANNERS: Banner[] = [
 ];
 
 export default function Banners() {
-  const [banners, setBanners] = useState(INITIAL_BANNERS);
+  const [banners, setBanners] = useState(() => (ehV1() ? [] : INITIAL_BANNERS));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ title: "", subtitle: "", cta: "", ctaUrl: "" });
 
@@ -151,7 +151,7 @@ export default function Banners() {
         <div className="flex items-center gap-3">
           <Image className="size-5 text-muted-foreground" />
           <div>
-            <div className="flex items-center gap-2"><h2 className="text-lg font-semibold">Banners Rotativos</h2><CustomTag /></div>
+            <h2 className="text-lg font-semibold">Banners Rotativos</h2>
             <p className="text-sm text-muted-foreground">
               Gerencie o carrossel de banners da homepage.
             </p>

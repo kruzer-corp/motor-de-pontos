@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Button, Input, Label, Tabs, TabsList, TabsTrigger, TabsContent, toast } from "@kruzer/ds";
 import { User, CreditCard, CheckCircle2, AlertCircle, Building2 } from "lucide-react";
-import { CustomTag } from "../../components/CustomTag";
 
 // ── Mock do membro logado ─────────────────────────────────────────────────────
 
@@ -114,7 +113,6 @@ export default function MinhaConta() {
           <TabsTrigger value="credito" className="gap-1.5">
             <CreditCard className="h-3.5 w-3.5 mr-1.5" />
             Dados para recebimento
-            <CustomTag className="text-[9px] px-1.5 py-0" />
             {!savedPF && (
               <span className="ml-1.5 h-2 w-2 rounded-full bg-amber-500 shrink-0" />
             )}

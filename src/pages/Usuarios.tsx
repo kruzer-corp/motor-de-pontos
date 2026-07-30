@@ -29,13 +29,8 @@ const ROLE_DESCRIPTIONS: Record<Role, string> = {
   Analista:    "Leitura de membros, campanhas e relatórios",
 };
 
-const INITIAL_USERS: User[] = [
-  { id: "USR-001", name: "Mariana Souza",   email: "mariana.souza@kruzer.ai",  role: "Master",      status: "ativo",    lastLogin: "16/06/2025 14:22" },
-  { id: "USR-002", name: "João Operações",  email: "joao.ops@cliente.com.br",  role: "Coordenador", status: "ativo",    lastLogin: "15/06/2025 09:47" },
-  { id: "USR-003", name: "Fernanda Atend.", email: "fernanda@cliente.com.br",  role: "Analista",    status: "ativo",    lastLogin: "14/06/2025 16:30" },
-  { id: "USR-004", name: "Ricardo Lopes",   email: "ricardo@cliente.com.br",   role: "Analista",    status: "pendente", lastLogin: "—" },
-  { id: "USR-005", name: "Camila Freitas",  email: "camila@cliente.com.br",    role: "Coordenador", status: "inativo",  lastLogin: "01/04/2025 11:00" },
-];
+// Começa vazio de propósito — convide os usuários do zero.
+const INITIAL_USERS: User[] = [];
 
 const PERMISSIONS = [
   "Ver membros",

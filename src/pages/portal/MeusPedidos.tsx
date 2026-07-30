@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Badge, Button } from "@kruzer/ds";
 import { Package, FileText, Upload, CheckCircle2, X, AlertCircle } from "lucide-react";
-import { CustomTag } from "../../components/CustomTag";
 import { MOEDA } from "../../config/programa";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -272,12 +271,9 @@ export default function MeusPedidos() {
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-amber-600 shrink-0" />
                       <div>
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <p className="text-xs font-semibold text-amber-800">
-                            {p.tipoPessoa === "PF" ? "RPA necessário" : "Nota Fiscal necessária"}
-                          </p>
-                          <CustomTag className="text-[9px] px-1.5 py-0" />
-                        </div>
+                        <p className="text-xs font-semibold text-amber-800 mb-0.5">
+                          {p.tipoPessoa === "PF" ? "RPA necessário" : "Nota Fiscal necessária"}
+                        </p>
                         <p className="text-[10px] text-amber-700">
                           {p.tipoPessoa === "PF"
                             ? "Assine o Recibo de Pagamento Autônomo para liberar o crédito"

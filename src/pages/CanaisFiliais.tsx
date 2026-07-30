@@ -1,10 +1,14 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Button, EmptyState, FormDrawer, Input, Label, PageHeader, Pill,
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, toast,
 } from "@kruzer/ds";
-import { Building2, Plus, Pencil, Monitor, AlertCircle } from "lucide-react";
+import { Building2, Plus, Pencil, Monitor, AlertCircle, CheckCircle2 } from "lucide-react";
 import { FILIAIS as MOCK, type Canal, type Filial } from "../config/filiais";
+import { ehV1 } from "../lib/versao";
+import { onboardingCompleto, marcarOnboardingFeito } from "../lib/onboarding";
+import { OnboardingScreenShell } from "../components/OnboardingScreenShell";
 
 const REGIOES = ["Sudeste", "Sul", "Nordeste", "Norte", "Centro-Oeste"];
 
@@ -32,6 +36,8 @@ const PLATAFORMAS: Record<TipoDigital, string[]> = {
 const MOCK_DIGITAIS: CanalDigital[] = [];
 
 export default function CanaisFiliais() {
+  const navigate = useNavigate();
+
   // ── Lojas físicas ──────────────────────────────────────────────────────────
   const [filiais, setFiliais] = useState<Filial[]>(MOCK);
   const [openFisico,    setOpenFisico]    = useState(false);
@@ -109,14 +115,16 @@ export default function CanaisFiliais() {
     setDigitais(prev => prev.map(d => d.id === id ? { ...d, ativo: !d.ativo } : d));
   }
 
-  return (
-    <div className="space-y-8">
-      <PageHeader
-        title="Canais e Filiais"
-        path={[{ label: "Configuração" }]}
-        description="Cadastre os canais físicos e digitais que podem ser habilitados por campanha."
-      />
+  const modoOnboarding = ehV1() && !onboardingCompleto();
 
+  function concluir() {
+    marcarOnboardingFeito("canais");
+    toast.success("Passo concluído");
+    navigate("/onboarding");
+  }
+
+  const conteudo = (
+    <>
       {/* ── LOJAS FÍSICAS ── */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
@@ -303,6 +311,38 @@ export default function CanaisFiliais() {
           </div>
         </div>
       </FormDrawer>
+    </>
+  );
+
+  if (modoOnboarding) {
+    return (
+      <OnboardingScreenShell
+        title="Cadastre canais e filiais"
+        subtitle="Defina onde as vendas e eventos do programa acontecem."
+        maxWidth="max-w-3xl"
+      >
+        <div className="space-y-8">
+          {conteudo}
+          <div className="flex justify-between items-center pt-2">
+            <Button variant="outline" onClick={() => navigate("/onboarding")}>Voltar</Button>
+            <Button onClick={concluir}>
+              <CheckCircle2 className="mr-2 h-4 w-4" />
+              Concluir e voltar ao onboarding
+            </Button>
+          </div>
+        </div>
+      </OnboardingScreenShell>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      <PageHeader
+        title="Canais e Filiais"
+        path={[{ label: "Configuração" }]}
+        description="Cadastre os canais físicos e digitais que podem ser habilitados por campanha."
+      />
+      {conteudo}
     </div>
   );
 }

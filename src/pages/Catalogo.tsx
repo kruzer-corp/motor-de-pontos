@@ -5,6 +5,7 @@ import {
   Tabs, TabsList, TabsTrigger, toast, type UploadedFile,
 } from "@kruzer/ds";
 import { Archive, CheckCircle2, FileUp, Loader2, Pencil, Plus, RotateCcw, X } from "lucide-react";
+import { ehV1 } from "../lib/versao";
 
 type ImportJob = { status: "processing" | "done"; filename: string; total: number; current: number };
 
@@ -76,7 +77,7 @@ function OrigemBadge({ origem }: { origem: Origem }) {
 // ── Componente ────────────────────────────────────────────────────────────────
 
 export default function Catalogo() {
-  const [produtos, setProdutos] = useState<Produto[]>(MOCK);
+  const [produtos, setProdutos] = useState<Produto[]>(() => (ehV1() ? [] : MOCK));
   const [search,          setSearch]          = useState("");
   const [filtroOrigem,    setFiltroOrigem]    = useState<Origem | "todos">("todos");
   const [filtroCategoria, setFiltroCategoria] = useState("todas");

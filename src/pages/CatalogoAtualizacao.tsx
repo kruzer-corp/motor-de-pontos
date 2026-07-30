@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent, Button, Badge } from "@kruzer/ds";
 import { RefreshCw, CheckCheck, AlertTriangle, Upload, Package } from "lucide-react";
+import { ehV1 } from "../lib/versao";
 
 type FeedStatus = "sincronizado" | "pendente" | "erro" | "sincronizando";
 
@@ -95,7 +96,7 @@ const DIFF_CONFIG: Record<DiffItem["action"], { label: string; color: string; ro
 };
 
 export default function CatalogoAtualizacao() {
-  const [feeds, setFeeds] = useState(INITIAL_FEEDS);
+  const [feeds, setFeeds] = useState(() => (ehV1() ? [] : INITIAL_FEEDS));
   const [selectedFeed, setSelectedFeed] = useState<string | null>("FEED-002");
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState(false);

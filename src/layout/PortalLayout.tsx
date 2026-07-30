@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet } from "react-router-dom";
 import { MOEDA } from "../config/programa";
-import { Wallet, ScrollText, Gift, Package, Trophy, ArrowLeftRight, UserCircle, Tag } from "lucide-react";
+import { Wallet, ScrollText, Gift, Package, Trophy, UserCircle, Tag } from "lucide-react";
 import AceiteRegulamento from "../pages/portal/AceiteRegulamento";
-import { CustomTag } from "../components/CustomTag";
+import VersaoSwitcher from "../components/VersaoSwitcher";
+import { getMembro, getMembros, agruparSaldosPorMoeda } from "../lib/membros";
 
 const ACEITE_KEY = "motor_pontos_regulamento_aceito";
 
@@ -17,11 +18,16 @@ const NAV = [
   { to: "/portal/conta",   label: "Minha conta", icon: UserCircle, end: false },
 ];
 
-const MEMBRO = { nome: "Aline P.", saldo: 5200, tier: "Diamante", abrev: "AP" };
+function membroExibicao() {
+  const membro = getMembro("1") ?? getMembros()[0];
+  if (!membro) return { nome: "Novo Membro", saldo: 0, tier: "—", abrev: "NM" };
+  const saldoMoedaPrincipal = agruparSaldosPorMoeda(membro.saldos).find((s) => s.moeda === MOEDA.nome)?.total ?? 0;
+  return { nome: membro.nome, saldo: saldoMoedaPrincipal, tier: membro.tier, abrev: membro.initials };
+}
 
 export default function PortalLayout() {
-  const navigate = useNavigate();
   const [aceito, setAceito] = useState(() => localStorage.getItem(ACEITE_KEY) === "true");
+  const MEMBRO = membroExibicao();
 
   function handleAceitar() {
     localStorage.setItem(ACEITE_KEY, "true");
@@ -40,7 +46,6 @@ export default function PortalLayout() {
         <div className="px-5 py-5 border-b border-border">
           <div className="font-bold text-sm text-foreground">Programa de Fidelidade</div>
           <div className="text-xs text-muted-foreground mt-0.5">Beneficiário</div>
-          <div className="mt-2"><CustomTag /></div>
         </div>
 
         <div className="px-4 py-3 border-b border-border">
@@ -77,7 +82,6 @@ export default function PortalLayout() {
         <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-border bg-background">
           <div>
             <div className="font-bold text-sm">Programa de Fidelidade - Beneficiário</div>
-            <div className="mt-1"><CustomTag /></div>
           </div>
           <div className="flex items-center gap-2">
             <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[10px] font-bold">
@@ -111,14 +115,7 @@ export default function PortalLayout() {
         </nav>
       </div>
 
-      {/* Floating CTA — shift de papel */}
-      <button
-        onClick={() => navigate("/resgates")}
-        className="hidden md:flex fixed bottom-5 right-5 z-50 items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-xs font-medium text-muted-foreground shadow-lg transition-all hover:bg-muted hover:text-foreground hover:shadow-xl"
-      >
-        <ArrowLeftRight className="h-3 w-3 shrink-0" />
-        Ver como analista
-      </button>
+      <VersaoSwitcher />
     </div>
   );
 }

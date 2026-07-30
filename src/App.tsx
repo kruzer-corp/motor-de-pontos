@@ -9,6 +9,8 @@ import PortalNivel from "./pages/portal/MeuNivel";
 import PortalConta from "./pages/portal/MinhaConta";
 import PortalProdutos from "./pages/portal/PortalProdutos";
 import Dashboard from "./pages/Dashboard";
+import OnboardingCadastro from "./pages/OnboardingCadastro";
+import OnboardingRegra from "./pages/OnboardingRegra";
 import Usuarios from "./pages/Usuarios";
 import Membros from "./pages/Membros";
 import MembrosV2 from "./pages/MembrosV2";
@@ -45,6 +47,7 @@ import Niveis from "./pages/Niveis";
 import Canais from "./pages/Canais";
 import Config from "./pages/Config";
 import MecanicaPrograma from "./pages/MecanicaPrograma";
+import Biblioteca from "./pages/Biblioteca";
 import Ranking from "./pages/Ranking";
 import Logs from "./pages/Logs";
 import Regulamento from "./pages/Regulamento";
@@ -54,6 +57,8 @@ import SaldoExpirado from "./pages/SaldoExpirado";
 import Missoes from "./pages/Missoes";
 import AlertasFraude from "./pages/AlertasFraude";
 import TemplatesComunicacao from "./pages/TemplatesComunicacao";
+import OnboardingSetup from "./pages/OnboardingSetup";
+import RequireVersaoCompleta from "./components/RequireVersaoCompleta";
 
 export default function App() {
   return (
@@ -69,12 +74,19 @@ export default function App() {
         <Route path="portal/conta" element={<PortalConta />} />
       </Route>
 
+      {/* ── Onboarding obrigatório do primeiro acesso — rotas próprias, sem sidebar ── */}
+      <Route path="onboarding" element={<OnboardingSetup />} />
+      <Route path="onboarding/cadastro" element={<OnboardingCadastro />} />
+
       {/* ── Admin (analista) ── */}
+      <Route element={<RequireVersaoCompleta />}>
       <Route element={<AppLayout />}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
+        <Route path="onboarding/regra" element={<OnboardingRegra />} />
         <Route path="config" element={<Config />} />
         <Route path="mecanica" element={<MecanicaPrograma />} />
+        <Route path="biblioteca" element={<Biblioteca />} />
         <Route path="usuarios" element={<Usuarios />} />
         <Route path="canais-filiais" element={<CanaisFiliais />} />
         <Route path="membros" element={<Membros />} />
@@ -121,6 +133,7 @@ export default function App() {
         <Route path="logs" element={<Logs />} />
         <Route path="regulamento" element={<Regulamento />} />
         <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
       </Route>
     </Routes>
   );

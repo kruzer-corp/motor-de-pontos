@@ -1,6 +1,8 @@
 // ── Catálogo de produtos — fonte única usada pela tela "Produtos elegíveis" e pelo wizard de campanhas ───────
 
-export type ProdutoStatus = "ativo" | "pendente" | "arquivado";
+import { ehV1 } from "./versao";
+
+export type ProdutoStatus = "ativo" | "pendente" | "processando" | "arquivado";
 
 export type CampanhaParticipante = {
   id: string; nome: string; periodo: string;
@@ -17,13 +19,22 @@ export type HistoricoEvento = {
   tipo: "criado" | "editado" | "arquivado" | "reativado" | "campanha";
 };
 
+export type ModeloVenda = "1P" | "3P";
+
 export type Produto = {
   id: string; sku: string; nome: string; categoria: string; preco: number;
   status: ProdutoStatus; campanhasVinculadas: string[];
   criadoEm: string;
+  tierProdutoId?: string; // Tier de produto (Biblioteca) — usado na Elegibilidade da Regra
+  modeloVenda?: ModeloVenda; // 1P (vendido pela própria operação) ou 3P (vendido por seller/marketplace) — usado na Elegibilidade da Regra
   campanhas: CampanhaParticipante[];
   pedidos: PedidoProduto[];
   historico: HistoricoEvento[];
+};
+
+export const MODELO_VENDA_LABEL: Record<ModeloVenda, string> = {
+  "1P": "1P — venda própria",
+  "3P": "3P — seller/marketplace",
 };
 
 export const CATEGORIAS = ["Eletrônicos", "Eletrodomésticos", "Beleza", "Esportes", "Livros", "Acessórios", "Logística", "Voucher", "Desconto"];
@@ -83,13 +94,16 @@ const SEED: Produto[] = [
 const KEY = "motor_pontos_produtos";
 
 export function getProdutos(): Produto[] {
+  // Catálogo é output de configuração (como campanha/regra), não dado de
+  // transação — só cai no SEED de exemplo quando não há nada salvo E não é a
+  // Versão 1 (que deve começar zerada até um import de verdade acontecer).
   try {
     const stored = localStorage.getItem(KEY);
-    if (!stored) return SEED;
+    if (!stored) return ehV1() ? [] : SEED;
     const parsed: Partial<Produto>[] = JSON.parse(stored);
     return parsed.map((p) => ({ preco: 0, campanhasVinculadas: [], campanhas: [], pedidos: [], historico: [], ...p }) as Produto);
   } catch {
-    return SEED;
+    return ehV1() ? [] : SEED;
   }
 }
 

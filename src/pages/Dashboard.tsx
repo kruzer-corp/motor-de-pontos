@@ -1,97 +1,21 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis,
 } from "recharts";
 import {
-  KpiCard, Card, CardHeader, CardTitle, Button, ChartContainer, ChartTooltip,
-  ChartTooltipContent, type ChartConfig, Pill, Table, TableBody, TableCell,
+  KpiCard, Card, CardHeader, CardTitle, ChartContainer, ChartTooltip,
+  ChartTooltipContent, type ChartConfig, EmptyState, Pill, Table, TableBody, TableCell,
   TableHead, TableHeader, TableRow,
 } from "@kruzer/ds";
-import { Sparkles, ShieldCheck, Gift, Sliders, Building2, X, ChevronRight, CheckCircle2, ArrowUpRight, ArrowDownRight, TrendingUp } from "lucide-react";
+import { ShieldCheck, Gift, X, ChevronRight, ArrowUpRight, ArrowDownRight, TrendingUp, Users, Wallet } from "lucide-react";
 import { MOEDA } from "../config/programa";
+import { getRegras } from "../lib/regras";
+import { getConversao } from "../lib/conversaoPontos";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Period = "7d" | "30d" | "90d" | "12m";
 type DrillKey = "emitidos" | "resgatados" | "crescimento";
-
-// ── Onboarding ────────────────────────────────────────────────────────────────
-// Ordem reflete a jornada real de configuração: mecânica → canais → tiers → catálogo → campanha.
-
-const SETUP_STEPS = [
-  { id: "mecanica", icon: Sliders,     title: "Configure a mecânica do programa",  desc: "Taxa de acúmulo, multiplicador por tier e regras de resgate.", href: "/mecanica",       cta: "Configurar mecânica", color: "bg-sky-50 border-sky-200",        iconColor: "text-sky-600 bg-sky-100"      },
-  { id: "canais",   icon: Building2,   title: "Cadastre canais e filiais",         desc: "Defina onde as vendas e eventos do programa acontecem.",       href: "/canais-filiais", cta: "Configurar canais",   color: "bg-blue-50 border-blue-200",      iconColor: "text-blue-600 bg-blue-100"    },
-  { id: "tiers",    icon: ShieldCheck, title: "Configure os tiers",                desc: "Defina limiares de pontos e benefícios por nível.",            href: "/membros/tier",   cta: "Configurar tiers",    color: "bg-amber-50 border-amber-200",    iconColor: "text-amber-600 bg-amber-100"  },
-  { id: "produtos", icon: TrendingUp,  title: "Cadastre produtos incentivados",    desc: "Defina quais produtos geram pontos quando comprados.",        href: "/catalogo-produtos", cta: "Configurar produtos", color: "bg-teal-50 border-teal-200",      iconColor: "text-teal-600 bg-teal-100"    },
-  { id: "catalog",  icon: Gift,        title: "Adicione recompensas ao catálogo",  desc: "Cadastre os primeiros produtos para os membros resgatarem.",  href: "/catalogo",       cta: "Abrir catálogo",      color: "bg-emerald-50 border-emerald-200",iconColor: "text-emerald-600 bg-emerald-100" },
-  { id: "campaign", icon: Sparkles,    title: "Crie sua primeira campanha",        desc: "Escolha um modelo e configure em menos de 5 minutos.",         href: "/campanhas/nova", cta: "Criar campanha",      color: "bg-violet-50 border-violet-200",  iconColor: "text-violet-600 bg-violet-100" },
-];
-
-const ONBOARDING_KEY = "motor_pontos_onboarding_done";
-
-function getOnboardingDone(): string[] {
-  try {
-    return JSON.parse(localStorage.getItem(ONBOARDING_KEY) ?? "[]");
-  } catch {
-    return [];
-  }
-}
-
-function saveOnboardingDone(ids: string[]) {
-  localStorage.setItem(ONBOARDING_KEY, JSON.stringify(ids));
-}
-
-function OnboardingCard({ onDismiss }: { onDismiss: () => void }) {
-  const [done, setDone] = useState<string[]>(() => getOnboardingDone());
-  const allDone = done.length === SETUP_STEPS.length;
-  return (
-    <Card className="border-primary/20 bg-primary/5 overflow-hidden">
-      <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3">
-        <div>
-          <div className="font-semibold">Boas-vindas ao programa 👋</div>
-          <p className="text-sm text-muted-foreground mt-0.5">Complete os 3 passos abaixo para colocar seu programa no ar.</p>
-        </div>
-        <button onClick={onDismiss} className="shrink-0 text-muted-foreground hover:text-foreground" aria-label="Fechar"><X className="size-4" /></button>
-      </div>
-      <div className="px-5 pb-3">
-        <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
-          <span>{done.length} de {SETUP_STEPS.length} concluídos</span>
-          {allDone && <span className="text-emerald-600 font-semibold">Tudo pronto!</span>}
-        </div>
-        <div className="h-1.5 rounded-full bg-border">
-          <div className="h-1.5 rounded-full bg-primary transition-all" style={{ width: `${(done.length / SETUP_STEPS.length) * 100}%` }} />
-        </div>
-      </div>
-      <div className="grid gap-3 px-5 pb-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        {SETUP_STEPS.map((step) => {
-          const Icon = step.icon;
-          const isDone = done.includes(step.id);
-          return (
-            <div key={step.id} className={`rounded-2xl border p-4 ${step.color} ${isDone ? "opacity-60" : ""}`}>
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${step.iconColor}`}>
-                  {isDone ? <CheckCircle2 className="size-4" /> : <Icon className="size-4" />}
-                </div>
-                {isDone && <span className="text-[10px] font-semibold text-emerald-600">Feito</span>}
-              </div>
-              <div className="font-medium text-sm mb-0.5">{step.title}</div>
-              <div className="text-xs text-muted-foreground mb-3">{step.desc}</div>
-              {!isDone && (
-                <div className="flex items-center gap-2">
-                  <Button asChild size="sm" className="h-7 text-xs flex-1">
-                    <Link to={step.href}>{step.cta} <ChevronRight className="size-3 ml-1" /></Link>
-                  </Button>
-                  <button onClick={() => setDone(p => { const next = [...p, step.id]; saveOnboardingDone(next); return next; })} className="text-xs text-muted-foreground hover:text-foreground underline">já fiz</button>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </Card>
-  );
-}
 
 // ── KPI data por período ───────────────────────────────────────────────────────
 
@@ -123,6 +47,13 @@ const KPIS_BY_PERIOD: Record<Period, KpiDef[]> = {
     { label: "Níveis ativos",          value: "4",           subtitle: "Diamante a Bronze", drillKey: null          },
   ],
 };
+
+const KPIS_EMPTY: KpiDef[] = [
+  { label: `${MOEDA.nome} emitidos`,   value: "0", subtitle: "sem regra ativa ainda", drillKey: null },
+  { label: `${MOEDA.nome} resgatados`, value: "0", subtitle: "sem regra ativa ainda", drillKey: null },
+  { label: "Crescimento de membros",   value: "0%", subtitle: "sem regra ativa ainda", drillKey: null },
+  { label: "Níveis ativos",            value: "0", subtitle: "sem regra ativa ainda", drillKey: null },
+];
 
 // ── Dados de gráfico por período ──────────────────────────────────────────────
 
@@ -251,10 +182,9 @@ const TIERS = [
 ];
 
 // ── Liability de pontos ───────────────────────────────────────────────────────
+// COST_PER_PT vem da Mecânica do Programa (Conversão de pontos) — configurável.
 
-const COST_PER_PT = 0.01; // R$ por ponto
 const OUTSTANDING_PTS = 12_483_000;
-const LIABILITY_BRL = OUTSTANDING_PTS * COST_PER_PT; // R$ 124.830
 
 const LIABILITY_DELTA: Record<Period, { pct: string; brl: string; up: boolean }> = {
   "7d":  { pct: "+2,3%",  brl: "+R$ 2.811",  up: true  },
@@ -359,20 +289,21 @@ const PERIODS: { value: Period; label: string }[] = [
 ];
 
 export default function Dashboard() {
-  const [showOnboarding, setShowOnboarding] = useState(true);
   const [period,         setPeriod]         = useState<Period>("30d");
   const [drillKey,       setDrillKey]       = useState<DrillKey | null>(null);
   const [selectedMonth,  setSelectedMonth]  = useState<string | null>(null);
 
-  const kpis        = KPIS_BY_PERIOD[period];
+  const temRegraAtiva = getRegras().some((r) => r.ativa);
+  const costPerPt     = getConversao().valorPorPonto;
+  const liabilityBRL  = OUTSTANDING_PTS * costPerPt;
+
+  const kpis        = temRegraAtiva ? KPIS_BY_PERIOD[period] : KPIS_EMPTY;
   const growthData  = GROWTH_BY_PERIOD[period];
   const pointsData  = POINTS_BY_PERIOD[period];
   const monthData   = selectedMonth ? MONTH_BREAKDOWN[selectedMonth] : null;
 
   return (
     <div className="space-y-6">
-      {showOnboarding && <OnboardingCard onDismiss={() => setShowOnboarding(false)} />}
-
       {/* Period selector */}
       <div className="flex items-center justify-between gap-3">
         <span className="text-xs text-muted-foreground font-medium">Período</span>
@@ -421,38 +352,48 @@ export default function Dashboard() {
         <Card className="xl:col-span-2">
           <CardHeader><CardTitle>Crescimento de membros</CardTitle></CardHeader>
           <div className="px-6 pb-6">
-            <ChartContainer config={GROWTH_CONFIG} className="h-64 w-full">
-              <AreaChart data={growthData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="membersFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="var(--color-members)" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="var(--color-members)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="x" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Area type="monotone" dataKey="members" stroke="var(--color-members)" strokeWidth={2} fill="url(#membersFill)" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
-              </AreaChart>
-            </ChartContainer>
+            {temRegraAtiva ? (
+              <ChartContainer config={GROWTH_CONFIG} className="h-64 w-full">
+                <AreaChart data={growthData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="membersFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="var(--color-members)" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="var(--color-members)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="x" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                  <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Area type="monotone" dataKey="members" stroke="var(--color-members)" strokeWidth={2} fill="url(#membersFill)" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
+                </AreaChart>
+              </ChartContainer>
+            ) : (
+              <EmptyState icon={Users} title="Nenhum membro ainda"
+                description="O crescimento de membros aparece aqui assim que o programa tiver os primeiros cadastros." />
+            )}
           </div>
         </Card>
 
         <Card>
           <CardHeader><CardTitle>Distribuição de tiers</CardTitle></CardHeader>
           <div className="space-y-4 px-6 pb-6">
-            {TIERS.map(item => (
-              <div key={item.tier}>
-                <div className="mb-1.5 flex justify-between text-sm">
-                  <span>{item.tier}</span>
-                  <span className="text-muted-foreground">{item.pct}%</span>
+            {temRegraAtiva ? (
+              TIERS.map(item => (
+                <div key={item.tier}>
+                  <div className="mb-1.5 flex justify-between text-sm">
+                    <span>{item.tier}</span>
+                    <span className="text-muted-foreground">{item.pct}%</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-border">
+                    <div className={`h-2 rounded-full transition-all ${item.color}`} style={{ width: `${item.pct}%` }} />
+                  </div>
                 </div>
-                <div className="h-2 rounded-full bg-border">
-                  <div className={`h-2 rounded-full transition-all ${item.color}`} style={{ width: `${item.pct}%` }} />
-                </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <EmptyState icon={ShieldCheck} title="Nenhum membro classificado"
+                description="A distribuição por tier aparece aqui quando houver membros classificados." />
+            )}
           </div>
         </Card>
       </div>
@@ -468,28 +409,33 @@ export default function Dashboard() {
               </div>
             </CardHeader>
             <div className="px-6 pb-6">
-              <ChartContainer config={POINTS_CONFIG} className="h-52 w-full">
-                <BarChart data={pointsData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="x" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                  <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar
-                    dataKey="emitidos"
-                    fill="var(--color-emitidos)"
-                    radius={[4, 4, 0, 0]}
-                    className="cursor-pointer"
-                    onClick={(data: { x: string }) => setSelectedMonth(prev => prev === data.x ? null : data.x)}
-                  />
-                  <Bar
-                    dataKey="resgatados"
-                    fill="var(--color-resgatados)"
-                    radius={[4, 4, 0, 0]}
-                    className="cursor-pointer"
-                    onClick={(data: { x: string }) => setSelectedMonth(prev => prev === data.x ? null : data.x)}
-                  />
-                </BarChart>
-              </ChartContainer>
+              {temRegraAtiva ? (
+                <ChartContainer config={POINTS_CONFIG} className="h-52 w-full">
+                  <BarChart data={pointsData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="x" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                    <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Bar
+                      dataKey="emitidos"
+                      fill="var(--color-emitidos)"
+                      radius={[4, 4, 0, 0]}
+                      className="cursor-pointer"
+                      onClick={(data: { x: string }) => setSelectedMonth(prev => prev === data.x ? null : data.x)}
+                    />
+                    <Bar
+                      dataKey="resgatados"
+                      fill="var(--color-resgatados)"
+                      radius={[4, 4, 0, 0]}
+                      className="cursor-pointer"
+                      onClick={(data: { x: string }) => setSelectedMonth(prev => prev === data.x ? null : data.x)}
+                    />
+                  </BarChart>
+                </ChartContainer>
+              ) : (
+                <EmptyState icon={TrendingUp} title="Nenhum ponto emitido"
+                  description="O fluxo de emissão e resgate aparece aqui assim que houver uma regra ativa gerando pontos." />
+              )}
             </div>
           </Card>
 
@@ -518,26 +464,32 @@ export default function Dashboard() {
           <div className="px-4 py-3 border-b border-border">
             <span className="text-sm font-semibold">Resgates recentes</span>
           </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Pedido</TableHead>
-                <TableHead>Membro</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Valor</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {RECENT_REDEMPTIONS.map(row => (
-                <TableRow key={row.id} className="[&>td]:py-3.5">
-                  <TableCell className="font-mono text-xs text-muted-foreground">{row.id}</TableCell>
-                  <TableCell className="text-sm">{row.member}</TableCell>
-                  <TableCell><Pill color={statusPill[row.status] ?? "muted"} variant="soft" size="sm">{row.status}</Pill></TableCell>
-                  <TableCell className="tabular-nums text-sm">{row.value}</TableCell>
+          {temRegraAtiva ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Pedido</TableHead>
+                  <TableHead>Membro</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Valor</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {RECENT_REDEMPTIONS.map(row => (
+                  <TableRow key={row.id} className="[&>td]:py-3.5">
+                    <TableCell className="font-mono text-xs text-muted-foreground">{row.id}</TableCell>
+                    <TableCell className="text-sm">{row.member}</TableCell>
+                    <TableCell><Pill color={statusPill[row.status] ?? "muted"} variant="soft" size="sm">{row.status}</Pill></TableCell>
+                    <TableCell className="tabular-nums text-sm">{row.value}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="p-6">
+              <EmptyState icon={Gift} title="Nenhum resgate ainda" description="Os resgates aparecem aqui assim que os primeiros membros trocarem pontos." />
+            </div>
+          )}
         </div>
       </div>
 
@@ -550,53 +502,60 @@ export default function Dashboard() {
             <span className="ml-auto text-xs text-muted-foreground">Snapshot atual · independente do período</span>
           </div>
         </CardHeader>
-        <div className="px-6 pb-6 grid gap-6 md:grid-cols-2">
-          {/* Left: métricas */}
-          <div className="space-y-4">
-            <div>
-              <p className="text-3xl font-bold tabular-nums">
-                {LIABILITY_BRL.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1 tabular-nums">
-                {OUTSTANDING_PTS.toLocaleString("pt-BR")} {MOEDA.abrev} em circulação · R$ {COST_PER_PT.toFixed(2)}/{MOEDA.abrev}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className={`flex items-center gap-0.5 text-sm font-semibold ${LIABILITY_DELTA[period].up ? "text-amber-600" : "text-emerald-600"}`}>
-                {LIABILITY_DELTA[period].up
-                  ? <ArrowUpRight className="size-4" />
-                  : <ArrowDownRight className="size-4" />
-                }
-                {LIABILITY_DELTA[period].pct}
-              </span>
-              <span className="text-xs text-muted-foreground">({LIABILITY_DELTA[period].brl}) no período selecionado</span>
-            </div>
-            <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground space-y-1">
-              <p className="font-medium text-foreground text-sm">Como interpretar</p>
-              <p>Liability crescente indica que o programa está emitindo mais do que resgatando — é o passivo financeiro do programa. Monitore junto ao custo de resgate e GMV.</p>
-            </div>
-          </div>
-          {/* Right: breakdown por campanha */}
-          <div className="space-y-3">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Por campanha</p>
-            {LIABILITY_CAMPANHAS.map(c => (
-              <div key={c.nome} className="space-y-1.5">
-                <div className="flex items-center justify-between gap-2 text-sm">
-                  <span className="truncate">{c.nome}</span>
-                  <span className="tabular-nums text-muted-foreground shrink-0">
-                    {(c.pts * COST_PER_PT).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-1.5 rounded-full bg-border overflow-hidden">
-                    <div className="h-full rounded-full bg-primary/60 transition-all" style={{ width: `${c.pct}%` }} />
-                  </div>
-                  <span className="text-xs text-muted-foreground w-9 text-right tabular-nums">{c.pct}%</span>
-                </div>
+        {temRegraAtiva ? (
+          <div className="px-6 pb-6 grid gap-6 md:grid-cols-2">
+            {/* Left: métricas */}
+            <div className="space-y-4">
+              <div>
+                <p className="text-3xl font-bold tabular-nums">
+                  {liabilityBRL.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1 tabular-nums">
+                  {OUTSTANDING_PTS.toLocaleString("pt-BR")} {MOEDA.abrev} em circulação · R$ {costPerPt.toFixed(3)}/{MOEDA.abrev}
+                </p>
               </div>
-            ))}
+              <div className="flex items-center gap-2">
+                <span className={`flex items-center gap-0.5 text-sm font-semibold ${LIABILITY_DELTA[period].up ? "text-amber-600" : "text-emerald-600"}`}>
+                  {LIABILITY_DELTA[period].up
+                    ? <ArrowUpRight className="size-4" />
+                    : <ArrowDownRight className="size-4" />
+                  }
+                  {LIABILITY_DELTA[period].pct}
+                </span>
+                <span className="text-xs text-muted-foreground">({LIABILITY_DELTA[period].brl}) no período selecionado</span>
+              </div>
+              <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground space-y-1">
+                <p className="font-medium text-foreground text-sm">Como interpretar</p>
+                <p>Liability crescente indica que o programa está emitindo mais do que resgatando — é o passivo financeiro do programa. Monitore junto ao custo de resgate e GMV.</p>
+              </div>
+            </div>
+            {/* Right: breakdown por campanha */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Por campanha</p>
+              {LIABILITY_CAMPANHAS.map(c => (
+                <div key={c.nome} className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2 text-sm">
+                    <span className="truncate">{c.nome}</span>
+                    <span className="tabular-nums text-muted-foreground shrink-0">
+                      {(c.pts * costPerPt).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1.5 rounded-full bg-border overflow-hidden">
+                      <div className="h-full rounded-full bg-primary/60 transition-all" style={{ width: `${c.pct}%` }} />
+                    </div>
+                    <span className="text-xs text-muted-foreground w-9 text-right tabular-nums">{c.pct}%</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="px-6 pb-6">
+            <EmptyState icon={Wallet} title="Sem passivo ainda"
+              description="A liability aparece aqui assim que houver pontos emitidos em circulação — R$ 0,00 · 0 pts." />
+          </div>
+        )}
       </Card>
 
       {/* Drill panel */}

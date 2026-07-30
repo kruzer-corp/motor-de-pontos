@@ -10,6 +10,7 @@ import {
   UserX, Zap,
 } from "lucide-react";
 import { renderCrumbLink } from "../lib/crumbLink";
+import { ehV1 } from "../lib/versao";
 
 type AlertTipo      = "acumulo_atipico" | "cancelamento_pos" | "multiplas_contas" | "resgate_imediato" | "indicacao_abuso" | "velocidade";
 type AlertSev       = "alta" | "media" | "baixa";
@@ -142,7 +143,7 @@ type TabFilter = "todos" | "novo" | "em_analise" | "resolvido" | "bloqueado";
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function AlertasFraude() {
-  const [alertas,   setAlertas]   = useState<Alerta[]>(INITIAL);
+  const [alertas,   setAlertas]   = useState<Alerta[]>(() => (ehV1() ? [] : INITIAL));
   const [tab,       setTab]       = useState<TabFilter>("todos");
   const [expanded,  setExpanded]  = useState<string | null>(null);
   const [configOpen,setConfigOpen]= useState(false);

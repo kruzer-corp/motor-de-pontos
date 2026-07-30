@@ -1,65 +1,147 @@
 // ── Tipos compartilhados entre a listagem (Minhas Campanhas) e o wizard ───────
+// Campanha é autossuficiente — define sua própria Elegibilidade (Quem/Onde/O
+// quê/Quando), sem referenciar uma Regra da Mecânica. Output e Políticas ainda
+// estão no formato antigo (tabela/teto único) até migrarem pra Multiplicador,
+// Expiração, Limite (3 escopos), Cancelamento e Prioridade.
+
+import {
+  type GatilhoTipo, type MecanismoAtribuicao, type EixoTipo, type EstornoPolicy, type FaixaBeneficio,
+} from "./regras";
 
 export type CampStatus = "ativa" | "pausada" | "agendada" | "rascunho" | "encerrada" | "arquivada";
 
+// Multiplicador — substitui a antiga tabela de Output. Base sempre em pontos;
+// cada multiplicador que bater na transação multiplica o resultado (em cascata).
+export type MultiplicadorTipo = "categoria" | "produto" | "segmento" | "tier";
+
+export type Multiplicador = {
+  id: string;
+  tipo: MultiplicadorTipo;
+  alvoId: string; // categoria (string) | conjunto de produtos | segmento | tier de membro
+  fator: number;  // ex: 2 = dobro
+};
+
+export function novoIdMultiplicador(): string {
+  return `MULT-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}
+
+// Expiração de pontos — só a configuração por enquanto (decisão explícita: o
+// motor ainda não expira saldo de verdade, isso fica pra uma etapa futura).
+export type ExpiracaoTipo = "nao_expira" | "dias_sem_movimentacao" | "data_fixa";
+
+// Limite — substitui o antigo teto único. Recalculado a cada avaliação a
+// partir do histórico de eventos do membro (mesmo padrão já usado pra Primeira
+// compra/Marco de recorrência) — não depende de tag de origem na transação.
+export type LimiteEscopo = "transacao" | "periodo" | "membro";
+export type LimitePeriodoGranularidade = "dia" | "semana" | "mes";
+
 export type Form = {
-  codigo: string; nome: string; descricao: string; segmento: string;
-  tiersElegiveis: string[];
-  periodoInicio: string; periodoFim: string;
-  // Gatilho — o que dispara a pontuação desta campanha
-  gatilhoTipo: "pedido" | "evento";
-  gatilhoEvento: string; // usado quando gatilhoTipo === "evento" — hoje só existe "cadastro" (entrada no programa)
-  // Valor fixo do bônus — única pontuação definida na campanha (só usada quando gatilhoTipo === "evento").
-  // Acúmulo por pedido, multiplicador por tier e resgate são sempre definidos na Mecânica do Programa.
-  taxaValor: string;
-  fontes: Record<string, boolean>;
-  pdvEscopo: "todas" | "especificas";
-  pdvFiliais: string[];
-  statusConceder: Record<string, boolean>;
-  diasCreditado: string;
-  statusAnular: Record<string, boolean>;
-  produtosElegiveis: string[];
-  categoriasExcluidas: string[]; // categorias de produto que NÃO geram pontos nesta campanha
-  // Limites e vigência
-  liberacaoTipo: "imediato" | "dias";
-  liberacaoDias: string;
-  expiracaoTipo: "herdar" | "meses" | "data_fixa";
-  expiracaoMeses: string;
-  expiracaoData: string;
+  nome: string;
+  codigo: string;
+  descricao: string;
+
+  // Elegibilidade — "o quê" (gatilho derivado da entidade: produto/pedido/cliente)
+  gatilhoTipo: GatilhoTipo;
+  gatilhoConjuntoId: string;
+  gatilhoClasseId: string;
+  gatilhoMarcoN: number;
+  gatilhoEventoNome: string;
+
+  // Elegibilidade — "quem" gera vs. quem recebe (indicação/comissão)
+  atribuicaoAtiva: boolean;
+  papelGeradoraId: string;
+  papelBeneficiariaId: string;
+  mecanismoAtribuicao: MecanismoAtribuicao;
+  percentualDivisao: number;
+
+  // Elegibilidade — "quem" e "onde"
+  conjuntoElegibilidadeId: string;
+  produtoTiers: string[];
+  valorMinimo: string;
+  canais: string[];
+  segmentos: string[];
+  tiers: string[];
+  papeis: string[];
+  statusPedido: string[];
+
+  // Elegibilidade — "quando"
+  periodoInicio: string;
+  periodoFim: string;
+
+  // Multiplicador — pontos base + multiplicadores por categoria/produto/segmento/tier
+  pontosBase: number;
+  multiplicadores: Multiplicador[];
+
+  // Expiração de pontos — quando o saldo gerado por esta campanha vence
+  expiracaoTipo: ExpiracaoTipo;
+  expiracaoDias: number;    // dias sem movimentação, quando expiracaoTipo === "dias_sem_movimentacao"
+  expiracaoData: string;    // data fixa, quando expiracaoTipo === "data_fixa"
+
+  // Limite — teto de acúmulo, com escopo configurável
   limiteAtivo: boolean;
-  limitePts: string;
-  limiteEscopo: "membro_campanha" | "membro_dia";
-  tetoEmissaoAtivo: boolean;
-  tetoEmissaoPts: string;
-  cancelamentoPolicy: "estornar_tudo" | "estornar_proporcional" | "manter";
+  limiteEscopo: LimiteEscopo;
+  limiteValor: number;
+  limitePeriodoGranularidade: LimitePeriodoGranularidade; // usado quando limiteEscopo === "periodo"
+
+  // Output antigo — mantido só pra compatibilidade de dado, não editado no wizard novo
+  eixoTipo: EixoTipo;
+  tabelaBeneficio: FaixaBeneficio[];
+
+  // Políticas — Cancelamento ainda não migrado pro novo mecanismo
+  timingTipo: "imediato" | "dias";
+  timingDias: number;
+  estornoPolicy: EstornoPolicy;
+  conversaoParcialPermitida: boolean;
 };
 
 export const DEFAULTS: Form = {
-  codigo: "CAMP01", nome: "", descricao: "", segmento: "todos",
-  tiersElegiveis: [],
-  periodoInicio: "", periodoFim: "",
-  gatilhoTipo: "pedido",
-  gatilhoEvento: "cadastro",
-  taxaValor: "",
-  fontes: { portal: true, pdv: true, ecommerce: false, marketplace: false },
-  pdvEscopo: "todas",
-  pdvFiliais: [],
-  statusConceder: { Aprovado: false, Faturado: false, "Em separação": false, Entregue: false, Concluído: false, Cancelado: false, Devolvido: false, Recusado: false },
-  diasCreditado: "",
-  statusAnular:   { Aprovado: false, Faturado: false, "Em separação": false, Entregue: false, Concluído: false, Cancelado: false, Devolvido: false, Recusado: false },
-  produtosElegiveis: [],
-  categoriasExcluidas: [],
-  liberacaoTipo: "imediato",
-  liberacaoDias: "7",
-  expiracaoTipo: "herdar",
-  expiracaoMeses: "12",
+  nome: "",
+  codigo: "CAMP01",
+  descricao: "",
+
+  gatilhoTipo: "compra_qualquer",
+  gatilhoConjuntoId: "",
+  gatilhoClasseId: "",
+  gatilhoMarcoN: 2,
+  gatilhoEventoNome: "cadastro",
+
+  atribuicaoAtiva: false,
+  papelGeradoraId: "",
+  papelBeneficiariaId: "",
+  mecanismoAtribuicao: "mesma_pessoa",
+  percentualDivisao: 100,
+
+  conjuntoElegibilidadeId: "",
+  produtoTiers: [],
+  valorMinimo: "",
+  canais: [],
+  segmentos: [],
+  tiers: [],
+  papeis: [],
+  statusPedido: ["Concluído"],
+
+  periodoInicio: "",
+  periodoFim: "",
+
+  pontosBase: 0,
+  multiplicadores: [],
+
+  expiracaoTipo: "nao_expira",
+  expiracaoDias: 365,
   expiracaoData: "",
+
   limiteAtivo: false,
-  limitePts: "",
-  limiteEscopo: "membro_campanha",
-  tetoEmissaoAtivo: false,
-  tetoEmissaoPts: "",
-  cancelamentoPolicy: "estornar_tudo",
+  limiteEscopo: "transacao",
+  limiteValor: 0,
+  limitePeriodoGranularidade: "mes",
+
+  eixoTipo: "valor_total",
+  tabelaBeneficio: [],
+
+  timingTipo: "imediato",
+  timingDias: 7,
+  estornoPolicy: "estornar_tudo",
+  conversaoParcialPermitida: true,
 };
 
 export type Campanha = Form & {
@@ -69,106 +151,21 @@ export type Campanha = Form & {
   agendadaPara?: string;
 };
 
-// ── Dados iniciais (seed) ──────────────────────────────────────────────────────
-
-const SEED: Campanha[] = [
-  {
-    ...DEFAULTS,
-    id: "CMP-001", codigo: "BOAS-VINDAS", nome: "Bônus de Boas-vindas", status: "ativa",
-    descricao: "Pontos na primeira compra de cada novo membro.",
-    segmento: "todos", periodoInicio: "01/01/2026", periodoFim: "31/12/2026",
-    fontes: { portal: true, pdv: true, ecommerce: true, marketplace: false },
-    categoriasExcluidas: ["Voucher"],
-    statusConceder: { Aprovado: false, Faturado: false, "Em separação": false, Entregue: true, Concluído: true, Cancelado: false, Devolvido: false, Recusado: false },
-    limiteAtivo: true, limitePts: "500", limiteEscopo: "membro_campanha",
-    tetoEmissaoAtivo: false, tetoEmissaoPts: "",
-    color: "bg-emerald-500",
-  },
-  {
-    ...DEFAULTS,
-    id: "CMP-002", codigo: "ANIVERSARIO", nome: "Dobro no Aniversário", status: "ativa",
-    descricao: "2× pontos em todos os pedidos feitos no mês de aniversário do membro.",
-    segmento: "todos", periodoInicio: "01/01/2026", periodoFim: "31/12/2026",
-    fontes: { portal: true, pdv: true, ecommerce: true, marketplace: false },
-    limiteAtivo: true, limitePts: "2000", limiteEscopo: "membro_campanha",
-    tetoEmissaoAtivo: false, tetoEmissaoPts: "",
-    color: "bg-violet-500",
-  },
-  {
-    ...DEFAULTS,
-    id: "CMP-003", codigo: "VERAO26", nome: "Lançamento Verão", status: "ativa",
-    descricao: "Campanha sazonal com multiplicadores por tier e teto de emissão.",
-    segmento: "todos", periodoInicio: "01/07/2026", periodoFim: "31/08/2026",
-    fontes: { portal: true, pdv: false, ecommerce: true, marketplace: true },
-    limiteAtivo: false, limitePts: "", limiteEscopo: "membro_campanha",
-    tetoEmissaoAtivo: true, tetoEmissaoPts: "500000",
-    color: "bg-sky-500",
-  },
-  {
-    ...DEFAULTS,
-    id: "CMP-007", codigo: "BLACKFRIDAY26", nome: "Black Friday 2026", status: "agendada",
-    descricao: "Multiplicador de pontos para a semana da Black Friday.",
-    segmento: "todos", periodoInicio: "27/11/2026", periodoFim: "30/11/2026",
-    agendadaPara: "27/11/2026 00:00",
-    fontes: { portal: true, pdv: true, ecommerce: true, marketplace: false },
-    limiteAtivo: true, limitePts: "4000", limiteEscopo: "membro_campanha",
-    tetoEmissaoAtivo: true, tetoEmissaoPts: "800000",
-    color: "bg-indigo-500",
-  },
-  {
-    ...DEFAULTS,
-    id: "CMP-004", codigo: "PARCEIRO-REC", nome: "Parceiro Recorrente", status: "rascunho",
-    descricao: "Pontos extras para afiliados com compras recorrentes pelo PDV.",
-    segmento: "arquiteto", periodoInicio: "", periodoFim: "",
-    fontes: { portal: false, pdv: true, ecommerce: false, marketplace: false },
-    limiteAtivo: true, limitePts: "3000", limiteEscopo: "membro_dia",
-    tetoEmissaoAtivo: true, tetoEmissaoPts: "200000",
-    color: "bg-blue-500",
-  },
-  {
-    ...DEFAULTS,
-    id: "CMP-005", codigo: "SUPER-JUN", nome: "Super Junho", status: "encerrada",
-    descricao: "2× pontos em Eletrônicos durante todo o mês de junho.",
-    segmento: "todos", periodoInicio: "01/06/2026", periodoFim: "30/06/2026",
-    fontes: { portal: true, pdv: true, ecommerce: false, marketplace: false },
-    limiteAtivo: true, limitePts: "5000", limiteEscopo: "membro_campanha",
-    tetoEmissaoAtivo: true, tetoEmissaoPts: "300000",
-    color: "bg-amber-500",
-  },
-  {
-    ...DEFAULTS,
-    id: "CMP-006", codigo: "MAE25", nome: "Dia das Mães 2025", status: "arquivada",
-    descricao: "Pontos em dobro para compras de presente no Dia das Mães.",
-    segmento: "todos", periodoInicio: "05/05/2025", periodoFim: "12/05/2025",
-    fontes: { portal: true, pdv: false, ecommerce: true, marketplace: false },
-    limiteAtivo: false, limitePts: "", limiteEscopo: "membro_campanha",
-    tetoEmissaoAtivo: false, tetoEmissaoPts: "",
-    color: "bg-pink-500",
-  },
-  {
-    ...DEFAULTS,
-    id: "CMP-008", codigo: "BEMVINDO", nome: "Bônus de Cadastro", status: "ativa",
-    descricao: "Pontos concedidos uma única vez quando o membro entra no programa — não depende de pedido.",
-    gatilhoTipo: "evento", gatilhoEvento: "cadastro",
-    segmento: "todos", periodoInicio: "01/01/2026", periodoFim: "31/12/2026",
-    taxaValor: "50",
-    color: "bg-teal-500",
-  },
-];
-
 // ── Persistência (localStorage — sem back-end neste protótipo) ───────────────
+// Campanha não é forçada a vazio na Versão 1 — é um dos "outputs" do setup
+// que o primeiro acesso deve mostrar depois de configurado.
 
 const KEY = "motor_pontos_campanhas";
 
 export function getCampanhas(): Campanha[] {
   try {
     const stored = localStorage.getItem(KEY);
-    if (!stored) return SEED;
+    if (!stored) return [];
     const parsed: Partial<Campanha>[] = JSON.parse(stored);
     // preenche campos que não existiam ainda quando a campanha foi salva (evita crash/tela em branco)
     return parsed.map((c) => ({ ...DEFAULTS, ...c }) as Campanha);
   } catch {
-    return SEED;
+    return [];
   }
 }
 

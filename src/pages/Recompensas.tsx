@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Card, CardHeader, CardTitle, Button, Badge, Avatar, AvatarFallback } from "@kruzer/ds";
 import { ArrowRight, CheckCheck, X, ChevronRight, FileCheck, ShoppingCart } from "lucide-react";
 import { MOEDA } from "../config/programa";
+import { ehV1 } from "../lib/versao";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -85,7 +86,7 @@ const BADGE_COLOR: Record<PipelineStatus, string> = {
 // ── Component ────────────────────────────────────────────────────────
 
 export default function Recompensas() {
-  const [orders, setOrders] = useState(INITIAL_ORDERS);
+  const [orders, setOrders] = useState(() => (ehV1() ? [] : INITIAL_ORDERS));
   const [selectedStatus, setSelectedStatus] = useState<PipelineStatus | null>("Em Análise");
 
   const countFor = (status: PipelineStatus) => orders.filter((o) => o.status === status).length;
