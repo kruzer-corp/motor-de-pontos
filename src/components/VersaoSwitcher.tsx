@@ -6,7 +6,7 @@ import { aplicarSeedV2SeNecessario } from "../lib/seedV2";
 
 const VERSAO_LABEL: Record<"v1" | "v2", string> = {
   v1: "Primeiro acesso",
-  v2: "Versão completa",
+  v2: "Programa funcionando",
 };
 
 const VERSAO_DOT: Record<"v1" | "v2", string> = {
@@ -19,7 +19,9 @@ export default function VersaoSwitcher() {
   const location = useLocation();
   const versao = getVersao();
   const emPortal = location.pathname.startsWith("/portal");
-  const rotuloBotao = emPortal ? `Visão do membro · ${VERSAO_LABEL[versao]}` : VERSAO_LABEL[versao];
+  const rotuloBotao = emPortal
+    ? (versao === "v1" ? "Visão do membro" : `Visão do membro · ${VERSAO_LABEL[versao]}`)
+    : VERSAO_LABEL[versao];
 
   function irPara(v: "v1" | "v2") {
     if (v === "v2") aplicarSeedV2SeNecessario();
@@ -53,7 +55,7 @@ export default function VersaoSwitcher() {
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => irPara("v2")}>
           <CheckCircle2 className="size-3.5 mr-2" />
-          Versão completa{versao === "v2" ? " · atual" : ""}
+          Programa funcionando{versao === "v2" ? " · atual" : ""}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={resetarEIrParaOnboarding}>

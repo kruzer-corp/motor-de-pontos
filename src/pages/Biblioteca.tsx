@@ -20,8 +20,7 @@ import {
   type SegmentoMembro, getSegmentosMembro, saveSegmentosMembro, novoIdSegmentoMembro,
 } from "../lib/segmentosMembro";
 import { getProdutos } from "../lib/produtos";
-import { type MetodoBase, getMetodoBase, saveMetodoBase } from "../lib/onboarding";
-import { MetodoSelector, SecaoMembros, SecaoProdutos } from "../components/CadastroBase";
+import { SecaoMembros, SecaoProdutos } from "../components/CadastroBase";
 
 // ── Modal: Conjunto de produtos ──────────────────────────────────────────────
 
@@ -214,9 +213,6 @@ function TierProdutoModal({ initial, onSave, onClose }: { initial?: TierProduto;
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function Biblioteca() {
-  const [metodo, setMetodo] = useState<MetodoBase | null>(() => getMetodoBase());
-  function escolherMetodo(v: MetodoBase) { setMetodo(v); saveMetodoBase(v); }
-
   const [conjuntos, setConjuntos] = useState<ConjuntoProdutos[]>(() => getConjuntosProdutos());
   const [conjuntoModal, setConjuntoModal] = useState<ConjuntoProdutos | null | "new">(null);
 
@@ -241,7 +237,7 @@ export default function Biblioteca() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Biblioteca"
+        title="Cadastro de produtos e membros"
         path={[{ label: "Configuração" }]}
         description="Ponto único de entrada de qualquer elemento do programa — produtos, membros, conjuntos, classes, tiers, papéis e segmentos."
       />
@@ -250,193 +246,202 @@ export default function Biblioteca() {
         <TabsList>
           <TabsTrigger value="produtos">Produtos</TabsTrigger>
           <TabsTrigger value="membros">Membros</TabsTrigger>
-          <TabsTrigger value="conjuntos">Conjuntos de produtos</TabsTrigger>
-          <TabsTrigger value="classes">Classes de produto</TabsTrigger>
-          <TabsTrigger value="tiers-produto">Tiers de produto</TabsTrigger>
-          <TabsTrigger value="papeis">Papéis de membro</TabsTrigger>
-          <TabsTrigger value="segmentos">Segmentos de membro</TabsTrigger>
         </TabsList>
 
-        {/* ── ABA: Produtos ── */}
-        <TabsContent value="produtos" className="mt-5 space-y-4">
-          <MetodoSelector metodo={metodo} onChange={escolherMetodo} />
-          <SecaoProdutos metodo={metodo} />
-        </TabsContent>
+        {/* ── ABA: Produtos (+ sub-itens) ── */}
+        <TabsContent value="produtos" className="mt-5">
+          <Tabs defaultValue="cadastro">
+            <TabsList>
+              <TabsTrigger value="cadastro">Cadastro</TabsTrigger>
+              <TabsTrigger value="conjuntos">Conjuntos de produtos</TabsTrigger>
+              <TabsTrigger value="classes">Classes de produto</TabsTrigger>
+              <TabsTrigger value="tiers-produto">Tiers de produto</TabsTrigger>
+            </TabsList>
 
-        {/* ── ABA: Membros ── */}
-        <TabsContent value="membros" className="mt-5 space-y-4">
-          <MetodoSelector metodo={metodo} onChange={escolherMetodo} />
-          <SecaoMembros metodo={metodo} />
-        </TabsContent>
+            <TabsContent value="cadastro" className="mt-5 space-y-4">
+              <SecaoProdutos />
+            </TabsContent>
 
-        {/* ── ABA: Conjuntos de produtos ── */}
-        <TabsContent value="conjuntos" className="mt-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-semibold flex items-center gap-1.5"><Package className="size-3.5" />Conjuntos de produtos</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Listas de produtos escolhidos à mão, reutilizáveis em Gatilho e Elegibilidade — só faz sentido pra regras transacionais.</p>
-            </div>
-            <Button size="sm" onClick={() => setConjuntoModal("new")}><Plus className="size-3.5 mr-1.5" />Novo conjunto</Button>
-          </div>
-          {conjuntos.length === 0 ? (
-            <EmptyState icon={Package} title="Nenhum conjunto cadastrado"
-              description="Agrupe produtos escolhidos à mão pra usar no Gatilho e na Elegibilidade das suas Regras."
-              action={{ label: "Novo conjunto", onClick: () => setConjuntoModal("new") }} />
-          ) : (
-            <div className="space-y-2">
-              {conjuntos.map((c) => (
-                <Card key={c.id} className="overflow-hidden">
-                  <div className="flex items-center gap-4 px-5 py-4">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold">{c.nome}</p>
-                      {c.descricao && <p className="text-xs text-muted-foreground mt-0.5">{c.descricao}</p>}
-                      <p className="text-xs text-muted-foreground mt-1">{c.produtosIds.length} produto(s)</p>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={() => setConjuntoModal(c)} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil className="size-3.5" /></button>
-                      <button onClick={() => { persistirConjuntos(conjuntos.filter((x) => x.id !== c.id)); toast.success(`${c.nome} removido`); }} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive"><Trash2 className="size-3.5" /></button>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        {/* ── ABA: Classes de produto ── */}
-        <TabsContent value="classes" className="mt-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-semibold flex items-center gap-1.5"><Tag className="size-3.5" />Classes de produto</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Taxonomia dos produtos, mapeada de um PIM externo ou definida internamente.</p>
-            </div>
-            <Button size="sm" onClick={() => setClasseModal("new")}><Plus className="size-3.5 mr-1.5" />Nova classe</Button>
-          </div>
-          {classes.length === 0 ? (
-            <EmptyState icon={Tag} title="Nenhuma classe cadastrada"
-              description="Mapeie a taxonomia dos seus produtos, vinda de um PIM externo ou definida internamente."
-              action={{ label: "Nova classe", onClick: () => setClasseModal("new") }} />
-          ) : (
-            <div className="space-y-2">
-              {classes.map((c) => (
-                <Card key={c.id} className="overflow-hidden">
-                  <div className="flex items-center gap-4 px-5 py-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold">{c.nome}</p>
-                        <Badge variant="secondary">{c.fonte === "pim" ? "PIM" : "Interno"}</Badge>
+            <TabsContent value="conjuntos" className="mt-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold flex items-center gap-1.5"><Package className="size-3.5" />Conjuntos de produtos</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Listas de produtos escolhidos à mão, reutilizáveis em Gatilho e Elegibilidade — só faz sentido pra regras transacionais.</p>
+                </div>
+                <Button size="sm" onClick={() => setConjuntoModal("new")}><Plus className="size-3.5 mr-1.5" />Novo conjunto</Button>
+              </div>
+              {conjuntos.length === 0 ? (
+                <EmptyState icon={Package} title="Nenhum conjunto cadastrado"
+                  description="Agrupe produtos escolhidos à mão pra usar no Gatilho e na Elegibilidade das suas Regras."
+                  action={{ label: "Novo conjunto", onClick: () => setConjuntoModal("new") }} />
+              ) : (
+                <div className="space-y-2">
+                  {conjuntos.map((c) => (
+                    <Card key={c.id} className="overflow-hidden">
+                      <div className="flex items-center gap-4 px-5 py-4">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold">{c.nome}</p>
+                          {c.descricao && <p className="text-xs text-muted-foreground mt-0.5">{c.descricao}</p>}
+                          <p className="text-xs text-muted-foreground mt-1">{c.produtosIds.length} produto(s)</p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button onClick={() => setConjuntoModal(c)} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil className="size-3.5" /></button>
+                          <button onClick={() => { persistirConjuntos(conjuntos.filter((x) => x.id !== c.id)); toast.success(`${c.nome} removido`); }} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive"><Trash2 className="size-3.5" /></button>
+                        </div>
                       </div>
-                      {c.fonte === "pim" && c.codigoExterno && <p className="text-xs text-muted-foreground mt-0.5 font-mono">{c.codigoExterno}</p>}
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={() => setClasseModal(c)} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil className="size-3.5" /></button>
-                      <button onClick={() => { persistirClasses(classes.filter((x) => x.id !== c.id)); toast.success(`${c.nome} removida`); }} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive"><Trash2 className="size-3.5" /></button>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="classes" className="mt-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold flex items-center gap-1.5"><Tag className="size-3.5" />Classes de produto</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Taxonomia dos produtos, mapeada de um PIM externo ou definida internamente.</p>
+                </div>
+                <Button size="sm" onClick={() => setClasseModal("new")}><Plus className="size-3.5 mr-1.5" />Nova classe</Button>
+              </div>
+              {classes.length === 0 ? (
+                <EmptyState icon={Tag} title="Nenhuma classe cadastrada"
+                  description="Mapeie a taxonomia dos seus produtos, vinda de um PIM externo ou definida internamente."
+                  action={{ label: "Nova classe", onClick: () => setClasseModal("new") }} />
+              ) : (
+                <div className="space-y-2">
+                  {classes.map((c) => (
+                    <Card key={c.id} className="overflow-hidden">
+                      <div className="flex items-center gap-4 px-5 py-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold">{c.nome}</p>
+                            <Badge variant="secondary">{c.fonte === "pim" ? "PIM" : "Interno"}</Badge>
+                          </div>
+                          {c.fonte === "pim" && c.codigoExterno && <p className="text-xs text-muted-foreground mt-0.5 font-mono">{c.codigoExterno}</p>}
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button onClick={() => setClasseModal(c)} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil className="size-3.5" /></button>
+                          <button onClick={() => { persistirClasses(classes.filter((x) => x.id !== c.id)); toast.success(`${c.nome} removida`); }} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive"><Trash2 className="size-3.5" /></button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="tiers-produto" className="mt-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold flex items-center gap-1.5"><Award className="size-3.5" />Tiers de produto</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Classificação de valor/qualidade do produto (ex: iPhone 17 = Ouro, iPhone 12 = Bronze) — usada no cadastro em Produtos incentivados e na Elegibilidade de uma Regra.</p>
+                </div>
+                <Button size="sm" onClick={() => setTierProdutoModal("new")}><Plus className="size-3.5 mr-1.5" />Novo tier de produto</Button>
+              </div>
+              {tiersProduto.length === 0 ? (
+                <EmptyState icon={Award} title="Nenhum tier de produto cadastrado"
+                  description="Classifique o valor/qualidade dos seus produtos (ex: Ouro, Bronze) pra usar no cadastro e na Elegibilidade das Regras."
+                  action={{ label: "Novo tier de produto", onClick: () => setTierProdutoModal("new") }} />
+              ) : (
+                <div className="space-y-2">
+                  {tiersProduto.map((tier) => (
+                    <Card key={tier.id} className="overflow-hidden">
+                      <div className="flex items-center gap-4 px-5 py-4">
+                        <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: tier.cor }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold">{tier.nome}</p>
+                          {tier.descricao && <p className="text-xs text-muted-foreground mt-0.5">{tier.descricao}</p>}
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button onClick={() => setTierProdutoModal(tier)} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil className="size-3.5" /></button>
+                          <button onClick={() => { persistirTiersProduto(tiersProduto.filter((x) => x.id !== tier.id)); toast.success(`${tier.nome} removido`); }} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive"><Trash2 className="size-3.5" /></button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
-        {/* ── ABA: Tiers de produto ── */}
-        <TabsContent value="tiers-produto" className="mt-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-semibold flex items-center gap-1.5"><Award className="size-3.5" />Tiers de produto</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Classificação de valor/qualidade do produto (ex: iPhone 17 = Ouro, iPhone 12 = Bronze) — usada no cadastro em Produtos incentivados e na Elegibilidade de uma Regra.</p>
-            </div>
-            <Button size="sm" onClick={() => setTierProdutoModal("new")}><Plus className="size-3.5 mr-1.5" />Novo tier de produto</Button>
-          </div>
-          {tiersProduto.length === 0 ? (
-            <EmptyState icon={Award} title="Nenhum tier de produto cadastrado"
-              description="Classifique o valor/qualidade dos seus produtos (ex: Ouro, Bronze) pra usar no cadastro e na Elegibilidade das Regras."
-              action={{ label: "Novo tier de produto", onClick: () => setTierProdutoModal("new") }} />
-          ) : (
-            <div className="space-y-2">
-              {tiersProduto.map((tier) => (
-                <Card key={tier.id} className="overflow-hidden">
-                  <div className="flex items-center gap-4 px-5 py-4">
-                    <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: tier.cor }} />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold">{tier.nome}</p>
-                      {tier.descricao && <p className="text-xs text-muted-foreground mt-0.5">{tier.descricao}</p>}
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={() => setTierProdutoModal(tier)} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil className="size-3.5" /></button>
-                      <button onClick={() => { persistirTiersProduto(tiersProduto.filter((x) => x.id !== tier.id)); toast.success(`${tier.nome} removido`); }} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive"><Trash2 className="size-3.5" /></button>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
+        {/* ── ABA: Membros (+ sub-itens) ── */}
+        <TabsContent value="membros" className="mt-5">
+          <Tabs defaultValue="cadastro">
+            <TabsList>
+              <TabsTrigger value="cadastro">Cadastro</TabsTrigger>
+              <TabsTrigger value="papeis">Papéis de membro</TabsTrigger>
+              <TabsTrigger value="segmentos">Segmentos de membro</TabsTrigger>
+            </TabsList>
 
-        {/* ── ABA: Papéis de membro ── */}
-        <TabsContent value="papeis" className="mt-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-semibold flex items-center gap-1.5"><Users className="size-3.5" />Papéis de membro</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Função do membro no programa (ex: Arquiteto) — independente de Tier e Segmento. Usado em Atribuição e Elegibilidade.</p>
-            </div>
-            <Button size="sm" onClick={() => setPapelModal("new")}><Plus className="size-3.5 mr-1.5" />Novo papel</Button>
-          </div>
-          {papeis.length === 0 ? (
-            <EmptyState icon={Users} title="Nenhum papel cadastrado"
-              description="Defina funções do membro no programa (ex: Arquiteto) pra usar em Atribuição e Elegibilidade."
-              action={{ label: "Novo papel", onClick: () => setPapelModal("new") }} />
-          ) : (
-            <div className="space-y-2">
-              {papeis.map((p) => (
-                <Card key={p.id} className="overflow-hidden">
-                  <div className="flex items-center gap-4 px-5 py-4">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold">{p.nome}</p>
-                      {p.descricao && <p className="text-xs text-muted-foreground mt-0.5">{p.descricao}</p>}
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={() => setPapelModal(p)} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil className="size-3.5" /></button>
-                      <button onClick={() => { persistirPapeis(papeis.filter((x) => x.id !== p.id)); toast.success(`${p.nome} removido`); }} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive"><Trash2 className="size-3.5" /></button>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
+            <TabsContent value="cadastro" className="mt-5 space-y-4">
+              <SecaoMembros />
+            </TabsContent>
 
-        {/* ── ABA: Segmentos de membro ── */}
-        <TabsContent value="segmentos" className="mt-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-semibold flex items-center gap-1.5"><Layers className="size-3.5" />Segmentos de membro</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Categoria comercial do membro (ex: Premium, Fidelidade) — usada no cadastro e na Elegibilidade de uma Regra.</p>
-            </div>
-            <Button size="sm" onClick={() => setSegmentoModal("new")}><Plus className="size-3.5 mr-1.5" />Novo segmento</Button>
-          </div>
-          {segmentosMembro.length === 0 ? (
-            <EmptyState icon={Layers} title="Nenhum segmento cadastrado"
-              description="Defina os segmentos comerciais do programa (ex: Premium, Fidelidade) pra usar no cadastro de membro e na Elegibilidade."
-              action={{ label: "Novo segmento", onClick: () => setSegmentoModal("new") }} />
-          ) : (
-            <div className="space-y-2">
-              {segmentosMembro.map((s) => (
-                <Card key={s.id} className="overflow-hidden">
-                  <div className="flex items-center gap-4 px-5 py-4">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold">{s.nome}</p>
-                      {s.descricao && <p className="text-xs text-muted-foreground mt-0.5">{s.descricao}</p>}
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={() => setSegmentoModal(s)} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil className="size-3.5" /></button>
-                      <button onClick={() => { persistirSegmentosMembro(segmentosMembro.filter((x) => x.id !== s.id)); toast.success(`${s.nome} removido`); }} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive"><Trash2 className="size-3.5" /></button>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
+            <TabsContent value="papeis" className="mt-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold flex items-center gap-1.5"><Users className="size-3.5" />Papéis de membro</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Função do membro no programa (ex: Arquiteto) — independente de Tier e Segmento. Usado em Atribuição e Elegibilidade.</p>
+                </div>
+                <Button size="sm" onClick={() => setPapelModal("new")}><Plus className="size-3.5 mr-1.5" />Novo papel</Button>
+              </div>
+              {papeis.length === 0 ? (
+                <EmptyState icon={Users} title="Nenhum papel cadastrado"
+                  description="Defina funções do membro no programa (ex: Arquiteto) pra usar em Atribuição e Elegibilidade."
+                  action={{ label: "Novo papel", onClick: () => setPapelModal("new") }} />
+              ) : (
+                <div className="space-y-2">
+                  {papeis.map((p) => (
+                    <Card key={p.id} className="overflow-hidden">
+                      <div className="flex items-center gap-4 px-5 py-4">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold">{p.nome}</p>
+                          {p.descricao && <p className="text-xs text-muted-foreground mt-0.5">{p.descricao}</p>}
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button onClick={() => setPapelModal(p)} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil className="size-3.5" /></button>
+                          <button onClick={() => { persistirPapeis(papeis.filter((x) => x.id !== p.id)); toast.success(`${p.nome} removido`); }} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive"><Trash2 className="size-3.5" /></button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="segmentos" className="mt-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold flex items-center gap-1.5"><Layers className="size-3.5" />Segmentos de membro</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Categoria comercial do membro (ex: Premium, Fidelidade) — usada no cadastro e na Elegibilidade de uma Regra.</p>
+                </div>
+                <Button size="sm" onClick={() => setSegmentoModal("new")}><Plus className="size-3.5 mr-1.5" />Novo segmento</Button>
+              </div>
+              {segmentosMembro.length === 0 ? (
+                <EmptyState icon={Layers} title="Nenhum segmento cadastrado"
+                  description="Defina os segmentos comerciais do programa (ex: Premium, Fidelidade) pra usar no cadastro de membro e na Elegibilidade."
+                  action={{ label: "Novo segmento", onClick: () => setSegmentoModal("new") }} />
+              ) : (
+                <div className="space-y-2">
+                  {segmentosMembro.map((s) => (
+                    <Card key={s.id} className="overflow-hidden">
+                      <div className="flex items-center gap-4 px-5 py-4">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold">{s.nome}</p>
+                          {s.descricao && <p className="text-xs text-muted-foreground mt-0.5">{s.descricao}</p>}
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button onClick={() => setSegmentoModal(s)} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil className="size-3.5" /></button>
+                          <button onClick={() => { persistirSegmentosMembro(segmentosMembro.filter((x) => x.id !== s.id)); toast.success(`${s.nome} removido`); }} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive"><Trash2 className="size-3.5" /></button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </TabsContent>
       </Tabs>
 

@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Badge, Button, EmptyState, PageHeader, Switch, toast } from "@kruzer/ds";
-import { CheckCircle2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { CheckCircle2, ChevronRight, Library, Pencil, Plus, Trash2, X } from "lucide-react";
 import {
   IdentidadeFields, GatilhoFields, AtribuicaoFields, ElegibilidadeFields,
   OutputFields, FonteClasseFields, PoliticasFields,
@@ -11,13 +12,17 @@ import {
   getRegras, saveRegras, novoIdRegra,
 } from "../lib/regras";
 import { getConjuntosProdutos } from "../lib/conjuntosProdutos";
+import { getClassesProduto } from "../lib/classesProduto";
 import { getTiersMembro } from "../lib/tiers";
 import { getPapeisMembro } from "../lib/papeisMembro";
 import { getTiersProduto } from "../lib/tiersProduto";
 import { getSegmentosMembro } from "../lib/segmentosMembro";
 import { getConversao, saveConversao } from "../lib/conversaoPontos";
-import { getLiberacao } from "../lib/liberacao";
-import { getOnboardingDone } from "../lib/onboarding";
+import { type LiberacaoConfig, getLiberacao, saveLiberacao } from "../lib/liberacao";
+import {
+  type BonificaEntidade, type BonificaEscolha, BONIFICA_OPCOES,
+  entidadesDoGatilho, getBonificaEscolha, saveBonificaEscolha, getOnboardingDone,
+} from "../lib/onboarding";
 
 // ── Resumos textuais (listagem e revisão) ───────────────────────────────────
 
@@ -178,6 +183,148 @@ function RegraModal({ initial, onSave, onClose }: { initial?: Regra; onSave: (r:
   );
 }
 
+// ── O que bonifica ────────────────────────────────────────────────────────────
+
+function BonificaMecanica() {
+  const [bonifica, setBonifica] = useState<BonificaEscolha>(() => getBonificaEscolha());
+  const [confirmar, setConfirmar] = useState<{ entidade: BonificaEntidade; count: number } | null>(null);
+  const bonificaConfigurada = getOnboardingDone().includes("mecanica");
+
+  function aplicar(v: BonificaEntidade) {
+    const next = bonifica.includes(v) ? bonifica.filter((e) => e !== v) : [...bonifica, v];
+    setBonifica(next);
+    saveBonificaEscolha(next);
+  }
+
+  function alternar(v: BonificaEntidade) {
+    if (bonifica.includes(v)) {
+      const count = getRegras().filter((r) => entidadesDoGatilho(r.gatilhoTipo).includes(v)).length;
+      if (count > 0) {
+        setConfirmar({ entidade: v, count });
+        return;
+      }
+    }
+    aplicar(v);
+  }
+
+  if (!bonificaConfigurada) return null;
+
+  const label = confirmar ? BONIFICA_OPCOES.find((o) => o.value === confirmar.entidade)?.label : "";
+
+  return (
+    <div className="rounded-lg border border-border bg-card px-5 py-4 flex items-center justify-between gap-4 flex-wrap">
+      <div>
+        <p className="text-sm font-semibold">O que bonifica</p>
+        <p className="text-xs text-muted-foreground mt-0.5">Define o que o programa recompensa — usado pelo Gatilho de cada regra.</p>
+      </div>
+      <div className="flex items-center gap-1.5">
+        {BONIFICA_OPCOES.map((opt) => (
+          <button key={opt.value} type="button" title={opt.desc} onClick={() => alternar(opt.value)}
+            className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
+              bonifica.includes(opt.value) ? "border-primary bg-primary/10 text-primary" : "border-border/70 bg-background text-muted-foreground hover:border-primary/40"
+            }`}>
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
+      {confirmar && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setConfirmar(null)}>
+          <div className="bg-background rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold">Remover "{label}"?</h2>
+            <p className="text-sm text-muted-foreground">
+              {confirmar.count} regra{confirmar.count > 1 ? "s" : ""} já {confirmar.count > 1 ? "usam" : "usa"} esse tipo de gatilho — {confirmar.count > 1 ? "elas continuam ativas" : "ela continua ativa"}, o programa só deixa de indicar que bonifica {label}.
+            </p>
+            <div className="flex gap-2">
+              <Button variant="secondary" className="flex-1" onClick={() => setConfirmar(null)}>Cancelar</Button>
+              <Button variant="destructive" className="flex-1" onClick={() => { aplicar(confirmar.entidade); setConfirmar(null); }}>Remover mesmo assim</Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Bases de produto (Biblioteca) ────────────────────────────────────────────
+
+function BasesProduto() {
+  const bonifica = getBonificaEscolha();
+  if (!bonifica.includes("produto")) return null;
+
+  const conjuntos = getConjuntosProdutos().length;
+  const classes = getClassesProduto().length;
+  const tiers = getTiersProduto().length;
+  const nenhumaBase = conjuntos === 0 && classes === 0 && tiers === 0;
+
+  return (
+    <div className="rounded-lg border border-border bg-card px-5 py-4 flex items-center justify-between gap-4 flex-wrap">
+      <div className="flex items-center gap-3">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-100 text-violet-600 shrink-0">
+          <Library className="size-4" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold">Bases de produto</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {nenhumaBase
+              ? "Nenhum Conjunto, Classe ou Tier de produto criado ainda — usados pelo Gatilho e pela Elegibilidade das regras."
+              : `${conjuntos} conjunto${conjuntos !== 1 ? "s" : ""} · ${classes} classe${classes !== 1 ? "s" : ""} · ${tiers} tier${tiers !== 1 ? "s" : ""} de produto`}
+          </p>
+        </div>
+      </div>
+      <Button asChild size="sm" variant="outline">
+        <Link to="/biblioteca">Gerenciar no Cadastro <ChevronRight className="ml-1.5 h-3.5 w-3.5" /></Link>
+      </Button>
+    </div>
+  );
+}
+
+// ── Liberação padrão ─────────────────────────────────────────────────────────
+
+function LiberacaoPadrao() {
+  const [liberacao, setLiberacao] = useState<LiberacaoConfig>(() => getLiberacao());
+  const liberacaoConfigurada = getOnboardingDone().includes("liberacao");
+
+  function alterar(patch: Partial<LiberacaoConfig>) {
+    setLiberacao((prev) => {
+      const next = { ...prev, ...patch };
+      saveLiberacao(next);
+      return next;
+    });
+  }
+
+  if (!liberacaoConfigurada) return null;
+
+  return (
+    <div className="rounded-lg border border-border bg-card px-5 py-4 flex items-center justify-between gap-4 flex-wrap">
+      <div>
+        <p className="text-sm font-semibold">Liberação padrão</p>
+        <p className="text-xs text-muted-foreground mt-0.5">Timing inicial de toda regra nova — mudar aqui não afeta regra já criada.</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="flex gap-1.5">
+          {([{ value: "imediato" as const, label: "Imediato" }, { value: "dias" as const, label: "Após X dias" }]).map((opt) => (
+            <button key={opt.value} type="button" onClick={() => alterar({ timingTipo: opt.value })}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                liberacao.timingTipo === opt.value ? "border-primary bg-primary/10 text-primary" : "border-border/70 bg-background text-muted-foreground hover:border-primary/40"
+              }`}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        {liberacao.timingTipo === "dias" && (
+          <div className="flex items-center gap-1.5">
+            <input type="number" min={1} value={liberacao.timingDias}
+              onChange={(e) => alterar({ timingDias: e.target.value ? Number(e.target.value) : 1 })}
+              className="w-16 rounded-md border border-input bg-background px-2 py-1.5 text-xs" />
+            <span className="text-xs text-muted-foreground">dias</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Conversão de pontos ──────────────────────────────────────────────────────
 
 function ConversaoPontos() {
@@ -251,7 +398,10 @@ export default function MecanicaPrograma() {
         }
       />
 
+      <BonificaMecanica />
+      <BasesProduto />
       <ConversaoPontos />
+      <LiberacaoPadrao />
 
       {regras.length === 0 ? (
         <EmptyState icon={Plus} title="Nenhuma regra cadastrada"

@@ -1,18 +1,12 @@
 import { useState } from "react";
-import { Button, Input, Label, Tabs, TabsList, TabsTrigger, TabsContent, toast } from "@kruzer/ds";
+import { Button, EmptyState, Input, Label, Tabs, TabsList, TabsTrigger, TabsContent, toast } from "@kruzer/ds";
 import { User, CreditCard, CheckCircle2, AlertCircle, Building2 } from "lucide-react";
+import { getMembroLogado, upsertMembro } from "../../lib/membros";
 
-// ── Mock do membro logado ─────────────────────────────────────────────────────
-
-const MEMBRO = {
-  nome: "Aline Paula Silva",
-  email: "aline.silva@email.com",
-  telefone: "(11) 99876-5432",
-  tipoPessoa: "PF" as "PF" | "PJ",
-  cpf: "123.456.789-00",
-  cnpj: "",
-  razaoSocial: "",
-};
+// Dados bancários/PJ ainda não têm modelo real por trás (Membro não tem
+// cnpj/razaoSocial/chavePix) — combinado que isso fica pra decidir depois,
+// então continua fixo em "PF" e vazio por enquanto.
+const DADOS_PJ_MOCK = { tipoPessoa: "PF" as "PF" | "PJ", cnpj: "", razaoSocial: "" };
 
 type ChavePix = "cpf" | "email" | "telefone" | "aleatoria";
 type TipoConta = "corrente" | "poupanca";
@@ -41,42 +35,60 @@ type DadosBancariosPJ = {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function MinhaConta() {
-  // Dados pessoais
-  const [nome, setNome]     = useState(MEMBRO.nome);
-  const [email, setEmail]   = useState(MEMBRO.email);
-  const [tel, setTel]       = useState(MEMBRO.telefone);
+  const membro = getMembroLogado();
+
+  // Dados pessoais — hooks precisam rodar sempre, mesmo sem membro (a tela some
+  // via early return abaixo, o hook em si não pode ser condicional)
+  const [nome, setNome]     = useState(membro?.nome ?? "");
+  const [email, setEmail]   = useState(membro?.email ?? "");
+  const [tel, setTel]       = useState(membro?.telefone ?? "");
   const [savingDados, setSavingDados] = useState(false);
 
   // Dados bancários PF
   const [pf, setPF] = useState<DadosBancariosPF>({
     chavePix: "cpf",
-    valorChave: MEMBRO.cpf,
+    valorChave: membro?.cpf ?? "",
     banco: "",
     agencia: "",
     conta: "",
     tipoConta: "corrente",
-    nomeCompleto: MEMBRO.nome,
-    cpf: MEMBRO.cpf,
+    nomeCompleto: membro?.nome ?? "",
+    cpf: membro?.cpf ?? "",
   });
   const [savingPF, setSavingPF] = useState(false);
   const [savedPF, setSavedPF] = useState(false);
 
   // Dados bancários PJ
   const [pj, setPJ] = useState<DadosBancariosPJ>({
-    cnpj: MEMBRO.cnpj,
-    razaoSocial: MEMBRO.razaoSocial,
+    cnpj: DADOS_PJ_MOCK.cnpj,
+    razaoSocial: DADOS_PJ_MOCK.razaoSocial,
     banco: "",
     agencia: "",
     conta: "",
     tipoConta: "corrente",
-    responsavel: MEMBRO.nome,
+    responsavel: membro?.nome ?? "",
   });
 
-  const isPF = MEMBRO.tipoPessoa === "PF";
+  const isPF = DADOS_PJ_MOCK.tipoPessoa === "PF";
+
+  if (!membro) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold">Minha conta</h1>
+          <p className="text-sm text-muted-foreground mt-1">Gerencie seus dados e configure como receber créditos de resgate.</p>
+        </div>
+        <EmptyState icon={User} title="Nenhum membro cadastrado ainda"
+          description="Assim que houver um membro no programa, esta tela mostra os dados dele." />
+      </div>
+    );
+  }
 
   async function salvarDados() {
+    if (!membro) return;
     setSavingDados(true);
     await new Promise(r => setTimeout(r, 600));
+    upsertMembro({ ...membro, nome, email, telefone: tel });
     setSavingDados(false);
     toast.success("Dados atualizados com sucesso");
   }
@@ -147,7 +159,7 @@ export default function MinhaConta() {
               </div>
               <div className="space-y-1.5">
                 <Label>{isPF ? "CPF" : "CNPJ"}</Label>
-                <Input value={isPF ? MEMBRO.cpf : MEMBRO.cnpj} disabled className="bg-muted/40" />
+                <Input value={isPF ? membro.cpf : DADOS_PJ_MOCK.cnpj} disabled className="bg-muted/40" />
                 <p className="text-[10px] text-muted-foreground">Campo não editável — entre em contato com o suporte.</p>
               </div>
             </div>
@@ -206,7 +218,7 @@ export default function MinhaConta() {
                   <div className="space-y-1.5">
                     <Label>Chave</Label>
                     <Input
-                      value={pf.chavePix === "cpf" ? MEMBRO.cpf : pf.valorChave}
+                      value={pf.chavePix === "cpf" ? membro.cpf : pf.valorChave}
                       onChange={e => setPF(p => ({ ...p, valorChave: e.target.value }))}
                       disabled={pf.chavePix === "cpf"}
                       placeholder={

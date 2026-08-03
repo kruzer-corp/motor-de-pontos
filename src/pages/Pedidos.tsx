@@ -8,9 +8,9 @@ import {
   Tabs, TabsContent, TabsList, TabsTrigger,
   toast,
 } from "@kruzer/ds";
-import { AlertTriangle, Ban, FileCheck, FileCheck2, MoreHorizontal, Package, Pencil, RotateCcw, Upload, CheckCheck, UserCircle } from "lucide-react";
-import { TIPO_RESGATE_LABEL, TIPO_RESGATE_ICON } from "../config/resgateLifecycle";
-import { registrarTransacaoSaldo } from "../lib/membros";
+import { AlertTriangle, Ban, FileCheck, FileCheck2, MoreHorizontal, Package, Pencil, RotateCcw, Upload, CheckCheck, UserCircle, X } from "lucide-react";
+import { TIPO_RESGATE_LABEL, TIPO_RESGATE_ICON, STATUS_LABEL, type OrderStatus } from "../config/resgateLifecycle";
+import { registrarTransacaoSaldo, getSolicitacoesEstornoPendentes, resolverEstornoSolicitado, type PedidoResgate } from "../lib/membros";
 import { ehV1 } from "../lib/versao";
 
 // ── Fluxo Documental ──────────────────────────────────────────────────────────
@@ -162,8 +162,6 @@ function DocTable({ orders, docType }: { orders: DocOrder[]; docType: "RPA" | "N
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-
-export type OrderStatus = "solicitado" | "aguardando_doc" | "doc_recebido" | "aprovado" | "em_separacao" | "entregue" | "enviado" | "creditado" | "rejeitado" | "cancelado";
 
 export type TimelineEntry = {
   status: OrderStatus; date: string; operator?: string;
@@ -322,19 +320,6 @@ export function aplicarAprovacaoAutomatica(orders: Order[]): Order[] {
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-export const STATUS_LABEL: Record<OrderStatus, string> = {
-  solicitado:    "Solicitado",
-  aguardando_doc:"Aguardando doc.",
-  doc_recebido:  "Doc. recebido",
-  aprovado:      "Aprovado",
-  em_separacao:  "Em separação",
-  entregue:      "Entregue",
-  enviado:       "Enviado",
-  creditado:     "Creditado",
-  rejeitado:     "Rejeitado",
-  cancelado:     "Cancelado",
-};
-
 const STATUS_PILL: Record<OrderStatus, "warning" | "primary" | "secondary" | "success" | "destructive" | "muted"> = {
   solicitado:    "warning",
   aguardando_doc:"warning",
@@ -372,14 +357,76 @@ function matchTab(status: OrderStatus, tab: string) {
 
 const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+// ── Recusar solicitação de estorno ──────────────────────────────────────────────
+
+function RecusarEstornoModal({ pedido, onClose, onRecusar }: {
+  pedido: PedidoResgate; onClose: () => void; onRecusar: (motivo: string) => void;
+}) {
+  const [motivo, setMotivo] = useState("");
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-background rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-base font-bold">Recusar solicitação</h2>
+          <button onClick={onClose}><X className="h-4 w-4 text-muted-foreground" /></button>
+        </div>
+        <div className="rounded-lg bg-muted/40 px-4 py-3 text-sm">
+          <p className="font-medium">{pedido.produto}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{pedido.pontos.toLocaleString("pt-BR")} {pedido.abrev} — o membro vai ver esse motivo.</p>
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">Motivo da recusa <span className="text-destructive">*</span></label>
+          <textarea
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+            placeholder="Explique por que o estorno não vai ser feito."
+            rows={3}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex-1" onClick={onClose}>Voltar</Button>
+          <Button variant="destructive" className="flex-1" disabled={!motivo.trim()} onClick={() => onRecusar(motivo)}>
+            Confirmar recusa
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function Pedidos() {
   const navigate = useNavigate();
-  const [pageView, setPageView] = useState<"pedidos" | "documental">("pedidos");
+  const [pageView, setPageView] = useState<"pedidos" | "documental" | "estornos">("pedidos");
   const [orders, setOrders] = useState<Order[]>(() => (ehV1() ? [] : aplicarAprovacaoAutomatica(ORDERS)));
   const [search, setSearch] = useState("");
   const [tab,    setTab]    = useState("todos");
+  const [solicitacoesEstorno, setSolicitacoesEstorno] = useState(() => getSolicitacoesEstornoPendentes());
+  const [recusando, setRecusando] = useState<{ membroId: string; pedido: PedidoResgate } | null>(null);
+
+  function aprovarEstorno(membroId: string, pedidoId: string) {
+    const resultado = resolverEstornoSolicitado(membroId, pedidoId, true);
+    if (!resultado.ok) {
+      toast.error(resultado.erro ?? "Não foi possível aprovar esse estorno.");
+      return;
+    }
+    setSolicitacoesEstorno(getSolicitacoesEstornoPendentes());
+    toast.success("Estorno aprovado — saldo devolvido ao membro");
+  }
+
+  function recusarEstorno(motivo: string) {
+    if (!recusando) return;
+    const resultado = resolverEstornoSolicitado(recusando.membroId, recusando.pedido.id, false, motivo);
+    if (!resultado.ok) {
+      toast.error(resultado.erro ?? "Não foi possível recusar essa solicitação.");
+      return;
+    }
+    setSolicitacoesEstorno(getSolicitacoesEstornoPendentes());
+    toast.info("Solicitação de estorno recusada");
+    setRecusando(null);
+  }
 
   const filtered = useMemo(() =>
     orders.filter((o) =>
@@ -407,12 +454,16 @@ export default function Pedidos() {
       <PageHeader
         title="Aprovações de Resgate"
         path={[{ label: "Operação" }]}
-        description={pageView === "pedidos" ? "Fila de resgates solicitados pelos membros via canal." : "Documentos enviados pelos membros via portal."}
+        description={
+          pageView === "pedidos" ? "Fila de resgates solicitados pelos membros via canal." :
+          pageView === "documental" ? "Documentos enviados pelos membros via portal." :
+          "Pedidos de estorno feitos pelo membro depois que o resgate já foi finalizado."
+        }
       />
 
       {/* View switcher */}
       <div className="flex gap-1 border-b border-border">
-        {([["pedidos", "Fila de resgates"], ["documental", "Fluxo documental"]] as const).map(([view, label]) => (
+        {([["pedidos", "Fila de resgates"], ["documental", "Fluxo documental"], ["estornos", "Solicitações de estorno"]] as const).map(([view, label]) => (
           <button
             key={view}
             onClick={() => setPageView(view)}
@@ -423,6 +474,11 @@ export default function Pedidos() {
             }`}
           >
             {label}
+            {view === "estornos" && solicitacoesEstorno.length > 0 && (
+              <span className="ml-1.5 rounded-full bg-amber-100 text-amber-700 px-1.5 py-0.5 text-[10px] font-semibold">
+                {solicitacoesEstorno.length}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -648,6 +704,53 @@ export default function Pedidos() {
             </TabsContent>
           </Tabs>
         </div>
+      )}
+
+      {/* ── Solicitações de estorno (pedido do membro, execução do analista) ── */}
+      {pageView === "estornos" && (
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
+          {solicitacoesEstorno.length === 0 ? (
+            <div className="py-16 flex flex-col items-center gap-2">
+              <RotateCcw className="size-8 text-muted-foreground/40" />
+              <p className="text-sm text-muted-foreground">Nenhuma solicitação de estorno pendente.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {solicitacoesEstorno.map(({ membroId, membroNome, pedido }) => (
+                <div key={pedido.id} className="flex items-start justify-between gap-4 px-5 py-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold">{pedido.produto}</p>
+                      <Pill color="warning" variant="soft" size="sm">{TIPO_RESGATE_LABEL[pedido.tipo]}</Pill>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {membroNome} · {pedido.pontos.toLocaleString("pt-BR")} {pedido.abrev} · solicitado em {pedido.estornoSolicitadoEm}
+                    </p>
+                    <p className="text-sm mt-2 rounded-lg bg-muted/40 px-3 py-2">{pedido.motivoEstornoSolicitado}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button size="sm" variant="outline" onClick={() => setRecusando({ membroId, pedido })}>
+                      <Ban className="size-3.5 mr-1.5" />
+                      Recusar
+                    </Button>
+                    <Button size="sm" onClick={() => aprovarEstorno(membroId, pedido.id)}>
+                      <CheckCheck className="size-3.5 mr-1.5" />
+                      Aprovar estorno
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {recusando && (
+        <RecusarEstornoModal
+          pedido={recusando.pedido}
+          onClose={() => setRecusando(null)}
+          onRecusar={recusarEstorno}
+        />
       )}
     </div>
   );

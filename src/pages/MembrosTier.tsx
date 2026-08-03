@@ -231,7 +231,7 @@ export default function MembrosTier() {
         <TabsContent value="segmentacoes" className="mt-5 space-y-8">
 
           <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
-            Segmento de membro (Premium, Fidelidade etc.) agora é gerenciado na <Link to="/biblioteca" className="underline font-medium text-foreground">Biblioteca</Link> — junto dos outros recursos que a Regra consome.
+            Segmento de membro (Premium, Fidelidade etc.) agora é gerenciado no <Link to="/biblioteca" className="underline font-medium text-foreground">Cadastro de produtos e membros</Link> — junto dos outros recursos que a Regra consome.
           </div>
 
           {/* Segmentações · Produtos */}

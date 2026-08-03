@@ -1,8 +1,6 @@
 import { useState } from "react";
 import {
-  Button, FormDrawer, Input, Label, PageHeader, Pill,
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-  TableEmpty, toast,
+  Button, FormDrawer, Input, Label, PageHeader, Pill, toast,
 } from "@kruzer/ds";
 import {
   AlertTriangle, Ban, CheckCircle2, ChevronDown, ChevronUp,
@@ -38,14 +36,14 @@ const TIPO_META: Record<AlertTipo, { label: string; icon: React.ElementType }> =
   velocidade:       { label: "Velocidade suspeita",       icon: Clock         },
 };
 
-const SEV_STYLE: Record<AlertSev, { bar: string; bg: string; pill: "danger" | "warning" | "muted"; label: string }> = {
-  alta:  { bar: "bg-rose-500",  bg: "bg-rose-50 dark:bg-rose-950/20",  pill: "danger",  label: "Alta"  },
+const SEV_STYLE: Record<AlertSev, { bar: string; bg: string; pill: "destructive" | "warning" | "muted"; label: string }> = {
+  alta:  { bar: "bg-rose-500",  bg: "bg-rose-50 dark:bg-rose-950/20",  pill: "destructive",  label: "Alta"  },
   media: { bar: "bg-amber-400", bg: "bg-amber-50 dark:bg-amber-950/20",pill: "warning", label: "Média" },
   baixa: { bar: "bg-slate-300", bg: "",                                  pill: "muted",   label: "Baixa" },
 };
 
-const STATUS_META: Record<AlertStatus, { label: string; color: "danger" | "warning" | "success" | "muted" }> = {
-  novo:       { label: "Novo",       color: "danger"  },
+const STATUS_META: Record<AlertStatus, { label: string; color: "destructive" | "warning" | "success" | "muted" }> = {
+  novo:       { label: "Novo",       color: "destructive"  },
   em_analise: { label: "Em análise", color: "warning" },
   resolvido:  { label: "Resolvido",  color: "success" },
   bloqueado:  { label: "Bloqueado",  color: "muted"   },

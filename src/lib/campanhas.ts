@@ -7,6 +7,8 @@
 import {
   type GatilhoTipo, type MecanismoAtribuicao, type EixoTipo, type EstornoPolicy, type FaixaBeneficio,
 } from "./regras";
+import { type Produto, getProdutos } from "./produtos";
+import { getConjuntosProdutos } from "./conjuntosProdutos";
 
 export type CampStatus = "ativa" | "pausada" | "agendada" | "rascunho" | "encerrada" | "arquivada";
 
@@ -193,4 +195,55 @@ export function removeCampanha(id: string): Campanha[] {
 
 export function novoIdCampanha(): string {
   return `CMP-${String(Date.now()).slice(-6)}`;
+}
+
+// ── Produtos elegíveis (derivado de Gatilho + Elegibilidade) ─────────────────
+// Campanha não guarda uma lista fixa de produtos — ela é baseada em regra. A
+// lista de produtos que ela atinge é CALCULADA cruzando essas regras com o
+// catálogo, aqui, na hora do uso — não em um campo salvo no Produto. Fonte
+// única, usada tanto no wizard (Revisão) quanto na lista de Produtos
+// incentivados (pra saber quem está em campanha ativa agora).
+//
+// Gatilho por Classe é a exceção: Produto não tem vínculo direto com Classe
+// de produto no cadastro atual, então não dá pra derivar por esse filtro.
+
+export function produtosElegiveisDaCampanha(f: Form): { produtos: Produto[]; semFiltro: boolean; gatilhoSemVinculo: boolean } {
+  const gatilhoSemVinculo = f.gatilhoTipo === "compra_classe";
+  let base = getProdutos().filter((p) => p.status !== "arquivado");
+  let filtrou = false;
+
+  if (f.gatilhoTipo === "compra_conjunto" && f.gatilhoConjuntoId) {
+    const conjunto = getConjuntosProdutos().find((c) => c.id === f.gatilhoConjuntoId);
+    base = conjunto ? base.filter((p) => conjunto.produtosIds.includes(p.id)) : [];
+    filtrou = true;
+  }
+  if (f.conjuntoElegibilidadeId) {
+    const conjunto = getConjuntosProdutos().find((c) => c.id === f.conjuntoElegibilidadeId);
+    base = conjunto ? base.filter((p) => conjunto.produtosIds.includes(p.id)) : base;
+    filtrou = true;
+  }
+  if (f.produtoTiers.length > 0) {
+    base = base.filter((p) => p.tierProdutoId && f.produtoTiers.includes(p.tierProdutoId));
+    filtrou = true;
+  }
+
+  return { produtos: base, semFiltro: !filtrou && !gatilhoSemVinculo, gatilhoSemVinculo };
+}
+
+// Mapa produtoId → campanhas ativas que o incentivam agora — usado pela lista
+// de Produtos incentivados. Só considera Gatilho transacional (produto/pedido);
+// campanhas de evento (cliente) não têm dimensão de produto.
+export function camposCampanhasAtivasPorProduto(): Map<string, Campanha[]> {
+  const mapa = new Map<string, Campanha[]>();
+  const ativas = getCampanhas().filter((c) => c.status === "ativa");
+  for (const c of ativas) {
+    if (c.gatilhoTipo === "evento_nao_transacional") continue;
+    const { produtos } = produtosElegiveisDaCampanha(c);
+    for (const p of produtos) {
+      const lista = mapa.get(p.id) ?? [];
+      lista.push(c);
+      mapa.set(p.id, lista);
+    }
+  }
+  return mapa;
 }

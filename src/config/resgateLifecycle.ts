@@ -1,4 +1,19 @@
-import type { OrderStatus } from "../pages/Pedidos";
+export type OrderStatus = "solicitado" | "aguardando_doc" | "doc_recebido" | "aprovado" | "em_separacao" | "entregue" | "enviado" | "creditado" | "rejeitado" | "cancelado";
+
+// Rótulo do status — fonte única (admin e portal do membro leem daqui, cada
+// um decide sua própria cor/variante de exibição em cima do mesmo texto).
+export const STATUS_LABEL: Record<OrderStatus, string> = {
+  solicitado:     "Solicitado",
+  aguardando_doc: "Aguardando doc.",
+  doc_recebido:   "Doc. recebido",
+  aprovado:       "Aprovado",
+  em_separacao:   "Em separação",
+  entregue:       "Entregue",
+  enviado:        "Enviado",
+  creditado:      "Creditado",
+  rejeitado:      "Rejeitado",
+  cancelado:      "Cancelado",
+};
 
 export type TipoResgate = "produto_fisico" | "voucher_digital" | "credito_conta";
 

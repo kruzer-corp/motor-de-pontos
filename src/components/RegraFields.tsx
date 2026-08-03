@@ -15,21 +15,13 @@ import { getClassesProduto } from "../lib/classesProduto";
 import { getPapeisMembro } from "../lib/papeisMembro";
 import { getTiersProduto } from "../lib/tiersProduto";
 import { getTiersMembro } from "../lib/tiers";
-import { type BonificaEntidade, getBonificaEscolha } from "../lib/onboarding";
+import { getBonificaEscolha, GATILHOS_POR_ENTIDADE } from "../lib/onboarding";
 import { getSegmentosMembro } from "../lib/segmentosMembro";
 
 const GATILHOS: GatilhoTipo[] = ["compra_qualquer", "compra_conjunto", "compra_classe", "primeira_compra", "marco_recorrencia", "evento_nao_transacional"];
 const EIXOS: EixoTipo[] = ["valor_total", "valor_linha", "quantidade", "flat"];
 const MECANISMOS: MecanismoAtribuicao[] = ["mesma_pessoa", "direto", "dividido"];
 const ESTORNOS: EstornoPolicy[] = ["estornar_tudo", "estornar_proporcional", "manter"];
-
-// Gatilhos relevantes por entidade de bonifica — a tela de Regra mostra a
-// união de todas as entidades marcadas (1, 2 ou as 3).
-const GATILHOS_POR_ENTIDADE: Record<BonificaEntidade, GatilhoTipo[]> = {
-  produto: ["compra_conjunto", "compra_classe"],
-  pedido:  ["compra_qualquer", "primeira_compra", "marco_recorrencia"],
-  cliente: ["marco_recorrencia", "evento_nao_transacional"],
-};
 
 type Props = { value: RegraCampos; onChange: (patch: Partial<RegraCampos>) => void };
 
@@ -159,7 +151,7 @@ export function GatilhoFields({ value, onChange }: GatilhoProps) {
             <SelectTrigger><SelectValue placeholder="Selecione um conjunto" /></SelectTrigger>
             <SelectContent>{conjuntos.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
           </Select>
-          {conjuntos.length === 0 && <p className="text-xs text-muted-foreground">Nenhum conjunto cadastrado — crie um em Biblioteca.</p>}
+          {conjuntos.length === 0 && <p className="text-xs text-muted-foreground">Nenhum conjunto cadastrado — crie um no Cadastro de produtos e membros.</p>}
         </div>
       )}
       {value.gatilhoTipo === "compra_classe" && (
@@ -232,7 +224,7 @@ export function AtribuicaoFields({ value, onChange }: AtribuicaoProps) {
               </Select>
             </div>
           </div>
-          {papeis.length === 0 && <p className="text-xs text-muted-foreground">Nenhum papel cadastrado ainda — crie em Biblioteca (ex: Arquiteto).</p>}
+          {papeis.length === 0 && <p className="text-xs text-muted-foreground">Nenhum papel cadastrado ainda — crie no Cadastro de produtos e membros (ex: Arquiteto).</p>}
 
           <div className="space-y-1.5">
             <Label className="text-xs">Mecanismo</Label>

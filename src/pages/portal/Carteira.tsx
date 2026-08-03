@@ -1,52 +1,63 @@
 import { useNavigate } from "react-router-dom";
-import { Button } from "@kruzer/ds";
-import { Gift, AlertCircle, ChevronRight } from "lucide-react";
+import { Button, EmptyState } from "@kruzer/ds";
+import { Gift, AlertCircle, ChevronRight, UserCircle } from "lucide-react";
 import { MOEDA } from "../../config/programa";
-
-const MEMBRO = {
-  nome: "Aline P.", saldo: 5200, expiram: 240, tier: "Diamante",
-  tierColor: "bg-violet-100 text-violet-700", progresso: 100, proximoTier: null,
-};
-
-const ULTIMAS = [
-  { id: "t1", data: "18/06/2025", desc: "Compra na loja — R$ 320,00", valor: +320, tipo: "acumulo" },
-  { id: "t2", data: "15/06/2025", desc: "Resgate — Cupom 10% desconto", valor: -500, tipo: "resgate" },
-  { id: "t3", data: "10/06/2025", desc: "Compra na loja — R$ 180,00", valor: +180, tipo: "acumulo" },
-];
+import { getMembroLogado, agruparSaldosPorMoeda } from "../../lib/membros";
+import { getTiersMembro, ordenarPorLimiar, proximoTier } from "../../lib/tiers";
 
 export default function Carteira() {
   const navigate = useNavigate();
+  const membro = getMembroLogado();
+
+  if (!membro) {
+    return (
+      <EmptyState icon={UserCircle} title="Nenhum membro cadastrado ainda"
+        description="Assim que houver um membro no programa, esta tela mostra o saldo e os benefícios dele." />
+    );
+  }
+
+  const saldo = agruparSaldosPorMoeda(membro.saldos).find((s) => s.moeda === MOEDA.nome)?.total ?? 0;
+  const tiers = ordenarPorLimiar(getTiersMembro());
+  const tierAtual = tiers.find((t) => t.nome === membro.tier);
+  const proximo = tierAtual ? proximoTier(tiers, tierAtual.nome) : null;
+  const ultimas = membro.transacoes.slice(0, 3);
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Olá, {MEMBRO.nome.split(" ")[0]}!</h1>
+        <h1 className="text-2xl font-bold">Olá, {membro.nome.split(" ")[0]}!</h1>
         <p className="text-sm text-muted-foreground mt-1">Veja seu saldo e acompanhe seus benefícios.</p>
       </div>
 
       {/* Saldo principal */}
       <div className="rounded-2xl bg-primary p-6 text-primary-foreground">
         <p className="text-sm opacity-70 mb-1">Seu saldo atual</p>
-        <p className="text-4xl font-bold tabular-nums">{MEMBRO.saldo.toLocaleString("pt-BR")}</p>
+        <p className="text-4xl font-bold tabular-nums">{saldo.toLocaleString("pt-BR")}</p>
         <p className="text-sm opacity-70 mt-1">{MOEDA.nome}</p>
         <div className="flex items-center gap-3 mt-4 pt-4 border-t border-white/20">
-          <span className={`rounded-full px-3 py-1 text-xs font-bold ${MEMBRO.tierColor}`}>{MEMBRO.tier}</span>
-          {MEMBRO.proximoTier && (
-            <span className="text-xs opacity-60">Faltam X {MOEDA.abrev} para {MEMBRO.proximoTier}</span>
+          {tierAtual ? (
+            <span className="rounded-full px-3 py-1 text-xs font-bold" style={{ backgroundColor: `${tierAtual.cor}33`, color: tierAtual.cor }}>
+              {tierAtual.nome}
+            </span>
+          ) : (
+            <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold">{membro.tier}</span>
           )}
-          {!MEMBRO.proximoTier && (
+          {proximo && (
+            <span className="text-xs opacity-60">Faltam {(proximo.limiarMin - saldo).toLocaleString("pt-BR")} {MOEDA.abrev} para {proximo.nome}</span>
+          )}
+          {tierAtual && !proximo && (
             <span className="text-xs opacity-60">Tier máximo atingido ✓</span>
           )}
         </div>
       </div>
 
       {/* Alerta de expiração */}
-      {MEMBRO.expiram > 0 && (
+      {membro.expiram30d > 0 && (
         <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
           <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
           <div>
             <p className="text-sm font-semibold text-amber-800">
-              {MEMBRO.expiram.toLocaleString("pt-BR")} {MOEDA.abrev} expiram em 30 dias
+              {membro.expiram30d.toLocaleString("pt-BR")} {MOEDA.abrev} expiram em 30 dias
             </p>
             <p className="text-xs text-amber-700 mt-0.5">Resgate antes de perder seus {MOEDA.nome.toLowerCase()}.</p>
           </div>
@@ -91,24 +102,28 @@ export default function Carteira() {
             Ver extrato completo
           </button>
         </div>
-        <div className="rounded-xl border border-border bg-card divide-y divide-border">
-          {ULTIMAS.map((t) => (
-            <div key={t.id} className="flex items-center gap-3 px-4 py-3.5">
-              <div className={`h-7 w-7 rounded-full flex items-center justify-center shrink-0 text-xs font-bold
-                ${t.tipo === "acumulo" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-600"}`}>
-                {t.tipo === "acumulo" ? "+" : "−"}
+        {ultimas.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-6 rounded-xl border border-border bg-card">Nenhuma movimentação ainda.</p>
+        ) : (
+          <div className="rounded-xl border border-border bg-card divide-y divide-border">
+            {ultimas.map((t) => (
+              <div key={t.id} className="flex items-center gap-3 px-4 py-3.5">
+                <div className={`h-7 w-7 rounded-full flex items-center justify-center shrink-0 text-xs font-bold
+                  ${t.valor >= 0 ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-600"}`}>
+                  {t.valor >= 0 ? "+" : "−"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{t.descricao}</p>
+                  <p className="text-xs text-muted-foreground">{t.data}</p>
+                </div>
+                <span className={`text-sm font-semibold tabular-nums shrink-0
+                  ${t.valor >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                  {t.valor > 0 ? "+" : ""}{t.valor.toLocaleString("pt-BR")}
+                </span>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{t.desc}</p>
-                <p className="text-xs text-muted-foreground">{t.data}</p>
-              </div>
-              <span className={`text-sm font-semibold tabular-nums shrink-0
-                ${t.tipo === "acumulo" ? "text-emerald-600" : "text-rose-600"}`}>
-                {t.valor > 0 ? "+" : ""}{t.valor.toLocaleString("pt-BR")}
-              </span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

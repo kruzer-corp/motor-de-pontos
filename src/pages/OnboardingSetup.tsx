@@ -16,17 +16,11 @@ import { MOEDA, type TipoResgate, TIPO_RESGATE_LABEL, saveMoeda } from "../confi
 import { getConversao, saveConversao } from "../lib/conversaoPontos";
 import { type LiberacaoConfig, getLiberacao, saveLiberacao } from "../lib/liberacao";
 import {
-  type BonificaEntidade, type BonificaEscolha, getBonificaEscolha, saveBonificaEscolha,
+  type BonificaEntidade, type BonificaEscolha, BONIFICA_OPCOES, getBonificaEscolha, saveBonificaEscolha,
   getOnboardingDone, marcarOnboardingFeito, onboardingCompleto,
 } from "../lib/onboarding";
 import { ehV1 } from "../lib/versao";
 import { OnboardingScreenShell } from "../components/OnboardingScreenShell";
-
-const BONIFICA_OPCOES: { value: BonificaEntidade; label: string; desc: string }[] = [
-  { value: "produto", label: "Produto",  desc: "Pontua a compra de um produto ou conjunto/classe específico." },
-  { value: "pedido",  label: "Pedido",   desc: "Pontua a compra em geral — qualquer pedido, sem exigir produto específico." },
-  { value: "cliente", label: "Cliente",  desc: "Pontua por comportamento — cadastro, indicação, recorrência." },
-];
 
 function descCadastro(bonifica: BonificaEscolha): string {
   const temProduto = bonifica.includes("produto") || bonifica.includes("pedido");
@@ -42,12 +36,12 @@ const SETUP_STEPS: {
   dependsOn: string[];
 }[] = [
   { id: "mecanica",   icon: Sliders,    title: "Decida o que bonifica",                    desc: "Produto, pedido, cliente ou os dois — o gatilho da regra define isso.", href: "",                cta: "",                       iconColor: "text-sky-600 bg-sky-100",        relevantFor: null, dependsOn: [] },
-  { id: "cadastro",   icon: UserPlus,   title: "Cadastre e importe",                        desc: "Escolha o que bonifica no passo 1 pra ver o que cadastrar aqui.", href: "/onboarding/cadastro", cta: "Cadastrar agora",       iconColor: "text-blue-600 bg-blue-100",      relevantFor: null, dependsOn: ["mecanica"] },
-  { id: "conversao",  icon: Wallet,     title: "Defina o valor de 1 ponto",                 desc: "Quanto R$ vale 1 ponto — usado no cálculo de liability e resgate.", href: "",                    cta: "",                       iconColor: "text-fuchsia-600 bg-fuchsia-100",relevantFor: null, dependsOn: ["mecanica"] },
-  { id: "canais",     icon: Building2,  title: "Cadastre canais e filiais",                 desc: "Defina onde as vendas e eventos do programa acontecem.",        href: "/canais-filiais",       cta: "Configurar canais",     iconColor: "text-indigo-600 bg-indigo-100",  relevantFor: null, dependsOn: ["mecanica"] },
-  { id: "liberacao",  icon: Unlock,     title: "Defina a liberação do crédito",             desc: "Quando o ponto fica disponível — na hora do acúmulo ou após um prazo.", href: "",                cta: "",                       iconColor: "text-rose-600 bg-rose-100",      relevantFor: null, dependsOn: ["mecanica"] },
-  { id: "moeda",      icon: Coins,      title: "Defina a moeda do resgate",                 desc: "Em que o ponto se converte no resgate, além de nome e sigla.",  href: "",                     cta: "",                       iconColor: "text-yellow-600 bg-yellow-100",  relevantFor: null, dependsOn: ["mecanica"] },
-  { id: "campaign",   icon: Sparkles,   title: "Crie sua primeira campanha",                desc: "Escolha um modelo e configure em menos de 5 minutos.",          href: "/campanhas/nova",       cta: "Criar campanha",        iconColor: "text-violet-600 bg-violet-100",  relevantFor: null, dependsOn: ["cadastro"] },
+  { id: "cadastro",   icon: UserPlus,   title: "Cadastre sua base",                         desc: "Escolha o que bonifica no passo 1 pra ver o que cadastrar aqui.", href: "/onboarding/cadastro", cta: "Cadastrar agora",       iconColor: "text-blue-600 bg-blue-100",      relevantFor: null, dependsOn: ["mecanica"] },
+  { id: "conversao",  icon: Wallet,     title: "Defina o valor de 1 ponto",                 desc: "Quanto R$ vale 1 ponto — usado no cálculo de liability e resgate.", href: "",                    cta: "",                       iconColor: "text-fuchsia-600 bg-fuchsia-100",relevantFor: null, dependsOn: ["cadastro"] },
+  { id: "canais",     icon: Building2,  title: "Cadastre canais e filiais",                 desc: "Defina onde as vendas e eventos do programa acontecem.",        href: "/canais-filiais",       cta: "Configurar canais",     iconColor: "text-indigo-600 bg-indigo-100",  relevantFor: null, dependsOn: ["conversao"] },
+  { id: "liberacao",  icon: Unlock,     title: "Defina a liberação do crédito",             desc: "Quando o ponto fica disponível — na hora do acúmulo ou após um prazo.", href: "",                cta: "",                       iconColor: "text-rose-600 bg-rose-100",      relevantFor: null, dependsOn: ["canais"] },
+  { id: "moeda",      icon: Coins,      title: "Defina a moeda do resgate",                 desc: "Em que o ponto se converte no resgate, além de nome e sigla.",  href: "",                     cta: "",                       iconColor: "text-yellow-600 bg-yellow-100",  relevantFor: null, dependsOn: ["liberacao"] },
+  { id: "campaign",   icon: Sparkles,   title: "Crie sua primeira campanha",                desc: "Escolha um modelo e configure em menos de 5 minutos.",          href: "/campanhas/nova",       cta: "Criar campanha",        iconColor: "text-violet-600 bg-violet-100",  relevantFor: null, dependsOn: ["moeda"] },
 ];
 
 function ehRelevante(step: typeof SETUP_STEPS[number], bonifica: BonificaEscolha): boolean {
@@ -144,7 +138,7 @@ export default function OnboardingSetup() {
                   </div>
 
                   {/* Conteúdo */}
-                  <div className={`flex-1 pb-5 ${isLocked ? "opacity-50" : ""}`}>
+                  <div className={`flex-1 pb-5 ${isLocked ? "opacity-50 pointer-events-none" : ""}`}>
                     <div className="flex items-center gap-2">
                       <p className="font-medium text-sm">{step.title}</p>
                       {isDone && <span className="text-[10px] font-semibold text-emerald-600">Feito</span>}

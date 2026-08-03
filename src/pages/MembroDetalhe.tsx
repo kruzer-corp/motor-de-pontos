@@ -12,8 +12,10 @@ import { renderCrumbLink } from "../lib/crumbLink";
 import {
   getMembro, upsertMembro, registrarTransacaoSaldo,
   avaliarEventosMembro, creditarEventosAcumulo,
-  MOEDA_COR, agruparSaldosPorMoeda, type Tier,
+  MOEDA_COR, agruparSaldosPorMoeda, type Tier, type Transacao,
 } from "../lib/membros";
+import { CancelarTransacaoModal } from "../components/CancelarTransacaoModal";
+import { type OrderStatus, STATUS_LABEL } from "../config/resgateLifecycle";
 
 // ── Tier config ───────────────────────────────────────────────────────────────
 
@@ -31,10 +33,17 @@ const TIPO_CONFIG = {
   expiracao: { label: "Expiração", icon: Clock,          color: "text-slate-500",   bg: "bg-slate-50" },
 };
 
-const STATUS_CONFIG = {
-  entregue:    { label: "Entregue",    variant: "success" as const },
-  processando: { label: "Processando", variant: "warning" as const },
-  cancelado:   { label: "Cancelado",   variant: "destructive" as const },
+const STATUS_VARIANT: Record<OrderStatus, "success" | "warning" | "destructive" | "secondary"> = {
+  solicitado:     "warning",
+  aguardando_doc: "warning",
+  doc_recebido:   "secondary",
+  aprovado:       "secondary",
+  em_separacao:   "secondary",
+  entregue:       "success",
+  enviado:        "success",
+  creditado:      "success",
+  rejeitado:      "destructive",
+  cancelado:      "destructive",
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -90,6 +99,8 @@ export default function MembroDetalhe() {
   const [bloqueioOpen,   setBloqueioOpen]   = useState(false);
   const [bloqueioMotivo, setBloqueioMotivo] = useState("");
   const [bloqueioSaving, setBloqueioSaving] = useState(false);
+  const [cancelarAlvo,   setCancelarAlvo]   = useState<Transacao | null>(null);
+  const [, forceRefresh] = useState(0);
 
   // Roda o motor de acúmulo uma vez, na montagem — credita os eventos elegíveis (compra, cadastro, indicação) no ledger real.
   useState(() => {
@@ -319,6 +330,7 @@ export default function MembroDetalhe() {
                   <TableHead>Tipo</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                   <TableHead className="text-right">Saldo</TableHead>
+                  <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -328,7 +340,15 @@ export default function MembroDetalhe() {
                   return (
                     <TableRow key={t.id} className="[&>td]:py-3.5">
                       <TableCell className="text-muted-foreground tabular-nums text-sm">{t.data}</TableCell>
-                      <TableCell className="font-medium text-sm">{t.descricao}</TableCell>
+                      <TableCell className="font-medium text-sm">
+                        <span className={t.canceladaEm ? "line-through text-muted-foreground" : ""}>{t.descricao}</span>
+                        {t.canceladaEm && (
+                          <Pill color="muted" variant="soft" size="sm" className="ml-2">Cancelada</Pill>
+                        )}
+                        {t.estornoDeId && (
+                          <Pill color="secondary" variant="soft" size="sm" className="ml-2">Estorno</Pill>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <span className={`inline-flex items-center gap-1 text-xs font-medium ${cfg.color}`}>
                           <Icon className="h-3 w-3" />{cfg.label}
@@ -339,6 +359,17 @@ export default function MembroDetalhe() {
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-sm text-muted-foreground">
                         {t.saldo.toLocaleString("pt-BR")} {t.abrev}
+                      </TableCell>
+                      <TableCell>
+                        {!t.canceladaEm && !t.estornoDeId && (
+                          <button
+                            onClick={() => setCancelarAlvo(t)}
+                            className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:border-rose-300 hover:text-rose-600 transition-colors whitespace-nowrap"
+                          >
+                            <Ban className="h-3 w-3" />
+                            Cancelar
+                          </button>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
@@ -427,8 +458,8 @@ export default function MembroDetalhe() {
                       <TableCell className="font-medium text-sm">{p.produto}</TableCell>
                       <TableCell className="text-muted-foreground text-sm tabular-nums">{p.data}</TableCell>
                       <TableCell>
-                        <Badge variant={STATUS_CONFIG[p.status].variant} className="text-xs">
-                          {STATUS_CONFIG[p.status].label}
+                        <Badge variant={STATUS_VARIANT[p.status]} className="text-xs">
+                          {STATUS_LABEL[p.status]}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right tabular-nums font-semibold text-sm text-rose-600">
@@ -592,6 +623,15 @@ export default function MembroDetalhe() {
             </div>
           </div>
         </div>
+      )}
+
+      {cancelarAlvo && (
+        <CancelarTransacaoModal
+          membroId={member.id}
+          transacao={cancelarAlvo}
+          onClose={() => setCancelarAlvo(null)}
+          onCancelado={() => forceRefresh((n) => n + 1)}
+        />
       )}
     </div>
   );

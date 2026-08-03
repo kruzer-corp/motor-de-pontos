@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  Button, Input, Label, NumberInput, PageHeader, Switch, toast,
+  Button, Input, Label, NumberInput, PageHeader, Pill, Switch, toast,
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@kruzer/ds";
 import { CheckCircle2, Plus, Trash2 } from "lucide-react";
@@ -9,16 +9,16 @@ import { renderCrumbLink } from "../lib/crumbLink";
 import {
   type Form, type Campanha, type Multiplicador, type MultiplicadorTipo, type ExpiracaoTipo,
   type LimiteEscopo, type LimitePeriodoGranularidade,
-  DEFAULTS, getCampanha, upsertCampanha, novoIdCampanha, novoIdMultiplicador,
+  DEFAULTS, getCampanha, upsertCampanha, novoIdCampanha, novoIdMultiplicador, produtosElegiveisDaCampanha,
 } from "../lib/campanhas";
-import { type EstornoPolicy, GATILHO_LABEL, MECANISMO_LABEL, ESTORNO_LABEL, CANAIS } from "../lib/regras";
+import { type EstornoPolicy, GATILHO_LABEL, MECANISMO_LABEL, ESTORNO_LABEL, CANAIS, gatilhoEhTransacional } from "../lib/regras";
 import { GatilhoFields, AtribuicaoFields, ElegibilidadeFields } from "../components/RegraFields";
 import { getLiberacao } from "../lib/liberacao";
 import { getSegmentosMembro } from "../lib/segmentosMembro";
 import { getTiersMembro } from "../lib/tiers";
 import { getPapeisMembro } from "../lib/papeisMembro";
 import { getTiersProduto } from "../lib/tiersProduto";
-import { CATEGORIAS } from "../lib/produtos";
+import { CATEGORIAS, PRODUTO_STATUS_PILL, PRODUTO_STATUS_LABEL } from "../lib/produtos";
 import { getConjuntosProdutos } from "../lib/conjuntosProdutos";
 
 // ── Steps ─────────────────────────────────────────────────────────────────────
@@ -86,6 +86,77 @@ function resumoElegibilidade(f: Form): string {
   if (f.papeis.length > 0) partes.push(f.papeis.map((id) => getPapeisMembro().find((x) => x.id === id)?.nome ?? id).join(", "));
   partes.push(f.statusPedido.length === 0 ? "qualquer status" : f.statusPedido.join(", "));
   return partes.join(" · ");
+}
+
+// ── Produtos elegíveis ────────────────────────────────────────────────────────
+// Lógica de derivação mora em lib/campanhas.ts (produtosElegiveisDaCampanha) —
+// reaproveitada aqui e na lista de Produtos incentivados.
+
+function ProdutosElegiveis({ form }: { form: Form }) {
+  const tiersProduto = getTiersProduto();
+  const { produtos, semFiltro, gatilhoSemVinculo } = produtosElegiveisDaCampanha(form);
+
+  return (
+    <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <div className="px-5 py-3 border-b border-border bg-muted/30 flex items-center justify-between">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Produtos elegíveis nesta campanha</p>
+        <span className="text-xs text-muted-foreground">{produtos.length} produto(s)</span>
+      </div>
+
+      {gatilhoSemVinculo && (
+        <div className="px-5 py-3 text-xs text-amber-800 bg-amber-50 border-b border-amber-200">
+          Gatilho por Classe de produto ainda não tem vínculo direto com o cadastro de Produto — não é possível derivar a lista por esse filtro. Abaixo, os produtos ativos sem esse filtro aplicado.
+        </div>
+      )}
+      {semFiltro && (
+        <div className="px-5 py-3 text-xs text-muted-foreground bg-muted/20 border-b border-border">
+          Esta campanha não restringe por Conjunto ou Tier de produto específico — todos os produtos ativos são elegíveis.
+        </div>
+      )}
+
+      {produtos.length === 0 ? (
+        <p className="text-xs text-muted-foreground text-center py-6">Nenhum produto ativo corresponde a este filtro.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-muted/20 border-b border-border">
+              <tr className="text-left text-muted-foreground">
+                {["SKU", "Nome", "Categoria", "Tier", "Status", "Preço"].map((h) => (
+                  <th key={h} className="px-4 py-2.5 font-medium text-xs whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {produtos.map((p) => (
+                <tr key={p.id}>
+                  <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground whitespace-nowrap">{p.sku}</td>
+                  <td className="px-4 py-2.5 text-sm whitespace-nowrap">{p.nome}</td>
+                  <td className="px-4 py-2.5 text-sm text-muted-foreground whitespace-nowrap">{p.categoria}</td>
+                  <td className="px-4 py-2.5 text-sm whitespace-nowrap">
+                    {(() => {
+                      const tier = tiersProduto.find((t) => t.id === p.tierProdutoId);
+                      return tier ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: tier.cor }} />
+                          {tier.nome}
+                        </span>
+                      ) : <span className="text-muted-foreground">—</span>;
+                    })()}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <Pill color={PRODUTO_STATUS_PILL[p.status]} variant="soft" size="sm">{PRODUTO_STATUS_LABEL[p.status]}</Pill>
+                  </td>
+                  <td className="px-4 py-2.5 text-sm whitespace-nowrap">
+                    {p.preco > 0 ? `R$ ${p.preco.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : <span className="text-muted-foreground">—</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── Multiplicador ─────────────────────────────────────────────────────────────
@@ -558,6 +629,8 @@ export default function CampanhasNova() {
                 <ReviewRow label="Período" value={form.periodoInicio && form.periodoFim ? `${form.periodoInicio} → ${form.periodoFim}` : "—"} />
               </div>
             </div>
+
+            {gatilhoEhTransacional(form.gatilhoTipo) && <ProdutosElegiveis form={form} />}
 
             {!jaPublicada && (
               <div className="rounded-lg border border-border overflow-hidden">

@@ -16,6 +16,7 @@ import {
 import { getTiersMembro } from "../lib/tiers";
 import { getPapeisMembro } from "../lib/papeisMembro";
 import { getSegmentosMembro } from "../lib/segmentosMembro";
+import { CancelarTransacaoModal } from "../components/CancelarTransacaoModal";
 
 // ── Config visual por tipo de movimentação (aba Movimentações) ───────────────
 
@@ -172,7 +173,7 @@ function AbaMembros() {
   return (
     <div className="space-y-4">
       <InfoNotice variant="info" title="Visão administrativa">
-        Membros não acessam esta interface. Eles participam do programa pelo canal próprio (loja, app ou dispositivo). Aqui você consulta e corrige o saldo (carteira) deles. Pra cadastrar membro novo (manual, planilha ou integração), use a <Link to="/biblioteca" className="underline font-medium">Biblioteca</Link>.
+        Membros não acessam esta interface. Eles participam do programa pelo canal próprio (loja, app ou dispositivo). Aqui você consulta e corrige o saldo (carteira) deles. Pra cadastrar membro novo (manual, planilha ou integração), use o <Link to="/biblioteca" className="underline font-medium">Cadastro de produtos e membros</Link>.
       </InfoNotice>
 
       <div className="rounded-lg border border-border bg-card overflow-hidden">
@@ -204,7 +205,7 @@ function AbaMembros() {
             <EmptyState
               icon={Users}
               title={search ? "Nenhum membro encontrado" : "Nenhum membro ainda"}
-              description={search ? "Tente buscar por outro nome ou segmento." : "Cadastre o primeiro na Biblioteca."}
+              description={search ? "Tente buscar por outro nome ou segmento." : "Cadastre o primeiro no Cadastro de produtos e membros."}
             />
           </div>
         ) : (
@@ -552,7 +553,7 @@ function AbaMembros() {
             )}
           </div>
           <div className="space-y-1.5">
-            <Label>Papel <span className="text-xs text-muted-foreground font-normal">(opcional — Biblioteca)</span></Label>
+            <Label>Papel <span className="text-xs text-muted-foreground font-normal">(opcional — Cadastro)</span></Label>
             <Select value={papel || "nenhum"} onValueChange={(v) => setPapel(v === "nenhum" ? "" : v)}>
               <SelectTrigger><SelectValue placeholder="Sem papel" /></SelectTrigger>
               <SelectContent>
@@ -560,7 +561,7 @@ function AbaMembros() {
                 {papeisMembro.map((p) => <SelectItem key={p.id} value={p.nome}>{p.nome}</SelectItem>)}
               </SelectContent>
             </Select>
-            {papeisMembro.length === 0 && <p className="text-xs text-muted-foreground">Nenhum papel cadastrado ainda — crie um em Biblioteca.</p>}
+            {papeisMembro.length === 0 && <p className="text-xs text-muted-foreground">Nenhum papel cadastrado ainda — crie um no Cadastro de produtos e membros.</p>}
           </div>
         </div>
       </FormDrawer>
@@ -575,13 +576,15 @@ function AbaMovimentacoes() {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [tipoFiltro, setTipoFiltro] = useState<"todos" | Transacao["tipo"]>("todos");
+  const [membros, setMembros] = useState<Membro[]>(() => getMembros());
+  const [cancelarAlvo, setCancelarAlvo] = useState<LinhaExtrato | null>(null);
 
   const linhas: LinhaExtrato[] = useMemo(() => {
-    const todas = getMembros().flatMap((m) =>
+    const todas = membros.flatMap((m) =>
       m.transacoes.map((t) => ({ ...t, membroId: m.id, membroNome: m.nome, membroInitials: m.initials }))
     );
     return todas.sort((a, b) => parseData(b.data) - parseData(a.data));
-  }, []);
+  }, [membros]);
 
   const filtradas = linhas.filter((l) =>
     (tipoFiltro === "todos" || l.tipo === tipoFiltro) &&
@@ -633,12 +636,13 @@ function AbaMovimentacoes() {
               <TableHead>Descrição</TableHead>
               <TableHead className="text-right">Valor</TableHead>
               <TableHead className="text-right">Saldo</TableHead>
+              <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtradas.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-10">
+                <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-10">
                   Nenhuma movimentação encontrada para esse filtro.
                 </TableCell>
               </TableRow>
@@ -661,12 +665,31 @@ function AbaMovimentacoes() {
                         </span>
                       </Pill>
                     </TableCell>
-                    <TableCell className="text-sm max-w-sm truncate">{l.descricao}</TableCell>
+                    <TableCell className="text-sm max-w-sm">
+                      <span className={`truncate block ${l.canceladaEm ? "line-through text-muted-foreground" : ""}`}>{l.descricao}</span>
+                      {l.canceladaEm && (
+                        <Pill color="muted" variant="soft" size="sm" className="mt-1">Cancelada em {l.canceladaEm}</Pill>
+                      )}
+                      {l.estornoDeId && (
+                        <Pill color="secondary" variant="soft" size="sm" className="mt-1">Estorno</Pill>
+                      )}
+                    </TableCell>
                     <TableCell className={`text-right tabular-nums font-semibold text-sm whitespace-nowrap ${l.valor >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
                       {l.valor >= 0 ? "+" : ""}{l.valor.toLocaleString("pt-BR")} {l.abrev}
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-sm text-muted-foreground whitespace-nowrap">
                       {l.saldo.toLocaleString("pt-BR")} {l.abrev}
+                    </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      {!l.canceladaEm && !l.estornoDeId && (
+                        <button
+                          onClick={() => setCancelarAlvo(l)}
+                          className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:border-rose-300 hover:text-rose-600 transition-colors whitespace-nowrap"
+                        >
+                          <Ban className="h-3 w-3" />
+                          Cancelar
+                        </button>
+                      )}
                     </TableCell>
                   </TableRow>
                 );
@@ -675,6 +698,15 @@ function AbaMovimentacoes() {
           </TableBody>
         </Table>
       </div>
+
+      {cancelarAlvo && (
+        <CancelarTransacaoModal
+          membroId={cancelarAlvo.membroId}
+          transacao={cancelarAlvo}
+          onClose={() => setCancelarAlvo(null)}
+          onCancelado={() => setMembros(getMembros())}
+        />
+      )}
     </div>
   );
 }

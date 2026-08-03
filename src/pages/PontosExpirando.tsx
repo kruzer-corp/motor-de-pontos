@@ -43,7 +43,7 @@ function daysColor(days: number): string {
 }
 
 function urgencyPill(days: number) {
-  if (days <= 7)  return <Pill color="danger"  variant="soft" size="sm" dot>{days}d</Pill>;
+  if (days <= 7)  return <Pill color="destructive"  variant="soft" size="sm" dot>{days}d</Pill>;
   if (days <= 15) return <Pill color="warning" variant="soft" size="sm" dot>{days}d</Pill>;
   return <Pill color="muted" variant="soft" size="sm">{days}d</Pill>;
 }

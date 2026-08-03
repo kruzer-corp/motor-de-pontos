@@ -8,6 +8,7 @@ import { getClassesProduto, type ClasseProduto } from "./classesProduto";
 import { getSegmentosMembro } from "./segmentosMembro";
 import { MOEDA } from "../config/programa";
 import { ehV1 } from "./versao";
+import { type TipoResgate, type OrderStatus, LIFECYCLE_POR_TIPO } from "../config/resgateLifecycle";
 
 // ── Fonte única de dados de membro — usada pela listagem e pelo detalhe ──────
 
@@ -25,11 +26,21 @@ export type Transacao = {
   tipo: "acumulo" | "resgate" | "ajuste" | "expiracao";
   moeda: string; abrev: string;
   valor: number; saldo: number;
+  canceladaEm?: string; motivoCancelamento?: string; // preenchidos quando a movimentação é cancelada — o lançamento original nunca é apagado
+  estornoDeId?: string; // presente só no lançamento de estorno gerado pelo cancelamento — aponta pra transação original
+  distribuicaoCampanhas?: { campanhaId: string; campanhaNome: string; valor: number }[]; // como um débito foi repartido entre as campanhas que compõem o saldo — usado pra estornar de volta nas campanhas certas
 };
 
 export type PedidoResgate = {
   id: string; data: string; produto: string;
-  status: "entregue" | "processando" | "cancelado"; pontos: number;
+  tipo: TipoResgate; status: OrderStatus;
+  pontos: number; moeda: string; abrev: string;
+  transacaoId: string; // aponta pra transação de débito no ledger — o que o cancelamento de fato estorna
+  canceladoEm?: string;
+  // Pedido do membro, feito depois que o resgate já foi finalizado (entregue/enviado/
+  // creditado) — não estorna nada por si só, fica pendente até um analista aprovar.
+  estornoSolicitadoEm?: string; motivoEstornoSolicitado?: string;
+  estornoRecusadoEm?: string; motivoRecusaEstorno?: string;
 };
 
 export type AjusteManual = {
@@ -117,8 +128,8 @@ const SEED: Membro[] = [
       { id: "t7", data: "22/05/2025", descricao: "Compra na loja — R$ 240,00", tipo: "acumulo", moeda: "Pontos", abrev: "pts", valor: 240, saldo: 4560 },
     ],
     pedidos: [
-      { id: "PED-001", data: "15/06/2025", produto: "Cupom 10% desconto", status: "entregue", pontos: 500 },
-      { id: "PED-002", data: "28/04/2025", produto: "Kit presente premium", status: "entregue", pontos: 1200 },
+      { id: "PED-001", data: "15/06/2025", produto: "Cupom 10% desconto", tipo: "voucher_digital", status: "enviado", pontos: 500, moeda: "Pontos", abrev: "pts", transacaoId: "PED-001" },
+      { id: "PED-002", data: "28/04/2025", produto: "Kit presente premium", tipo: "produto_fisico", status: "entregue", pontos: 1200, moeda: "Pontos", abrev: "pts", transacaoId: "PED-002" },
     ],
     ajustes: [
       { id: "AJ-001", data: "05/06/2025", operador: "Maria Admin", motivo: "Campanha Dia das Mães — bônus manual", valor: 200, saldoAntes: 5000 },
@@ -145,7 +156,7 @@ const SEED: Membro[] = [
       { id: "t5", data: "25/05/2025", descricao: "Compra no app — R$ 420,00", tipo: "acumulo", moeda: "Pontos", abrev: "pts", valor: 525, saldo: 2968 },
     ],
     pedidos: [
-      { id: "PED-003", data: "12/06/2025", produto: "Frete grátis (voucher)", status: "processando", pontos: 300 },
+      { id: "PED-003", data: "12/06/2025", produto: "Frete grátis (voucher)", tipo: "voucher_digital", status: "aprovado", pontos: 300, moeda: "Pontos", abrev: "pts", transacaoId: "PED-003" },
     ],
     ajustes: [
       { id: "AJ-003", data: "03/06/2025", operador: "Maria Admin", motivo: "Erro de processamento — reembolso em pontos", valor: 150, saldoAntes: 2968 },
@@ -220,8 +231,7 @@ const SEED: Membro[] = [
 
 const KEY = "motor_pontos_membros";
 
-export function getMembros(): Membro[] {
-  if (ehV1()) return [];
+function lerMembrosArmazenados(): Membro[] {
   try {
     const stored = localStorage.getItem(KEY);
     if (!stored) return SEED;
@@ -238,12 +248,25 @@ export function getMembros(): Membro[] {
   }
 }
 
+export function getMembros(): Membro[] {
+  if (ehV1()) return [];
+  return lerMembrosArmazenados();
+}
+
 export function saveMembros(list: Membro[]) {
   localStorage.setItem(KEY, JSON.stringify(list));
 }
 
 export function getMembro(id: string): Membro | undefined {
   return getMembros().find((m) => m.id === id);
+}
+
+// Membro "logado" simulado no Portal — visão do próprio beneficiário, por
+// isso NÃO passa pelo gate de "Primeiro acesso" (que zera a base pro lado do
+// admin, antes de qualquer importação real). Quem está logado como o próprio
+// membro sempre tem uma conta com saldo/histórico — nunca "nenhum membro".
+export function getMembroLogado(): Membro | undefined {
+  return lerMembrosArmazenados().find((m) => m.id === "1");
 }
 
 export function upsertMembro(m: Membro): Membro[] {
@@ -256,9 +279,45 @@ export function upsertMembro(m: Membro): Membro[] {
 
 // ── Ledger — todo débito/crédito de saldo (resgate, ajuste, estorno) passa por aqui ──
 
+// Reparte um débito entre todas as campanhas que compõem o saldo daquela
+// moeda, proporcional ao que cada uma tem — em vez de descontar tudo da
+// primeira campanha que encontrar (o que zerava uma campanha e ignorava as
+// outras). O último item absorve o resto da divisão pra fechar exato.
+function distribuirDebitoProporcional(
+  saldos: SaldoCampanha[], moeda: string, valorTotal: number
+): { saldosAtualizados: SaldoCampanha[]; distribuicao: { campanhaId: string; campanhaNome: string; valor: number }[] } {
+  const entradas = saldos.filter((s) => s.moeda === moeda && s.valor > 0);
+  const totalDisponivel = entradas.reduce((a, s) => a + s.valor, 0);
+
+  if (entradas.length === 0) {
+    return { saldosAtualizados: saldos, distribuicao: [] };
+  }
+
+  const aDistribuir = Math.min(valorTotal, totalDisponivel);
+  const distribuicao: { campanhaId: string; campanhaNome: string; valor: number }[] = [];
+  let restante = aDistribuir;
+
+  entradas.forEach((s, i) => {
+    const parte = i === entradas.length - 1 ? restante : Math.round((s.valor / totalDisponivel) * aDistribuir);
+    distribuicao.push({ campanhaId: s.campanhaId, campanhaNome: s.campanhaNome, valor: -parte });
+    restante -= parte;
+  });
+
+  const saldosAtualizados = saldos.map((s) => {
+    const d = s.moeda === moeda ? distribuicao.find((x) => x.campanhaId === s.campanhaId) : undefined;
+    return d ? { ...s, valor: Math.max(0, s.valor + d.valor) } : s;
+  });
+
+  return { saldosAtualizados, distribuicao };
+}
+
 export function registrarTransacaoSaldo(
   membroId: string,
-  args: { moeda: string; abrev: string; delta: number; descricao: string; tipo: Transacao["tipo"]; refId?: string }
+  args: {
+    moeda: string; abrev: string; delta: number; descricao: string; tipo: Transacao["tipo"];
+    refId?: string; estornoDeId?: string;
+    distribuicaoCampanhas?: { campanhaId: string; campanhaNome: string; valor: number }[];
+  }
 ): void {
   const membros = getMembros();
   const idx = membros.findIndex((m) => m.id === membroId);
@@ -268,13 +327,34 @@ export function registrarTransacaoSaldo(
   // idempotência: evita débito duplicado quando a mesma origem (ex: aprovação automática) roda de novo
   if (args.refId && m.transacoes.some((t) => t.id === args.refId)) return;
 
-  const saldos = [...m.saldos];
-  const sIdx = saldos.findIndex((s) => s.moeda === args.moeda);
-  if (sIdx === -1) {
-    saldos.push({ campanhaId: "AJUSTES", campanhaNome: "Ajustes e resgates", moeda: args.moeda, abrev: args.abrev, valor: Math.max(0, args.delta) });
+  let saldos = [...m.saldos];
+  let distribuicaoCampanhas = args.distribuicaoCampanhas;
+
+  if (distribuicaoCampanhas) {
+    // distribuição já calculada (ex: estorno devolvendo pras campanhas de origem)
+    for (const d of distribuicaoCampanhas) {
+      const sIdx = saldos.findIndex((s) => s.campanhaId === d.campanhaId && s.moeda === args.moeda);
+      if (sIdx === -1) {
+        saldos.push({ campanhaId: d.campanhaId, campanhaNome: d.campanhaNome, moeda: args.moeda, abrev: args.abrev, valor: Math.max(0, d.valor) });
+      } else {
+        saldos[sIdx] = { ...saldos[sIdx], valor: Math.max(0, saldos[sIdx].valor + d.valor) };
+      }
+    }
+  } else if (args.delta < 0) {
+    // débito sem distribuição explícita — reparte proporcional entre as campanhas dessa moeda
+    const resultado = distribuirDebitoProporcional(saldos, args.moeda, -args.delta);
+    saldos = resultado.saldosAtualizados;
+    if (resultado.distribuicao.length > 0) distribuicaoCampanhas = resultado.distribuicao;
   } else {
-    saldos[sIdx] = { ...saldos[sIdx], valor: Math.max(0, saldos[sIdx].valor + args.delta) };
+    // crédito manual (ajuste) — sem campanha de origem conhecida, cai no bucket de ajustes
+    const sIdx = saldos.findIndex((s) => s.moeda === args.moeda);
+    if (sIdx === -1) {
+      saldos.push({ campanhaId: "AJUSTES", campanhaNome: "Ajustes e resgates", moeda: args.moeda, abrev: args.abrev, valor: Math.max(0, args.delta) });
+    } else {
+      saldos[sIdx] = { ...saldos[sIdx], valor: Math.max(0, saldos[sIdx].valor + args.delta) };
+    }
   }
+
   const saldoMoeda = saldos.filter((s) => s.moeda === args.moeda).reduce((a, s) => a + s.valor, 0);
 
   const transacao: Transacao = {
@@ -286,11 +366,183 @@ export function registrarTransacaoSaldo(
     abrev: args.abrev,
     valor: args.delta,
     saldo: saldoMoeda,
+    ...(args.estornoDeId ? { estornoDeId: args.estornoDeId } : {}),
+    ...(distribuicaoCampanhas ? { distribuicaoCampanhas } : {}),
   };
 
   const next = [...membros];
   next[idx] = { ...m, saldos, transacoes: [transacao, ...m.transacoes] };
   saveMembros(next);
+}
+
+// ── Cancelamento de movimentação — preserva o lançamento original e gera um estorno vinculado ──
+export function cancelarTransacao(
+  membroId: string, transacaoId: string, motivo: string
+): { ok: boolean; erro?: string } {
+  const membros = getMembros();
+  const idx = membros.findIndex((m) => m.id === membroId);
+  if (idx === -1) return { ok: false, erro: "Membro não encontrado." };
+  const m = membros[idx];
+
+  const transacao = m.transacoes.find((t) => t.id === transacaoId);
+  if (!transacao) return { ok: false, erro: "Movimentação não encontrada." };
+  if (transacao.canceladaEm) return { ok: false, erro: "Essa movimentação já foi cancelada." };
+  if (transacao.estornoDeId) return { ok: false, erro: "Não é possível cancelar um estorno." };
+
+  const next = [...membros];
+  next[idx] = {
+    ...m,
+    transacoes: m.transacoes.map((t) =>
+      t.id === transacaoId
+        ? { ...t, canceladaEm: new Date().toLocaleDateString("pt-BR"), motivoCancelamento: motivo }
+        : t
+    ),
+  };
+  saveMembros(next);
+
+  // Estorno fiel: se o débito original foi repartido entre campanhas, devolve
+  // exatamente nelas e na mesma proporção — não num bucket genérico.
+  const distribuicaoEstorno = transacao.distribuicaoCampanhas?.map((d) => ({ ...d, valor: -d.valor }));
+
+  registrarTransacaoSaldo(membroId, {
+    moeda: transacao.moeda, abrev: transacao.abrev, delta: -transacao.valor,
+    descricao: `Estorno de "${transacao.descricao}" — ${motivo}`,
+    tipo: "ajuste",
+    estornoDeId: transacao.id,
+    ...(distribuicaoEstorno ? { distribuicaoCampanhas: distribuicaoEstorno } : {}),
+  });
+
+  return { ok: true };
+}
+
+// ── Pedido de resgate — cria o pedido e debita o saldo real de uma vez só ──
+export function criarPedidoResgate(
+  membroId: string,
+  args: { produto: string; tipo: TipoResgate; pontos: number; moeda: string; abrev: string }
+): { ok: boolean; erro?: string; pedido?: PedidoResgate } {
+  const m = getMembro(membroId);
+  if (!m) return { ok: false, erro: "Membro não encontrado." };
+
+  const saldoMoeda = agruparSaldosPorMoeda(m.saldos).find((s) => s.moeda === args.moeda)?.total ?? 0;
+  if (saldoMoeda < args.pontos) return { ok: false, erro: "Saldo insuficiente para este resgate." };
+
+  const pedidoId = `PED-${m.id}-${m.pedidos.length + 1}-${Date.now().toString(36)}`;
+
+  // o próprio id do pedido é o refId da transação — não tem como o pedido
+  // existir sem o débito correspondente já ter sido registrado (idempotente)
+  registrarTransacaoSaldo(membroId, {
+    moeda: args.moeda, abrev: args.abrev, delta: -args.pontos,
+    descricao: `Resgate — ${args.produto}`,
+    tipo: "resgate",
+    refId: pedidoId,
+  });
+
+  const pedido: PedidoResgate = {
+    id: pedidoId, data: new Date().toLocaleDateString("pt-BR"), produto: args.produto,
+    tipo: args.tipo, status: LIFECYCLE_POR_TIPO[args.tipo][0],
+    pontos: args.pontos, moeda: args.moeda, abrev: args.abrev,
+    transacaoId: pedidoId,
+  };
+
+  const next = getMembros().map((x) => (x.id === membroId ? { ...x, pedidos: [pedido, ...x.pedidos] } : x));
+  saveMembros(next);
+
+  return { ok: true, pedido };
+}
+
+// Cancelamento do lado do membro — estorna o débito de verdade (nas mesmas
+// campanhas de origem) e marca o pedido como cancelado, sem apagar o histórico.
+export function cancelarPedidoResgate(
+  membroId: string, pedidoId: string, motivo: string
+): { ok: boolean; erro?: string } {
+  const m = getMembro(membroId);
+  if (!m) return { ok: false, erro: "Membro não encontrado." };
+
+  const pedido = m.pedidos.find((p) => p.id === pedidoId);
+  if (!pedido) return { ok: false, erro: "Pedido não encontrado." };
+  if (pedido.canceladoEm) return { ok: false, erro: "Esse pedido já foi cancelado." };
+
+  const resultado = cancelarTransacao(membroId, pedido.transacaoId, motivo);
+  if (!resultado.ok) return resultado;
+
+  const next = getMembros().map((x) => (x.id === membroId ? {
+    ...x,
+    pedidos: x.pedidos.map((p) =>
+      p.id === pedidoId
+        ? { ...p, status: "cancelado" as OrderStatus, canceladoEm: new Date().toLocaleDateString("pt-BR") }
+        : p
+    ),
+  } : x));
+  saveMembros(next);
+
+  return { ok: true };
+}
+
+// Pedido de estorno feito pelo membro depois que o resgate já foi finalizado
+// (entregue/enviado/creditado) — não movimenta saldo, só fica pendente de
+// análise. Quem de fato estorna é o analista, via resolverEstornoSolicitado.
+export function solicitarEstornoPedido(
+  membroId: string, pedidoId: string, motivo: string
+): { ok: boolean; erro?: string } {
+  const m = getMembro(membroId);
+  if (!m) return { ok: false, erro: "Membro não encontrado." };
+
+  const pedido = m.pedidos.find((p) => p.id === pedidoId);
+  if (!pedido) return { ok: false, erro: "Pedido não encontrado." };
+  if (pedido.canceladoEm || pedido.status === "cancelado") return { ok: false, erro: "Esse pedido já foi cancelado." };
+  if (pedido.estornoSolicitadoEm && !pedido.estornoRecusadoEm) return { ok: false, erro: "Já existe uma solicitação de estorno em análise pra esse pedido." };
+
+  const next = getMembros().map((x) => (x.id === membroId ? {
+    ...x,
+    pedidos: x.pedidos.map((p) => p.id === pedidoId ? {
+      ...p,
+      estornoSolicitadoEm: new Date().toLocaleDateString("pt-BR"), motivoEstornoSolicitado: motivo,
+      estornoRecusadoEm: undefined, motivoRecusaEstorno: undefined,
+    } : p),
+  } : x));
+  saveMembros(next);
+
+  return { ok: true };
+}
+
+// Decisão do analista sobre uma solicitação de estorno pendente — aprovar
+// executa o estorno de verdade (mesmo caminho de cancelarPedidoResgate);
+// recusar só registra a resposta, sem tocar no saldo.
+export function resolverEstornoSolicitado(
+  membroId: string, pedidoId: string, aprovar: boolean, motivoResposta?: string
+): { ok: boolean; erro?: string } {
+  const m = getMembro(membroId);
+  if (!m) return { ok: false, erro: "Membro não encontrado." };
+
+  const pedido = m.pedidos.find((p) => p.id === pedidoId);
+  if (!pedido) return { ok: false, erro: "Pedido não encontrado." };
+  if (!pedido.estornoSolicitadoEm || pedido.estornoRecusadoEm) return { ok: false, erro: "Não há solicitação de estorno pendente pra esse pedido." };
+
+  if (aprovar) {
+    return cancelarPedidoResgate(membroId, pedidoId, motivoResposta || "Estorno solicitado pelo membro — aprovado pelo analista.");
+  }
+
+  const next = getMembros().map((x) => (x.id === membroId ? {
+    ...x,
+    pedidos: x.pedidos.map((p) => p.id === pedidoId ? {
+      ...p,
+      estornoRecusadoEm: new Date().toLocaleDateString("pt-BR"),
+      motivoRecusaEstorno: motivoResposta || "Solicitação recusada.",
+    } : p),
+  } : x));
+  saveMembros(next);
+
+  return { ok: true };
+}
+
+// Fila do analista — todos os pedidos, de todos os membros, com estorno
+// pendente de decisão. Fonte única pra tela de aprovação no admin.
+export function getSolicitacoesEstornoPendentes(): { membroId: string; membroNome: string; pedido: PedidoResgate }[] {
+  return getMembros().flatMap((m) =>
+    m.pedidos
+      .filter((p) => p.estornoSolicitadoEm && !p.estornoRecusadoEm && !p.canceladoEm)
+      .map((pedido) => ({ membroId: m.id, membroNome: m.nome, pedido }))
+  );
 }
 
 // ── Motor de acúmulo — avalia eventos brutos contra as Regras ativas ────────

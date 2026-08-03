@@ -47,7 +47,7 @@ export default function OnboardingCadastro() {
 
   return (
     <OnboardingScreenShell
-      title="Cadastre e importe"
+      title="Cadastre sua base"
       subtitle={bonifica.length > 0 ? "Suba uma planilha com toda a sua base de uma vez." : undefined}
       maxWidth="max-w-3xl"
     >
@@ -58,8 +58,8 @@ export default function OnboardingCadastro() {
       ) : (
         <div className="space-y-5">
           <div className={`grid gap-4 ${mostrarMembros && mostrarProdutos ? "lg:grid-cols-2" : ""}`}>
-            {mostrarMembros && <SecaoMembros metodo="planilha" sempreVazio />}
-            {mostrarProdutos && <SecaoProdutos metodo="planilha" sempreVazio />}
+            {mostrarMembros && <SecaoMembros sempreVazio />}
+            {mostrarProdutos && <SecaoProdutos sempreVazio />}
           </div>
 
           {mostrarProdutos && (

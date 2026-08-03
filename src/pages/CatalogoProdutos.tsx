@@ -13,12 +13,13 @@ import {
 import { MOEDA } from "../config/programa";
 import {
   type Produto, type ProdutoStatus, type CampanhaParticipante, type HistoricoEvento, type ModeloVenda,
-  CATEGORIAS, MODELO_VENDA_LABEL, getProdutos, saveProdutos,
+  CATEGORIAS, MODELO_VENDA_LABEL, PRODUTO_STATUS_PILL, PRODUTO_STATUS_LABEL, getProdutos, saveProdutos,
 } from "../lib/produtos";
 import { getTiersProduto } from "../lib/tiersProduto";
 import {
   type GrupoProdutos, getGruposProdutos, saveGruposProdutos,
 } from "../lib/gruposProdutos";
+import { camposCampanhasAtivasPorProduto } from "../lib/campanhas";
 import { GrupoModal } from "../components/GrupoModal";
 
 // ── Detalhe do produto (panel lateral) ───────────────────────────────────────
@@ -33,13 +34,6 @@ const HIST_ICON: Record<HistoricoEvento["tipo"], { icon: typeof Clock; color: st
 
 const CAMP_STATUS_PILL: Record<CampanhaParticipante["status"], "success" | "muted" | "warning"> = {
   ativa: "success", encerrada: "muted", rascunho: "warning",
-};
-
-const PRODUTO_STATUS_PILL: Record<ProdutoStatus, "success" | "warning" | "muted" | "primary"> = {
-  ativo: "success", pendente: "warning", processando: "primary", arquivado: "muted",
-};
-const PRODUTO_STATUS_LABEL: Record<ProdutoStatus, string> = {
-  ativo: "Ativo", pendente: "Pendente", processando: "Processando", arquivado: "Arquivado",
 };
 
 function ProdutoDetalhe({ produto, onClose, onEditar, onArquivar, onAprovar }: {
@@ -243,6 +237,7 @@ export default function CatalogoProdutos() {
   const [filtroCategoria, setFiltroCategoria] = useState<string>("todas");
   const [filtroStatus,    setFiltroStatus]    = useState<ProdutoStatus | "todos">("todos");
   const [filtroModelo,    setFiltroModelo]    = useState<ModeloVenda | "todos">("todos");
+  const [filtroCampanha,  setFiltroCampanha]   = useState<"todos" | "em_campanha">("todos");
   const [detalheId,   setDetalheId]   = useState<string | null>(null);
   const [excluirId,   setExcluirId]   = useState<string | null>(null);
   const [visualizacao, setVisualizacao] = useState<"lista" | "agrupado" | "grupos">("lista");
@@ -260,13 +255,19 @@ export default function CatalogoProdutos() {
 
   const tiersProduto = getTiersProduto();
 
+  // Campanhas ativas que incentivam cada produto agora — calculado ao vivo a
+  // partir do Gatilho/Elegibilidade de cada campanha (não existe campo salvo
+  // no Produto pra isso, já que uma campanha pode ser editada a qualquer hora).
+  const campanhasPorProduto = useMemo(() => camposCampanhasAtivasPorProduto(), [produtos]);
+
   const filtered = useMemo(() => produtos.filter(p => {
     const matchSearch    = !search || p.nome.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase());
     const matchCategoria = filtroCategoria === "todas" || p.categoria === filtroCategoria;
     const matchStatus    = filtroStatus === "todos" || p.status === filtroStatus;
     const matchModelo    = filtroModelo === "todos" || p.modeloVenda === filtroModelo;
-    return matchSearch && matchCategoria && matchStatus && matchModelo;
-  }), [produtos, search, filtroCategoria, filtroStatus, filtroModelo]);
+    const matchCampanha  = filtroCampanha === "todos" || (campanhasPorProduto.get(p.id)?.length ?? 0) > 0;
+    return matchSearch && matchCategoria && matchStatus && matchModelo && matchCampanha;
+  }), [produtos, search, filtroCategoria, filtroStatus, filtroModelo, filtroCampanha, campanhasPorProduto]);
 
   const produtoDetalhe = detalheId ? produtos.find(p => p.id === detalheId) ?? null : null;
 
@@ -395,15 +396,18 @@ export default function CatalogoProdutos() {
           </Pill>
         </td>
         <td className="px-4 py-3.5">
-          {p.campanhasVinculadas.length === 0 ? (
-            <span className="text-xs text-muted-foreground">—</span>
-          ) : (
-            <div className="flex flex-wrap gap-1">
-              {p.campanhasVinculadas.map(c => (
-                <span key={c} className="inline-flex rounded-full bg-muted px-2 py-0.5 text-[10px] font-mono text-muted-foreground">{c}</span>
-              ))}
-            </div>
-          )}
+          {(() => {
+            const ativas = campanhasPorProduto.get(p.id) ?? [];
+            return ativas.length === 0 ? (
+              <span className="text-xs text-muted-foreground">—</span>
+            ) : (
+              <div className="flex flex-wrap gap-1">
+                {ativas.map(c => (
+                  <span key={c.id} className="inline-flex rounded-full bg-emerald-50 text-emerald-700 px-2 py-0.5 text-[10px] font-medium">{c.nome}</span>
+                ))}
+              </div>
+            );
+          })()}
         </td>
         <td className="px-4 py-3.5 tabular-nums text-sm font-semibold text-primary">
           {totalMoeda > 0 ? totalMoeda.toLocaleString("pt-BR") : <span className="text-muted-foreground font-normal">—</span>}
@@ -458,7 +462,7 @@ export default function CatalogoProdutos() {
       <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-2.5">
         <TrendingUp className="h-4 w-4 text-primary shrink-0" />
         <p className="text-xs text-foreground">
-          Produto incentivado não é uma recompensa — é o item que <strong>gera pontos quando comprado</strong>. Ex: membro compra o produto X → acumula mais benefícios. Recompensas (o que o membro troca por pontos) ficam no Catálogo. Pra cadastrar produto novo (manual, planilha ou integração), use a <Link to="/biblioteca" className="underline font-medium">Biblioteca</Link>.
+          Produto incentivado não é uma recompensa — é o item que <strong>gera pontos quando comprado</strong>. Ex: membro compra o produto X → acumula mais benefícios. Recompensas (o que o membro troca por pontos) ficam no Catálogo. Pra cadastrar produto novo (manual, planilha ou integração), use o <Link to="/biblioteca" className="underline font-medium">Cadastro de produtos e membros</Link>.
         </p>
       </div>
 
@@ -533,6 +537,15 @@ export default function CatalogoProdutos() {
               </SelectContent>
             </Select>
           </div>
+          <div className="w-44 shrink-0">
+            <Select value={filtroCampanha} onValueChange={v => setFiltroCampanha(v as "todos" | "em_campanha")}>
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os produtos</SelectItem>
+                <SelectItem value="em_campanha">Só em campanha agora</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <span className="ml-auto text-xs text-muted-foreground">{filtered.length} produto(s)</span>
           <div className="flex items-center gap-0.5 rounded-lg border border-border p-0.5 shrink-0">
             <button onClick={() => setVisualizacao("lista")} title="Lista"
@@ -553,14 +566,14 @@ export default function CatalogoProdutos() {
         {filtered.length === 0 ? (
           <div className="p-10">
             <EmptyState icon={Package} title="Nenhum produto encontrado"
-              description="Ajuste os filtros ou cadastre produtos na Biblioteca." />
+              description="Ajuste os filtros ou cadastre produtos no Cadastro de produtos e membros." />
           </div>
         ) : visualizacao === "lista" ? (
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead className="bg-muted/20 border-b border-border">
                 <tr className="text-left text-muted-foreground">
-                  {["SKU", "Nome", "Categoria", "Tier", "Modelo", "Preço", "Status", "Campanhas", `${MOEDA.nome} gerado`, ""].map(h => (
+                  {["SKU", "Nome", "Categoria", "Tier", "Modelo", "Preço", "Status", "Campanhas ativas", `${MOEDA.nome} gerado`, ""].map(h => (
                     <th key={h} className="px-4 py-3 font-medium text-xs whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -581,7 +594,7 @@ export default function CatalogoProdutos() {
                 <table className="min-w-full text-sm">
                   <thead className="bg-muted/20 border-b border-border">
                     <tr className="text-left text-muted-foreground">
-                      {["SKU", "Nome", "Categoria", "Tier", "Modelo", "Preço", "Status", "Campanhas", `${MOEDA.nome} gerado`, ""].map(h => (
+                      {["SKU", "Nome", "Categoria", "Tier", "Modelo", "Preço", "Status", "Campanhas ativas", `${MOEDA.nome} gerado`, ""].map(h => (
                         <th key={h} className="px-4 py-3 font-medium text-xs whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -610,7 +623,7 @@ export default function CatalogoProdutos() {
                 <table className="min-w-full text-sm">
                   <thead className="bg-muted/20 border-b border-border">
                     <tr className="text-left text-muted-foreground">
-                      {["SKU", "Nome", "Categoria", "Tier", "Modelo", "Preço", "Status", "Campanhas", `${MOEDA.nome} gerado`, ""].map(h => (
+                      {["SKU", "Nome", "Categoria", "Tier", "Modelo", "Preço", "Status", "Campanhas ativas", `${MOEDA.nome} gerado`, ""].map(h => (
                         <th key={h} className="px-4 py-3 font-medium text-xs whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -720,7 +733,7 @@ export default function CatalogoProdutos() {
               </SelectContent>
             </Select>
             {tiersProduto.length === 0 && (
-              <p className="text-xs text-muted-foreground">Nenhum tier cadastrado ainda — crie um na Biblioteca.</p>
+              <p className="text-xs text-muted-foreground">Nenhum tier cadastrado ainda — crie um no Cadastro de produtos e membros.</p>
             )}
           </div>
           <div className="space-y-1.5">

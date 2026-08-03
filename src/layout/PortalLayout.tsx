@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { MOEDA } from "../config/programa";
 import { Wallet, ScrollText, Gift, Package, Trophy, UserCircle, Tag } from "lucide-react";
 import AceiteRegulamento from "../pages/portal/AceiteRegulamento";
 import VersaoSwitcher from "../components/VersaoSwitcher";
-import { getMembro, getMembros, agruparSaldosPorMoeda } from "../lib/membros";
+import { getMembroLogado, agruparSaldosPorMoeda } from "../lib/membros";
 
 const ACEITE_KEY = "motor_pontos_regulamento_aceito";
 
@@ -18,16 +18,18 @@ const NAV = [
   { to: "/portal/conta",   label: "Minha conta", icon: UserCircle, end: false },
 ];
 
-function membroExibicao() {
-  const membro = getMembro("1") ?? getMembros()[0];
-  if (!membro) return { nome: "Novo Membro", saldo: 0, tier: "—", abrev: "NM" };
-  const saldoMoedaPrincipal = agruparSaldosPorMoeda(membro.saldos).find((s) => s.moeda === MOEDA.nome)?.total ?? 0;
-  return { nome: membro.nome, saldo: saldoMoedaPrincipal, tier: membro.tier, abrev: membro.initials };
-}
-
 export default function PortalLayout() {
   const [aceito, setAceito] = useState(() => localStorage.getItem(ACEITE_KEY) === "true");
-  const MEMBRO = membroExibicao();
+  const [membro, setMembro] = useState(() => getMembroLogado());
+
+  // reflete saldo/pedido mudado em outra tela do portal (ex: resgate confirmado no Catálogo)
+  // sem precisar levantar um estado compartilhado — mesmo padrão já usado em OnboardingCadastro.
+  useEffect(() => {
+    const id = setInterval(() => setMembro(getMembroLogado()), 800);
+    return () => clearInterval(id);
+  }, []);
+
+  const saldoPrincipal = membro ? (agruparSaldosPorMoeda(membro.saldos).find((s) => s.moeda === MOEDA.nome)?.total ?? 0) : 0;
 
   function handleAceitar() {
     localStorage.setItem(ACEITE_KEY, "true");
@@ -48,17 +50,19 @@ export default function PortalLayout() {
           <div className="text-xs text-muted-foreground mt-0.5">Beneficiário</div>
         </div>
 
-        <div className="px-4 py-3 border-b border-border">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold shrink-0">
-              {MEMBRO.abrev}
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold truncate">{MEMBRO.nome}</p>
-              <p className="text-[10px] text-muted-foreground">{MEMBRO.saldo.toLocaleString("pt-BR")} {MOEDA.abrev} · {MEMBRO.tier}</p>
+        {membro && (
+          <div className="px-4 py-3 border-b border-border">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold shrink-0">
+                {membro.initials}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold truncate">{membro.nome}</p>
+                <p className="text-[10px] text-muted-foreground">{saldoPrincipal.toLocaleString("pt-BR")} {MOEDA.abrev} · {membro.tier}</p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
           {NAV.map(({ to, label, icon: Icon, end }) => (
@@ -83,11 +87,13 @@ export default function PortalLayout() {
           <div>
             <div className="font-bold text-sm">Programa de Fidelidade - Beneficiário</div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[10px] font-bold">
-              {MEMBRO.abrev}
+          {membro && (
+            <div className="flex items-center gap-2">
+              <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[10px] font-bold">
+                {membro.initials}
+              </div>
             </div>
-          </div>
+          )}
         </header>
 
         <main className="flex-1 overflow-y-auto pb-20 md:pb-0">

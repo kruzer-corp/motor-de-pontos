@@ -7,8 +7,8 @@ import {
 import { ArrowLeft, CheckCircle2, Circle, Clock, XCircle, Package, FileText, Download, Banknote, Pencil, X } from "lucide-react";
 import { ORDERS, aplicarAprovacaoAutomatica } from "./Pedidos";
 import { renderCrumbLink } from "../lib/crumbLink";
-import type { OrderStatus, Order } from "./Pedidos";
-import { LIFECYCLE_POR_TIPO, TIPO_RESGATE_LABEL, TIPO_RESGATE_ICON, proximoStatus } from "../config/resgateLifecycle";
+import type { Order } from "./Pedidos";
+import { LIFECYCLE_POR_TIPO, TIPO_RESGATE_LABEL, TIPO_RESGATE_ICON, proximoStatus, type OrderStatus } from "../config/resgateLifecycle";
 import { registrarTransacaoSaldo } from "../lib/membros";
 import { ehV1 } from "../lib/versao";
 

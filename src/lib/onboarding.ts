@@ -8,9 +8,35 @@
 // só sem dado de transação ainda.
 
 import { getCampanhas } from "./campanhas";
+import type { GatilhoTipo } from "./regras";
 
 export type BonificaEntidade = "produto" | "pedido" | "cliente";
 export type BonificaEscolha = BonificaEntidade[];
+
+export const BONIFICA_OPCOES: { value: BonificaEntidade; label: string; desc: string }[] = [
+  { value: "produto", label: "Produto",  desc: "Pontua a compra de um produto ou conjunto/classe específico." },
+  { value: "pedido",  label: "Pedido",   desc: "Pontua a compra em geral — qualquer pedido, sem exigir produto específico." },
+  { value: "cliente", label: "Cliente",  desc: "Pontua por comportamento — cadastro, indicação, recorrência." },
+];
+
+// Gatilhos relevantes por entidade de bonifica — fonte única, usada tanto pro
+// wizard de Regra (filtra as opções de Gatilho pela união das entidades
+// marcadas) quanto pro aviso na Mecânica do Programa (ao desmarcar uma
+// entidade, avisa se já existe regra com gatilho daquele tipo).
+export const GATILHOS_POR_ENTIDADE: Record<BonificaEntidade, GatilhoTipo[]> = {
+  produto: ["compra_conjunto", "compra_classe"],
+  pedido:  ["compra_qualquer", "primeira_compra", "marco_recorrencia"],
+  cliente: ["marco_recorrencia", "evento_nao_transacional"],
+};
+
+// Entidades de bonifica associadas a um tipo de Gatilho — inverso de
+// GATILHOS_POR_ENTIDADE. Um gatilho pode pertencer a mais de uma entidade
+// (ex: marco de recorrência conta pra Pedido e pra Cliente).
+export function entidadesDoGatilho(tipo: GatilhoTipo): BonificaEntidade[] {
+  return (Object.keys(GATILHOS_POR_ENTIDADE) as BonificaEntidade[]).filter(
+    (e) => GATILHOS_POR_ENTIDADE[e].includes(tipo)
+  );
+}
 
 const BONIFICA_KEY = "motor_pontos_bonifica_escolha";
 

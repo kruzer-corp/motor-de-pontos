@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { cn, TooltipProvider } from "@kruzer/ds";
 import {
-  LayoutDashboard, Users, User, ShieldCheck, Sparkles, Boxes, Building2,
+  LayoutDashboard, Users, User, ShieldCheck, Sparkles, Building2,
   ChevronDown, ChevronsLeft, ChevronsRight,
   Trophy, History, ScrollText, Share2,
   Palette, Webhook, Sliders, Library,
@@ -65,20 +65,11 @@ const MENU: MenuItem[] = [
   { to: "/campanhas", label: "Minhas Campanhas", icon: Sparkles },
   { to: "/membros/extrato", label: "Membros e Extratos", icon: Users },
   { to: "/indicacoes", label: "Indicações", icon: Share2 },
-  {
-    label: "Catálogos e produtos", icon: Boxes,
-    group: [
-      { to: "/catalogo-produtos",    label: "Produtos incentivados" },
-      { to: "/catalogo",             label: "Produtos (1P/3P)" },
-      { to: "/catalogo/grupos",      label: "Grupos" },
-      { to: "/catalogo/atualizacao", label: "Atualização" },
-    ],
-  },
 
   // ── CONFIGURAÇÃO DO PROGRAMA ───────────────────────────────────────────────
   { section: "Configuração do Programa" },
   { to: "/mecanica",       label: "Mecânica do Programa", icon: Sliders },
-  { to: "/biblioteca",     label: "Biblioteca",           icon: Library },
+  { to: "/biblioteca",     label: "Cadastro de produtos e membros", icon: Library },
   { to: "/canais-filiais", label: "Canais e Filiais",   icon: Building2 },
   { to: "/usuarios",       label: "Usuários & Papéis",  icon: User      },
   { to: "/membros/tier", label: "Tier e Segmentação", icon: ShieldCheck },
@@ -389,7 +380,7 @@ function PlatformHeader({ mode, collapsed, hover }: { mode: TenantMode; collapse
   return (
     <header
       className="flex shrink-0 items-center bg-card"
-      style={{ height: 48, zIndex: 10 }}
+      style={{ height: 56, zIndex: 10 }}
     >
       {/* Logo-box — acompanha a largura do sidebar (igual ao OMS) */}
       <div
@@ -403,9 +394,14 @@ function PlatformHeader({ mode, collapsed, hover }: { mode: TenantMode; collapse
         }}
       >
         {expanded && (
-          <span className="truncate text-sm font-bold tracking-tight text-foreground">
-            {BRAND_NAME[mode]}
-          </span>
+          <div className="flex flex-col leading-tight overflow-hidden">
+            <span className="truncate text-sm font-bold tracking-tight text-foreground">
+              {BRAND_NAME[mode]}
+            </span>
+            <span className="truncate text-[11px] font-medium text-muted-foreground">
+              Fast Pro
+            </span>
+          </div>
         )}
       </div>
 
