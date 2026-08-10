@@ -1,22 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { cn, TooltipProvider } from "@kruzer/ds";
+import { cn, Pill, TooltipProvider } from "@kruzer/ds";
 import {
   LayoutDashboard, Users, User, ShieldCheck, Sparkles, Building2,
   ChevronDown, ChevronsLeft, ChevronsRight,
   Trophy, History, ScrollText, Share2,
   Palette, Webhook, Sliders, Library,
+  Briefcase, MapPinned, Gift,
 } from "lucide-react";
 import VersaoSwitcher from "../components/VersaoSwitcher";
 import { ehV1 } from "../lib/versao";
 import { onboardingCompleto } from "../lib/onboarding";
+import { aplicarSeedV2SeNecessario } from "../lib/seedV2";
 
 // ── Tenants ───────────────────────────────────────────────────────────────────
 
 type TenantMode = "custom" | "product";
 
 const BRAND_NAME: Record<TenantMode, string> = {
-  custom:  "Programa de Fidelidade - Admin",
+  custom:  "Programa de Fidelidade",
   product: "Motor de Pontos",
 };
 
@@ -64,7 +66,9 @@ const MENU: MenuItem[] = [
   { section: "Operação" },
   { to: "/campanhas", label: "Minhas Campanhas", icon: Sparkles },
   { to: "/membros/extrato", label: "Membros e Extratos", icon: Users },
+  { to: "/carteira-afiliados", label: "Carteira de Membros", icon: Briefcase },
   { to: "/indicacoes", label: "Indicações", icon: Share2 },
+  { to: "/recompensas", label: "Resgates", icon: Gift },
 
   // ── CONFIGURAÇÃO DO PROGRAMA ───────────────────────────────────────────────
   { section: "Configuração do Programa" },
@@ -72,6 +76,7 @@ const MENU: MenuItem[] = [
   { to: "/biblioteca",     label: "Cadastro de produtos e membros", icon: Library },
   { to: "/canais-filiais", label: "Canais e Filiais",   icon: Building2 },
   { to: "/usuarios",       label: "Usuários & Papéis",  icon: User      },
+  { to: "/coordenadores",  label: "Coordenadores",      icon: MapPinned },
   { to: "/membros/tier", label: "Tier e Segmentação", icon: ShieldCheck },
 
   // ── CONFIGURAÇÃO — MARCA, COMUNICAÇÃO E JURÍDICO ──────────────────────────
@@ -93,6 +98,31 @@ const MENU: MenuItem[] = [
   { to: "/logs",        label: "Logs de auditoria", icon: History    },
 
 ];
+
+// Visão do coordenador — layout igual ao admin, mas sem as seções de
+// configuração/marca e sem os itens de Operação que não são dele.
+const SECOES_OCULTAS_COORDENADOR = ["Configuração do Programa", "Marca, Comunicação e Jurídico"];
+const CAMINHOS_OCULTOS_COORDENADOR = ["/campanhas", "/membros/extrato", "/indicacoes", "/recompensas"];
+
+function filterMenuCoordenador(menu: MenuItem[]): MenuItem[] {
+  const resultado: MenuItem[] = [];
+  let ocultandoSecao = false;
+  for (const item of menu) {
+    if (isSection(item)) {
+      ocultandoSecao = SECOES_OCULTAS_COORDENADOR.includes(item.section);
+      if (!ocultandoSecao) resultado.push(item);
+      continue;
+    }
+    if (ocultandoSecao) continue;
+    if (!isGroup(item) && CAMINHOS_OCULTOS_COORDENADOR.includes((item as FlatMenuItem).to)) continue;
+    if (!isGroup(item) && (item as FlatMenuItem).to === "/carteira-afiliados") {
+      resultado.push({ ...(item as FlatMenuItem), to: "/coordenador", label: "Minha Carteira" });
+      continue;
+    }
+    resultado.push(item);
+  }
+  return resultado;
+}
 
 // Itens de configuração — fora do sidebar principal, acessíveis pelo painel lateral
 
@@ -375,7 +405,7 @@ function AppSidebar({ visibleMenu, collapsed, setCollapsed, onHoverChange }: App
 
 // ── Platform Header ───────────────────────────────────────────────────────────
 
-function PlatformHeader({ mode, collapsed, hover }: { mode: TenantMode; collapsed: boolean; hover: boolean }) {
+function PlatformHeader({ mode, collapsed, hover, titulo, perfilBadge }: { mode: TenantMode; collapsed: boolean; hover: boolean; titulo?: string; perfilBadge?: string }) {
   const expanded = !collapsed || hover;
   return (
     <header
@@ -396,7 +426,7 @@ function PlatformHeader({ mode, collapsed, hover }: { mode: TenantMode; collapse
         {expanded && (
           <div className="flex flex-col leading-tight overflow-hidden">
             <span className="truncate text-sm font-bold tracking-tight text-foreground">
-              {BRAND_NAME[mode]}
+              {titulo ?? BRAND_NAME[mode]}
             </span>
             <span className="truncate text-[11px] font-medium text-muted-foreground">
               Fast Pro
@@ -407,6 +437,14 @@ function PlatformHeader({ mode, collapsed, hover }: { mode: TenantMode; collapse
 
       {/* Breadcrumb portal target — PageHeader portala aqui */}
       <div id="main-nav" className="flex h-full flex-1 items-center border-b border-border px-6" />
+
+      {perfilBadge && (
+        <div className="flex h-full shrink-0 items-center border-b border-border pr-6">
+          <Pill color="primary" variant="soft" size="sm">
+            <ShieldCheck className="size-3 mr-1" strokeWidth={2} />Perfil: {perfilBadge}
+          </Pill>
+        </div>
+      )}
     </header>
   );
 }
@@ -417,8 +455,20 @@ export default function AppLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarHover,     setSidebarHover]     = useState(false);
   const mode: TenantMode = "custom"; // admin sempre mostra tudo
-  const visibleMenu = filterMenu(MENU, mode);
   const location = useLocation();
+  // Cuidado: "/coordenadores" (CRUD do admin) começa com a mesma string que
+  // "/coordenador" (Visão do coordenador) — startsWith batia nos dois.
+  const emCoordenador = location.pathname === "/coordenador" || location.pathname.startsWith("/coordenador/");
+  const visibleMenu = emCoordenador ? filterMenuCoordenador(filterMenu(MENU, mode)) : filterMenu(MENU, mode);
+  // "Programa funcionando" (versão completa) deixa evidente que quem está
+  // logado no admin é o perfil Master — não aparece em Primeiro acesso nem
+  // na Visão do coordenador, que é outra pessoa.
+  const mostrarPerfilMaster = !emCoordenador && !ehV1();
+
+  // O seed de "Programa funcionando" precisa existir sempre que essa versão
+  // estiver ativa — não só no clique do VersaoSwitcher — senão uma atualização
+  // do seed nunca chega em quem já estava nessa versão antes da mudança.
+  if (!ehV1()) aplicarSeedV2SeNecessario();
 
   // Canais e Filiais também é uma tela de apoio do onboarding — enquanto o
   // primeiro acesso não estiver completo, ela mesma assume a moldura de tela
@@ -436,7 +486,12 @@ export default function AppLayout() {
   return (
     <TooltipProvider>
     <div className="flex h-svh flex-col bg-background">
-      <PlatformHeader mode={mode} collapsed={sidebarCollapsed} hover={sidebarHover} />
+      <PlatformHeader
+        mode={mode}
+        collapsed={sidebarCollapsed}
+        hover={sidebarHover}
+        perfilBadge={emCoordenador ? "Coordenador" : mostrarPerfilMaster ? "Master" : undefined}
+      />
 
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
         <AppSidebar

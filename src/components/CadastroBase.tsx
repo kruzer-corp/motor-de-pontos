@@ -13,7 +13,7 @@ import {
 } from "../lib/produtos";
 import { getTiersMembro, ordenarPorLimiar } from "../lib/tiers";
 import { getPapeisMembro } from "../lib/papeisMembro";
-import { getTiersProduto } from "../lib/tiersProduto";
+import { type TierProduto, getTiersProduto, tierProdutoPorPreco } from "../lib/tiersProduto";
 import { getSegmentosMembro } from "../lib/segmentosMembro";
 import { type Campanha, camposCampanhasAtivasPorProduto } from "../lib/campanhas";
 
@@ -580,6 +580,7 @@ export function SecaoProdutos({ sempreVazio }: { sempreVazio?: boolean }) {
     const novosProdutos: Produto[] = importResult.novos.map((n, i) => ({
       id: `SKU-${String(produtos.length + i + 1).padStart(3, "0")}`,
       sku: n.sku, nome: n.nome, categoria: n.categoria, preco: n.preco,
+      tierProdutoId: tierProdutoPorPreco(tiersProduto, n.preco)?.id,
       estoque: n.estoque, seller: n.seller || undefined, origemCadastro: "planilha",
       status: "processando", campanhasVinculadas: [], criadoEm: new Date().toLocaleDateString("pt-BR"),
       campanhas: [], pedidos: [], historico: [{ data: new Date().toLocaleDateString("pt-BR"), evento: "Produto cadastrado", detalhe: "Importado em lote — processando", tipo: "criado" }],
@@ -674,6 +675,31 @@ export function SecaoProdutos({ sempreVazio }: { sempreVazio?: boolean }) {
                     <p className="text-[11px] text-rose-600">Inválidos</p>
                   </div>
                 </div>
+                {importResult.novos.length > 0 && (
+                  <div className="rounded-lg border border-border divide-y divide-border max-h-48 overflow-y-auto">
+                    {importResult.novos.map((n) => {
+                      const tier = tierProdutoPorPreco(tiersProduto, n.preco);
+                      return (
+                        <div key={n.sku} className="flex items-center justify-between gap-2 px-3 py-2 text-xs">
+                          <div className="min-w-0">
+                            <p className="font-medium truncate">{n.nome}</p>
+                            <p className="text-muted-foreground">{n.categoria} · R$ {n.preco.toLocaleString("pt-BR")}</p>
+                          </div>
+                          {tiersProduto.length > 0 && (
+                            tier ? (
+                              <span className="flex items-center gap-1.5 shrink-0 font-medium">
+                                <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: tier.cor }} />
+                                {tier.nome}
+                              </span>
+                            ) : (
+                              <span className="text-amber-600 shrink-0">fora de faixa</span>
+                            )
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 <div className="flex gap-2">
                   <Button size="sm" variant="outline" onClick={() => setImportResult(null)}>Voltar</Button>
                   <Button size="sm" disabled={importResult.novos.length === 0} onClick={confirmarImport}>
@@ -835,9 +861,13 @@ function CatalogoTable({
 
 // ── Modal: editar produto ─────────────────────────────────────────────────────
 
+export function FormSectionLabel({ children }: { children: React.ReactNode }) {
+  return <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">{children}</p>;
+}
+
 function ProdutoFormModal({ initial, tiersProduto, onClose, onSave }: {
   initial?: Produto;
-  tiersProduto: { id: string; nome: string; cor: string }[];
+  tiersProduto: TierProduto[];
   onClose: () => void;
   onSave: (d: ProdutoDraft) => void;
 }) {
@@ -845,16 +875,18 @@ function ProdutoFormModal({ initial, tiersProduto, onClose, onSave }: {
   const [nome, setNome] = useState(initial?.nome ?? "");
   const [categoria, setCategoria] = useState(initial?.categoria ?? CATEGORIAS[0]);
   const [preco, setPreco] = useState(initial?.preco ? String(initial.preco) : "");
-  const [tierProdutoId, setTierProdutoId] = useState(initial?.tierProdutoId ?? "");
   const [modeloVenda, setModeloVenda] = useState<ModeloVenda | "">(initial?.modeloVenda ?? "");
   const [estoque, setEstoque] = useState<number | null>(initial?.estoque ?? null);
   const [seller, setSeller] = useState(initial?.seller ?? "");
 
+  const precoNumerico = Number(preco.replace(",", ".")) || 0;
+  const tierCalculado = tierProdutoPorPreco(tiersProduto, precoNumerico);
+
   function salvar() {
     if (!sku || !nome) return;
     onSave({
-      sku, nome, categoria, preco: Number(preco.replace(",", ".")) || 0,
-      tierProdutoId: tierProdutoId || undefined,
+      sku, nome, categoria, preco: precoNumerico,
+      tierProdutoId: tierCalculado?.id,
       modeloVenda: modeloVenda || undefined,
       estoque: estoque ?? 0,
       seller: modeloVenda === "3P" ? seller || undefined : undefined,
@@ -863,51 +895,70 @@ function ProdutoFormModal({ initial, tiersProduto, onClose, onSave }: {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-background rounded-xl shadow-2xl w-full max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-background rounded-xl shadow-2xl w-full max-w-md p-6 space-y-5 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3">
           <h2 className="text-lg font-semibold">{initial ? "Editar produto" : "Adicionar produto"}</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="size-4" /></button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label className="text-xs">SKU</Label>
-            <Input value={sku} onChange={(e) => setSku(e.target.value)} className="font-mono" />
+        {/* ── Informações do produto ── */}
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <FormSectionLabel>Informações do produto</FormSectionLabel>
+            <span className="text-[10px] font-medium text-muted-foreground rounded-full bg-muted px-2 py-0.5">
+              Origem: {ORIGEM_CADASTRO_LABEL[initial?.origemCadastro ?? "manual"]}
+            </span>
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Nome</Label>
-            <Input value={nome} onChange={(e) => setNome(e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Categoria</Label>
-            <Select value={categoria} onValueChange={setCategoria}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{CATEGORIAS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Preço (R$)</Label>
-            <Input value={preco} onChange={(e) => setPreco(e.target.value.replace(/[^0-9.,]/g, ""))} inputMode="decimal" />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Estoque</Label>
-            <NumberInput value={estoque} onChange={setEstoque} min={0} />
-          </div>
-          {tiersProduto.length > 0 && (
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs">Tier do produto</Label>
-              <Select value={tierProdutoId || "nenhum"} onValueChange={(v) => setTierProdutoId(v === "nenhum" ? "" : v)}>
-                <SelectTrigger><SelectValue placeholder="Sem tier" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="nenhum">Sem tier</SelectItem>
-                  {tiersProduto.map((t) => <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <Label className="text-xs">SKU</Label>
+              <Input value={sku} onChange={(e) => setSku(e.target.value)} className="font-mono" />
             </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Nome</Label>
+              <Input value={nome} onChange={(e) => setNome(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Preço (R$)</Label>
+              <Input value={preco} onChange={(e) => setPreco(e.target.value.replace(/[^0-9.,]/g, ""))} inputMode="decimal" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Estoque</Label>
+              <NumberInput value={estoque} onChange={setEstoque} min={0} />
+            </div>
+          </div>
+        </div>
+
+        {/* ── Categoria ── */}
+        <div className="space-y-2.5 border-t border-border pt-4">
+          <FormSectionLabel>Categoria</FormSectionLabel>
+          <Select value={categoria} onValueChange={setCategoria}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>{CATEGORIAS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+
+        {/* ── Tier do produto — calculado, não escolhido ── */}
+        <div className="space-y-2 border-t border-border pt-4">
+          <FormSectionLabel>Tier do produto</FormSectionLabel>
+          {tiersProduto.length === 0 ? (
+            <p className="text-xs text-muted-foreground rounded-lg border border-dashed border-border px-3 py-2.5">
+              Nenhum tier de produto cadastrado ainda — crie faixas de preço na Biblioteca pra classificar automaticamente.
+            </p>
+          ) : tierCalculado ? (
+            <div className="flex items-center gap-2 rounded-lg border border-border px-3 py-2.5">
+              <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: tierCalculado.cor }} />
+              <span className="text-sm font-semibold">{tierCalculado.nome}</span>
+              <span className="text-xs text-muted-foreground ml-auto">calculado pelo preço</span>
+            </div>
+          ) : (
+            <p className="text-xs text-amber-600 rounded-lg border border-dashed border-amber-300 px-3 py-2.5">
+              Preço fora de qualquer faixa cadastrada — ajuste os tiers de produto na Biblioteca.
+            </p>
           )}
         </div>
 
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 border-t border-border pt-4">
           <Label className="text-xs">Modelo de venda</Label>
           <div className="grid grid-cols-3 gap-2">
             {([["", "Não informado"], ["1P", "1P"], ["3P", "3P"]] as const).map(([v, label]) => (

@@ -13,14 +13,15 @@ import {
 import { MOEDA } from "../config/programa";
 import {
   type Produto, type ProdutoStatus, type CampanhaParticipante, type HistoricoEvento, type ModeloVenda,
-  CATEGORIAS, MODELO_VENDA_LABEL, PRODUTO_STATUS_PILL, PRODUTO_STATUS_LABEL, getProdutos, saveProdutos,
+  CATEGORIAS, MODELO_VENDA_LABEL, ORIGEM_CADASTRO_LABEL, PRODUTO_STATUS_PILL, PRODUTO_STATUS_LABEL, getProdutos, saveProdutos,
 } from "../lib/produtos";
-import { getTiersProduto } from "../lib/tiersProduto";
+import { getTiersProduto, tierProdutoPorPreco } from "../lib/tiersProduto";
 import {
   type GrupoProdutos, getGruposProdutos, saveGruposProdutos,
 } from "../lib/gruposProdutos";
 import { camposCampanhasAtivasPorProduto } from "../lib/campanhas";
 import { GrupoModal } from "../components/GrupoModal";
+import { FormSectionLabel } from "../components/CadastroBase";
 
 // ── Detalhe do produto (panel lateral) ───────────────────────────────────────
 
@@ -250,7 +251,6 @@ export default function CatalogoProdutos() {
   const [formNome,    setFormNome]    = useState("");
   const [formCategoria, setFormCategoria] = useState("");
   const [formPreco,   setFormPreco]   = useState("");
-  const [formTierProdutoId, setFormTierProdutoId] = useState("");
   const [formModeloVenda, setFormModeloVenda] = useState<ModeloVenda | "">("");
 
   const tiersProduto = getTiersProduto();
@@ -320,14 +320,14 @@ export default function CatalogoProdutos() {
     toast.success("Planilha exportada");
   }
 
-  function abrirEditar(p: Produto) { setEditandoId(p.id); setFormSku(p.sku); setFormNome(p.nome); setFormCategoria(p.categoria); setFormPreco(String(p.preco || "")); setFormTierProdutoId(p.tierProdutoId ?? ""); setFormModeloVenda(p.modeloVenda ?? ""); setDrawerOpen(true); }
-  function fecharDrawer() { setDrawerOpen(false); setEditandoId(null); setFormSku(""); setFormNome(""); setFormCategoria(""); setFormPreco(""); setFormTierProdutoId(""); setFormModeloVenda(""); }
+  function abrirEditar(p: Produto) { setEditandoId(p.id); setFormSku(p.sku); setFormNome(p.nome); setFormCategoria(p.categoria); setFormPreco(String(p.preco || "")); setFormModeloVenda(p.modeloVenda ?? ""); setDrawerOpen(true); }
+  function fecharDrawer() { setDrawerOpen(false); setEditandoId(null); setFormSku(""); setFormNome(""); setFormCategoria(""); setFormPreco(""); setFormModeloVenda(""); }
 
   async function handleSave() {
     if (!editandoId || !formSku || !formNome || !formCategoria) return;
     setSaving(true);
     await new Promise(r => setTimeout(r, 400));
-    const tierProdutoId = formTierProdutoId || undefined;
+    const tierProdutoId = tierProdutoPorPreco(tiersProduto, Number(formPreco.replace(",", ".")) || 0)?.id;
     const modeloVenda = formModeloVenda || undefined;
     setProdutos(prev => prev.map(p => p.id === editandoId ? { ...p, sku: formSku, nome: formNome, categoria: formCategoria, preco: Number(formPreco.replace(",", ".")) || 0, tierProdutoId, modeloVenda } : p));
     toast.success("Produto atualizado");
@@ -701,17 +701,32 @@ export default function CatalogoProdutos() {
         saveLabel="Salvar alterações"
         saveDisabled={!formSku || !formNome || !formCategoria}
       >
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label>SKU <span className="text-destructive">*</span></Label>
-            <Input value={formSku} onChange={e => setFormSku(e.target.value)} placeholder="Ex: TV-50-4K" className="font-mono" />
+        <div className="space-y-5">
+          {/* ── Informações do produto ── */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <FormSectionLabel>Informações do produto</FormSectionLabel>
+              <span className="text-[10px] font-medium text-muted-foreground rounded-full bg-muted px-2 py-0.5">
+                Origem: {ORIGEM_CADASTRO_LABEL[produtos.find(p => p.id === editandoId)?.origemCadastro ?? "manual"]}
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              <Label>SKU <span className="text-destructive">*</span></Label>
+              <Input value={formSku} onChange={e => setFormSku(e.target.value)} placeholder="Ex: TV-50-4K" className="font-mono" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Nome do produto <span className="text-destructive">*</span></Label>
+              <Input value={formNome} onChange={e => setFormNome(e.target.value)} placeholder='Ex: Smart TV 50"' />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Preço de referência (R$)</Label>
+              <Input value={formPreco} onChange={e => setFormPreco(e.target.value.replace(/[^0-9.,]/g, ""))} placeholder="Ex: 199,90" inputMode="decimal" />
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <Label>Nome do produto <span className="text-destructive">*</span></Label>
-            <Input value={formNome} onChange={e => setFormNome(e.target.value)} placeholder='Ex: Smart TV 50"' />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Categoria <span className="text-destructive">*</span></Label>
+
+          {/* ── Categoria ── */}
+          <div className="space-y-2.5 border-t border-border pt-4">
+            <FormSectionLabel>Categoria</FormSectionLabel>
             <Select value={formCategoria} onValueChange={setFormCategoria}>
               <SelectTrigger><SelectValue placeholder="Selecione uma categoria" /></SelectTrigger>
               <SelectContent>
@@ -719,24 +734,29 @@ export default function CatalogoProdutos() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
-            <Label>Preço de referência (R$)</Label>
-            <Input value={formPreco} onChange={e => setFormPreco(e.target.value.replace(/[^0-9.,]/g, ""))} placeholder="Ex: 199,90" inputMode="decimal" />
+
+          {/* ── Tier do produto — calculado, não escolhido ── */}
+          <div className="space-y-2 border-t border-border pt-4">
+            <FormSectionLabel>Tier do produto</FormSectionLabel>
+            {(() => {
+              const tierCalculado = tierProdutoPorPreco(tiersProduto, Number(formPreco.replace(",", ".")) || 0);
+              if (tiersProduto.length === 0) {
+                return <p className="text-xs text-muted-foreground rounded-lg border border-dashed border-border px-3 py-2.5">Nenhum tier de produto cadastrado ainda — crie faixas de preço no Cadastro de produtos e membros.</p>;
+              }
+              if (!tierCalculado) {
+                return <p className="text-xs text-amber-600 rounded-lg border border-dashed border-amber-300 px-3 py-2.5">Preço fora de qualquer faixa cadastrada — ajuste os tiers de produto no Cadastro de produtos e membros.</p>;
+              }
+              return (
+                <div className="flex items-center gap-2 rounded-lg border border-border px-3 py-2.5">
+                  <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: tierCalculado.cor }} />
+                  <span className="text-sm font-semibold">{tierCalculado.nome}</span>
+                  <span className="text-xs text-muted-foreground ml-auto">calculado pelo preço</span>
+                </div>
+              );
+            })()}
           </div>
-          <div className="space-y-1.5">
-            <Label>Tier de produto</Label>
-            <Select value={formTierProdutoId || "nenhum"} onValueChange={v => setFormTierProdutoId(v === "nenhum" ? "" : v)}>
-              <SelectTrigger><SelectValue placeholder="Sem tier" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="nenhum">Sem tier</SelectItem>
-                {tiersProduto.map(t => <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            {tiersProduto.length === 0 && (
-              <p className="text-xs text-muted-foreground">Nenhum tier cadastrado ainda — crie um no Cadastro de produtos e membros.</p>
-            )}
-          </div>
-          <div className="space-y-1.5">
+
+          <div className="space-y-1.5 border-t border-border pt-4">
             <Label>Modelo de venda</Label>
             <Select value={formModeloVenda || "nenhum"} onValueChange={v => setFormModeloVenda(v === "nenhum" ? "" : v as ModeloVenda)}>
               <SelectTrigger><SelectValue placeholder="Não informado" /></SelectTrigger>

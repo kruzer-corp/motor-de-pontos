@@ -37,6 +37,9 @@ const CHAVES_SETUP = [
   "motor_pontos_moeda",
   "motor_pontos_produtos",
   "motor_pontos_grupos_produtos",
+  "motor_pontos_coordenadores",
+  "motor_pontos_afiliados",
+  "motor_pontos_carteira_seed_aplicado_v2",
 ];
 
 export function resetarPrimeiroAcesso() {

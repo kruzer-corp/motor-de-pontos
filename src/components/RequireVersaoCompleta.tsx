@@ -11,7 +11,10 @@ const PERMITIDAS_EM_V1 = ["/onboarding/regra", "/canais-filiais", "/campanhas/no
 
 export default function RequireVersaoCompleta() {
   const location = useLocation();
-  const permitido = PERMITIDAS_EM_V1.some((p) => location.pathname.startsWith(p));
+  const path = location.pathname;
+  // "/coordenador" (Visão do coordenador) fica fora do array acima de propósito —
+  // "/coordenadores" (CRUD do admin) também começa com essa string, e não deve ser liberado.
+  const permitido = PERMITIDAS_EM_V1.some((p) => path.startsWith(p)) || path === "/coordenador" || path.startsWith("/coordenador/");
 
   if (ehV1() && !onboardingCompleto() && !permitido) return <Navigate to="/onboarding" replace />;
   return <Outlet />;

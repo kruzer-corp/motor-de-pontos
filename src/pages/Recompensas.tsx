@@ -103,9 +103,9 @@ export default function Recompensas() {
       {/* Quick links */}
       <div className="flex flex-wrap gap-2">
         <Button asChild variant="outline" size="sm">
-          <Link to="/recompensas/catalogo">
+          <Link to="/campanhas">
             <ShoppingCart className="size-3.5 mr-1.5" />
-            Catálogo de resgate
+            Produtos de resgate (nas campanhas)
           </Link>
         </Button>
         <Button asChild variant="outline" size="sm">

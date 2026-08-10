@@ -1,6 +1,8 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import AppLayout from "./layout/AppLayout";
 import PortalLayout from "./layout/PortalLayout";
+import CarteiraCoordenador from "./pages/coordenador/CarteiraCoordenador";
+import AfiliadoDetalhe from "./pages/coordenador/AfiliadoDetalhe";
 import PortalCarteira from "./pages/portal/Carteira";
 import PortalExtrato from "./pages/portal/Extrato";
 import PortalCatalogo from "./pages/portal/Catalogo";
@@ -12,6 +14,8 @@ import Dashboard from "./pages/Dashboard";
 import OnboardingCadastro from "./pages/OnboardingCadastro";
 import OnboardingRegra from "./pages/OnboardingRegra";
 import Usuarios from "./pages/Usuarios";
+import Coordenadores from "./pages/Coordenadores";
+import CarteiraAfiliados from "./pages/CarteiraAfiliados";
 import Membros from "./pages/Membros";
 import MembrosV2 from "./pages/MembrosV2";
 import MembrosTier from "./pages/MembrosTier";
@@ -25,7 +29,6 @@ import CatalogoGrupos from "./pages/CatalogoGrupos";
 import Campanhas from "./pages/Campanhas";
 import CampanhasNova from "./pages/CampanhasNova";
 import Recompensas from "./pages/Recompensas";
-import ResgateCatalogo from "./pages/ResgateCatalogo";
 import Comunicacoes from "./pages/Comunicacoes";
 import MinhaConta from "./pages/MinhaConta";
 import CatalogoAtualizacao from "./pages/CatalogoAtualizacao";
@@ -88,6 +91,8 @@ export default function App() {
         <Route path="mecanica" element={<MecanicaPrograma />} />
         <Route path="biblioteca" element={<Biblioteca />} />
         <Route path="usuarios" element={<Usuarios />} />
+        <Route path="coordenador" element={<CarteiraCoordenador />} />
+        <Route path="coordenador/afiliados/:id" element={<AfiliadoDetalhe />} />
         <Route path="canais-filiais" element={<CanaisFiliais />} />
         <Route path="membros" element={<Membros />} />
         <Route path="membros-v2" element={<MembrosV2 />} />
@@ -95,6 +100,8 @@ export default function App() {
         <Route path="membros/segmentos" element={<MembrosSegmentos />} />
         <Route path="membros/ajuste" element={<MembrosAjuste />} />
         <Route path="membros/extrato" element={<Extrato />} />
+        <Route path="coordenadores" element={<Coordenadores />} />
+        <Route path="carteira-afiliados" element={<CarteiraAfiliados />} />
         <Route path="membros/:id" element={<MembroDetalhe />} />
         <Route path="catalogo" element={<Catalogo />} />
         <Route path="catalogo/grupos" element={<CatalogoGrupos />} />
@@ -104,7 +111,6 @@ export default function App() {
         <Route path="campanhas/nova" element={<CampanhasNova />} />
         <Route path="campanhas/:id" element={<CampanhasNova />} />
         <Route path="recompensas" element={<Recompensas />} />
-        <Route path="recompensas/catalogo" element={<ResgateCatalogo />} />
         <Route path="catalogo-produtos" element={<CatalogoProdutos />} />
         <Route path="conformidade" element={<Navigate to="/logs" replace />} />
         <Route path="comunicacoes" element={<Comunicacoes />} />

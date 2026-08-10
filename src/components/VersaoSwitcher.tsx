@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@kruzer/ds";
-import { ArrowLeftRight, Sparkles, CheckCircle2, UserCircle, ShieldCheck, RotateCcw } from "lucide-react";
-import { getVersao, saveVersao, resetarPrimeiroAcesso } from "../lib/versao";
+import { ArrowLeftRight, Sparkles, CheckCircle2, UserCircle, Users, ShieldCheck } from "lucide-react";
+import { getVersao, saveVersao } from "../lib/versao";
 import { aplicarSeedV2SeNecessario } from "../lib/seedV2";
 
 const VERSAO_LABEL: Record<"v1" | "v2", string> = {
@@ -19,21 +19,17 @@ export default function VersaoSwitcher() {
   const location = useLocation();
   const versao = getVersao();
   const emPortal = location.pathname.startsWith("/portal");
-  const rotuloBotao = emPortal
-    ? (versao === "v1" ? "Visão do membro" : `Visão do membro · ${VERSAO_LABEL[versao]}`)
+  // "/coordenadores" (CRUD do admin) também começa com "/coordenador" — não pode contar.
+  const emCoordenador = location.pathname === "/coordenador" || location.pathname.startsWith("/coordenador/");
+  const rotuloBase = emPortal ? "Visão do membro" : emCoordenador ? "Visão do coordenador" : null;
+  const rotuloBotao = rotuloBase
+    ? (versao === "v1" ? rotuloBase : `${rotuloBase} · ${VERSAO_LABEL[versao]}`)
     : VERSAO_LABEL[versao];
 
   function irPara(v: "v1" | "v2") {
     if (v === "v2") aplicarSeedV2SeNecessario();
     saveVersao(v);
-    navigate(emPortal ? "/portal" : "/dashboard");
-    window.location.reload();
-  }
-
-  function resetarEIrParaOnboarding() {
-    resetarPrimeiroAcesso();
-    saveVersao("v1");
-    navigate("/onboarding");
+    navigate(emPortal ? "/portal" : emCoordenador ? "/coordenador" : "/dashboard");
     window.location.reload();
   }
 
@@ -58,21 +54,22 @@ export default function VersaoSwitcher() {
           Programa funcionando{versao === "v2" ? " · atual" : ""}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={resetarEIrParaOnboarding}>
-          <RotateCcw className="size-3.5 mr-2" />
-          Resetar primeiro acesso
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        {emPortal ? (
+        {emPortal || emCoordenador ? (
           <DropdownMenuItem onClick={() => navigate("/dashboard")}>
             <ShieldCheck className="size-3.5 mr-2" />
-            Ver como analista
+            Ver como master
           </DropdownMenuItem>
         ) : (
-          <DropdownMenuItem onClick={() => navigate("/portal")}>
-            <UserCircle className="size-3.5 mr-2" />
-            Visão do membro
-          </DropdownMenuItem>
+          <>
+            <DropdownMenuItem onClick={() => navigate("/portal")}>
+              <UserCircle className="size-3.5 mr-2" />
+              Visão do membro
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("/coordenador")}>
+              <Users className="size-3.5 mr-2" />
+              Visão do coordenador
+            </DropdownMenuItem>
+          </>
         )}
       </DropdownMenuContent>
     </DropdownMenu>

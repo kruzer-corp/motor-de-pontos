@@ -177,7 +177,7 @@ function SegmentoModal({ initial, onSave, onClose }: { initial?: SegmentoMembro;
 // ── Modal: Tier de produto ───────────────────────────────────────────────────
 
 function TierProdutoModal({ initial, onSave, onClose }: { initial?: TierProduto; onSave: (t: TierProduto) => void; onClose: () => void }) {
-  const [d, setD] = useState<Omit<TierProduto, "id">>(initial ?? { nome: "", cor: "#6366f1", descricao: "" });
+  const [d, setD] = useState<Omit<TierProduto, "id">>(initial ?? { nome: "", cor: "#6366f1", descricao: "", limiarMin: 0, limiarMax: null });
   const upd = <K extends keyof typeof d>(k: K, v: (typeof d)[K]) => setD((p) => ({ ...p, [k]: v }));
 
   return (
@@ -198,6 +198,17 @@ function TierProdutoModal({ initial, onSave, onClose }: { initial?: TierProduto;
             <span className="flex-1 text-sm text-muted-foreground">{d.cor}</span>
           </div>
         </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-sm">Preço de <span className="text-destructive">*</span></Label>
+            <Input type="number" min={0} value={d.limiarMin} onChange={(e) => upd("limiarMin", Number(e.target.value) || 0)} placeholder="Ex: 0" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm">Até</Label>
+            <Input type="number" min={0} value={d.limiarMax ?? ""} onChange={(e) => upd("limiarMax", e.target.value ? Number(e.target.value) : null)} placeholder="Sem teto" />
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground -mt-2">Todo produto com preço nessa faixa entra automaticamente neste tier — não precisa escolher na mão.</p>
         <div className="space-y-1.5">
           <Label className="text-sm">Descrição</Label>
           <Input value={d.descricao} onChange={(e) => upd("descricao", e.target.value)} placeholder="Ex: Produtos de ticket alto, foco de campanhas." />
@@ -350,7 +361,10 @@ export default function Biblioteca() {
                         <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: tier.cor }} />
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold">{tier.nome}</p>
-                          {tier.descricao && <p className="text-xs text-muted-foreground mt-0.5">{tier.descricao}</p>}
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            R$ {tier.limiarMin.toLocaleString("pt-BR")} {tier.limiarMax !== null ? `→ R$ ${tier.limiarMax.toLocaleString("pt-BR")}` : "em diante"}
+                            {tier.descricao ? ` · ${tier.descricao}` : ""}
+                          </p>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                           <button onClick={() => setTierProdutoModal(tier)} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil className="size-3.5" /></button>

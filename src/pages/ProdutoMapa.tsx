@@ -31,7 +31,7 @@ const SECTIONS: Section[] = [
       { label: "Grupos de catálogo", route: "/catalogo/grupos" },
       { label: "Campanhas + 7 políticas + arquivamento", route: "/campanhas" },
       { label: "Motor de Resgate (pipeline)", route: "/recompensas" },
-      { label: "Catálogo de resgate + checkout", route: "/recompensas/catalogo" },
+      { label: "Catálogo de resgate + checkout", route: "/campanhas" },
       { label: "Comunicações transacionais", route: "/comunicacoes" },
       { label: "Histórico de comunicados", route: "/comunicados" },
       { label: "Usuários & Papéis (IAM + RBAC)", route: "/usuarios" },

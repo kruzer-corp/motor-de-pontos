@@ -66,7 +66,7 @@ const INITIAL_BANNERS: Banner[] = [
     title: "Resgate Agora",
     subtitle: "Mais de 80 produtos disponíveis para resgate.",
     cta: "Ver catálogo",
-    ctaUrl: "/recompensas/catalogo",
+    ctaUrl: "/campanhas",
     startDate: "15/06/2025",
     endDate: "15/07/2025",
     status: "ativo",

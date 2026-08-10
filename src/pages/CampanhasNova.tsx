@@ -4,12 +4,13 @@ import {
   Button, Input, Label, NumberInput, PageHeader, Pill, Switch, toast,
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@kruzer/ds";
-import { CheckCircle2, Plus, Trash2 } from "lucide-react";
+import { CheckCircle2, Plus, Trash2, ChevronDown } from "lucide-react";
 import { renderCrumbLink } from "../lib/crumbLink";
 import {
   type Form, type Campanha, type Multiplicador, type MultiplicadorTipo, type ExpiracaoTipo,
-  type LimiteEscopo, type LimitePeriodoGranularidade,
-  DEFAULTS, getCampanha, upsertCampanha, novoIdCampanha, novoIdMultiplicador, produtosElegiveisDaCampanha,
+  type LimiteEscopo, type LimitePeriodoGranularidade, type ProdutoResgate, type ResgateLimiteEscopo,
+  DEFAULTS, getCampanha, upsertCampanha, novoIdCampanha, novoIdMultiplicador, novoIdProdutoResgate,
+  produtosElegiveisDaCampanha, produtosResgateDaCampanha,
 } from "../lib/campanhas";
 import { type EstornoPolicy, GATILHO_LABEL, MECANISMO_LABEL, ESTORNO_LABEL, CANAIS, gatilhoEhTransacional } from "../lib/regras";
 import { GatilhoFields, AtribuicaoFields, ElegibilidadeFields } from "../components/RegraFields";
@@ -18,22 +19,23 @@ import { getSegmentosMembro } from "../lib/segmentosMembro";
 import { getTiersMembro } from "../lib/tiers";
 import { getPapeisMembro } from "../lib/papeisMembro";
 import { getTiersProduto } from "../lib/tiersProduto";
-import { CATEGORIAS, PRODUTO_STATUS_PILL, PRODUTO_STATUS_LABEL } from "../lib/produtos";
+import { CATEGORIAS, PRODUTO_STATUS_PILL, PRODUTO_STATUS_LABEL, getProdutos } from "../lib/produtos";
 import { getConjuntosProdutos } from "../lib/conjuntosProdutos";
 
 // ── Steps ─────────────────────────────────────────────────────────────────────
-// Campanha é autossuficiente — 6 dimensões próprias (Elegibilidade, Multiplicador,
-// Expiração, Limite, Cancelamento/estorno, Prioridade), sem referenciar Regra da
-// Mecânica. Elegibilidade já está completa; as demais chegam nas próximas etapas
-// desta reconstrução — Multiplicador substitui a antiga tabela de Output.
+// Campanha é autossuficiente — 7 dimensões próprias (Elegibilidade, Multiplicador,
+// Expiração, Limite, Resgate, Cancelamento/estorno, Prioridade), sem referenciar
+// Regra da Mecânica nem um Catálogo de Resgate à parte — Resgate substitui a
+// antiga tela /recompensas/catalogo.
 
 const STEPS = [
   { num: 1, label: "Elegibilidade" },
   { num: 2, label: "Multiplicador" },
   { num: 3, label: "Expiração de pontos" },
   { num: 4, label: "Limite" },
-  { num: 5, label: "Cancelamento/estorno" },
-  { num: 6, label: "Prioridade" },
+  { num: 5, label: "Resgate" },
+  { num: 6, label: "Cancelamento/estorno" },
+  { num: 7, label: "Prioridade" },
 ];
 
 // ── Stepper ───────────────────────────────────────────────────────────────────
@@ -372,6 +374,206 @@ function LimiteFields({ value, onChange }: { value: Form; onChange: (patch: Part
   );
 }
 
+// ── Resgate ───────────────────────────────────────────────────────────────────
+// Substitui a antiga tela /recompensas/catalogo — a campanha define quais
+// produtos do catálogo entram no resgate, e a elegibilidade pra resgatar.
+
+const RESGATE_LIMITE_ESCOPO_LABEL: Record<ResgateLimiteEscopo, string> = {
+  mes: "por mês", campanha: "por vigência", ilimitado: "ilimitado",
+};
+
+function ResgateFields({ value, onChange }: { value: Form; onChange: (patch: Partial<Form>) => void }) {
+  const tiers = getTiersMembro();
+  const catalogo = getProdutos().filter((p) => p.status !== "arquivado");
+  const vinculados = produtosResgateDaCampanha(value);
+  const jaVinculadoIds = new Set(value.resgateProdutos.map((r) => r.produtoId));
+  const disponiveis = catalogo.filter((p) => !jaVinculadoIds.has(p.id));
+  const categorias = Array.from(new Set(disponiveis.map((p) => p.categoria)));
+
+  const [selecionados, setSelecionados] = useState<string[]>([]);
+  const [categoriaAberta, setCategoriaAberta] = useState<string | null>(null);
+
+  function toggleSelecionado(id: string) {
+    setSelecionados((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function selecionarCategoria(categoria: string) {
+    const idsCategoria = disponiveis.filter((p) => p.categoria === categoria).map((p) => p.id);
+    const todosMarcados = idsCategoria.every((id) => selecionados.includes(id));
+    setSelecionados((prev) =>
+      todosMarcados ? prev.filter((id) => !idsCategoria.includes(id)) : Array.from(new Set([...prev, ...idsCategoria]))
+    );
+  }
+
+  function adicionarSelecionados() {
+    if (selecionados.length === 0) return;
+    const novos: ProdutoResgate[] = selecionados.map((produtoId) => {
+      const p = disponiveis.find((x) => x.id === produtoId)!;
+      return {
+        id: novoIdProdutoResgate(), produtoId,
+        pontos: Math.round((p.preco || 0) * value.resgateConversaoPontosPorReal),
+        popular: false, visivelNoPortal: true,
+      };
+    });
+    onChange({ resgateProdutos: [...value.resgateProdutos, ...novos] });
+    setSelecionados([]);
+  }
+
+  function removerProduto(id: string) {
+    onChange({ resgateProdutos: value.resgateProdutos.filter((r) => r.id !== id) });
+  }
+
+  function toggleTier(tierId: string) {
+    const atual = value.resgateTiersElegiveis;
+    onChange({ resgateTiersElegiveis: atual.includes(tierId) ? atual.filter((x) => x !== tierId) : [...atual, tierId] });
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center mb-2">
+        <h3 className="text-lg font-semibold">O que dá pra resgatar com esses pontos</h3>
+        <p className="text-sm text-muted-foreground mt-1">Escolha os produtos do catálogo e quem pode resgatar.</p>
+      </div>
+
+      <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
+        <div>
+          <p className="text-sm font-medium">Permite resgate nesta campanha</p>
+          <p className="text-xs text-muted-foreground">Desativado, os pontos só valem por acúmulo — sem produto resgatável aqui.</p>
+        </div>
+        <Switch checked={value.resgateAtivo} onCheckedChange={(v) => onChange({ resgateAtivo: v })} />
+      </div>
+
+      {value.resgateAtivo && (
+        <>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Pontos por R$1</Label>
+            <div className="flex items-center gap-2 w-48">
+              <NumberInput value={value.resgateConversaoPontosPorReal} onChange={(v) => onChange({ resgateConversaoPontosPorReal: v ?? 0 })} min={0} />
+              <span className="text-xs text-muted-foreground">pts/R$</span>
+            </div>
+            <p className="text-xs text-muted-foreground">O custo em pontos de cada produto é calculado automaticamente (preço × taxa) — não precisa digitar item por item.</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm">Produtos elegíveis pra resgate</Label>
+            {disponiveis.length === 0 ? (
+              <p className="text-xs text-muted-foreground rounded-lg border border-dashed border-border px-3 py-3 text-center">Todos os produtos ativos do catálogo já foram adicionados.</p>
+            ) : (
+              <>
+                <div className="rounded-lg border border-border divide-y divide-border max-h-96 overflow-y-auto">
+                  {categorias.map((cat) => {
+                    const produtosCat = disponiveis.filter((p) => p.categoria === cat);
+                    const marcadosCat = produtosCat.filter((p) => selecionados.includes(p.id)).length;
+                    const todosMarcados = marcadosCat === produtosCat.length;
+                    const aberta = categoriaAberta === cat;
+                    return (
+                      <div key={cat}>
+                        <button
+                          type="button"
+                          onClick={() => setCategoriaAberta(aberta ? null : cat)}
+                          className="w-full flex items-center justify-between bg-muted/30 px-3 py-2 hover:bg-muted/50"
+                        >
+                          <span className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                            <ChevronDown className={`size-3.5 shrink-0 transition-transform ${aberta ? "" : "-rotate-90"}`} />
+                            {cat}
+                            <span className="normal-case font-normal text-muted-foreground/80">
+                              ({marcadosCat > 0 ? `${marcadosCat} de ${produtosCat.length}` : produtosCat.length})
+                            </span>
+                          </span>
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => { e.stopPropagation(); selecionarCategoria(cat); }}
+                            className="text-[11px] text-primary hover:underline shrink-0"
+                          >
+                            {todosMarcados ? "desmarcar categoria" : "selecionar categoria"}
+                          </span>
+                        </button>
+                        {aberta && produtosCat.map((p) => (
+                          <label key={p.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/20 border-t border-border">
+                            <input type="checkbox" className="accent-primary h-4 w-4 shrink-0" checked={selecionados.includes(p.id)} onChange={() => toggleSelecionado(p.id)} />
+                            <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+                              <span className="text-sm truncate">{p.nome}</span>
+                              <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                                R$ {p.preco.toLocaleString("pt-BR")} → {Math.round((p.preco || 0) * value.resgateConversaoPontosPorReal).toLocaleString("pt-BR")} pts
+                              </span>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+                <Button type="button" size="sm" disabled={selecionados.length === 0} onClick={adicionarSelecionados}>
+                  <Plus className="size-3.5 mr-1.5" />
+                  Adicionar{selecionados.length > 0 ? ` ${selecionados.length} selecionado(s)` : ""}
+                </Button>
+              </>
+            )}
+          </div>
+
+          {vinculados.length > 0 && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">Já no resgate desta campanha ({vinculados.length})</Label>
+              {vinculados.map((p) => (
+                <div key={p.id} className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{p.nome}</p>
+                    <p className="text-xs text-muted-foreground">{p.categoria} · {p.estoque} em estoque</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-sm font-semibold tabular-nums">{p.pontos.toLocaleString("pt-BR")} pts</span>
+                    <button onClick={() => removerProduto(p.id)} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive"><Trash2 className="size-3.5" /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label className="text-xs">Tiers elegíveis pra resgatar</Label>
+            <div className="flex gap-2 flex-wrap">
+              {tiers.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Nenhum tier cadastrado — todos os membros podem resgatar.</p>
+              ) : tiers.map((t) => (
+                <button key={t.id} type="button" onClick={() => toggleTier(t.id)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors border ${
+                    value.resgateTiersElegiveis.includes(t.id) ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"
+                  }`}>{t.nome}</button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">Nenhum selecionado = qualquer tier pode resgatar.</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Saldo mínimo exigido (além do custo)</Label>
+            <div className="flex items-center gap-2 w-48">
+              <NumberInput value={Number(value.resgateSaldoMinimo) || 0} onChange={(v) => onChange({ resgateSaldoMinimo: String(v ?? 0) })} min={0} />
+              <span className="text-xs text-muted-foreground">pts</span>
+            </div>
+            <p className="text-xs text-muted-foreground">Saldo que o membro precisa TER além do custo do produto. 0 = sem exigência adicional.</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Limite de resgates por membro</Label>
+            <div className="flex items-center gap-2">
+              <Input type="number" value={value.resgateLimitePorMembro} onChange={(e) => onChange({ resgateLimitePorMembro: e.target.value })} placeholder="Sem limite" className="w-24" min={1} />
+              <Select value={value.resgateLimiteEscopo} onValueChange={(v) => onChange({ resgateLimiteEscopo: v as ResgateLimiteEscopo })}>
+                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(RESGATE_LIMITE_ESCOPO_LABEL) as ResgateLimiteEscopo[]).map((v) => (
+                    <SelectItem key={v} value={v}>{RESGATE_LIMITE_ESCOPO_LABEL[v]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Cancelamento/estorno ─────────────────────────────────────────────────────
 // Pedido: já funciona de verdade — cancelamento/devolução gera transação negativa
 // no motor, seguindo a política escolhida aqui. Indicação: também já funciona —
@@ -595,13 +797,18 @@ export default function CampanhasNova() {
           <LimiteFields value={form} onChange={(p) => setForm((prev) => ({ ...prev, ...p }))} />
         )}
 
-        {/* ── Step 5: Cancelamento/estorno ── */}
+        {/* ── Step 5: Resgate ── */}
         {step === 5 && (
+          <ResgateFields value={form} onChange={(p) => setForm((prev) => ({ ...prev, ...p }))} />
+        )}
+
+        {/* ── Step 6: Cancelamento/estorno ── */}
+        {step === 6 && (
           <CancelamentoFields value={form} onChange={(p) => setForm((prev) => ({ ...prev, ...p }))} />
         )}
 
-        {/* ── Step 6: Prioridade + revisão + publicação ── */}
-        {step === 6 && (
+        {/* ── Step 7: Prioridade + revisão + publicação ── */}
+        {step === 7 && (
           <div className="space-y-6">
             <PlaceholderStep label="Prioridade" />
 
@@ -624,6 +831,10 @@ export default function CampanhasNova() {
                 <ReviewRow label="Limite" value={
                   !form.limiteAtivo ? "Sem limite" :
                   `${form.limiteValor}pt ${form.limiteEscopo === "transacao" ? "por transação" : form.limiteEscopo === "periodo" ? `por ${GRANULARIDADE_LABEL[form.limitePeriodoGranularidade].toLowerCase()}` : "por membro (vitalício)"}`
+                } />
+                <ReviewRow label="Resgate" value={
+                  !form.resgateAtivo ? "Não permite resgate" :
+                  `${form.resgateProdutos.length} produto(s)${form.resgateLimitePorMembro ? ` · limite ${form.resgateLimitePorMembro}× ${RESGATE_LIMITE_ESCOPO_LABEL[form.resgateLimiteEscopo]}` : ""}`
                 } />
                 <ReviewRow label="Cancelamento" value={ESTORNO_LABEL[form.estornoPolicy]} />
                 <ReviewRow label="Período" value={form.periodoInicio && form.periodoFim ? `${form.periodoInicio} → ${form.periodoFim}` : "—"} />
@@ -667,7 +878,7 @@ export default function CampanhasNova() {
           <Button variant="outline" className="flex-1" onClick={() => (step > 1 ? setStep(step - 1) : navigate("/campanhas"))}>
             Voltar
           </Button>
-          {step < 6 ? (
+          {step < 7 ? (
             <Button className="flex-1" disabled={!canContinue()} onClick={() => setStep(step + 1)}>
               Continuar
             </Button>
@@ -681,7 +892,7 @@ export default function CampanhasNova() {
             </Button>
           )}
         </div>
-        {step < 6 && (
+        {step < 7 && (
           <p className="text-center mt-3">
             <button className="text-xs text-muted-foreground hover:text-foreground underline" onClick={salvarComoRascunho}>
               {jaPublicada ? "Salvar alterações e voltar" : "Salvar como rascunho"}

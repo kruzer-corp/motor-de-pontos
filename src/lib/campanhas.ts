@@ -37,6 +37,24 @@ export type ExpiracaoTipo = "nao_expira" | "dias_sem_movimentacao" | "data_fixa"
 export type LimiteEscopo = "transacao" | "periodo" | "membro";
 export type LimitePeriodoGranularidade = "dia" | "semana" | "mes";
 
+// Resgate — a campanha define quais produtos do catálogo podem ser resgatados
+// com os pontos dela, e as regras de elegibilidade pra isso (tier, saldo
+// mínimo, limite por membro). Substitui o antigo Catálogo de Resgate, que era
+// uma tela separada e desconectada de qualquer campanha.
+export type ResgateLimiteEscopo = "mes" | "campanha" | "ilimitado";
+
+export type ProdutoResgate = {
+  id: string;
+  produtoId: string;
+  pontos: number;     // custo em pontos pra resgatar esse produto
+  popular: boolean;
+  visivelNoPortal: boolean;
+};
+
+export function novoIdProdutoResgate(): string {
+  return `PR-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}
+
 export type Form = {
   nome: string;
   codigo: string;
@@ -84,6 +102,15 @@ export type Form = {
   limiteEscopo: LimiteEscopo;
   limiteValor: number;
   limitePeriodoGranularidade: LimitePeriodoGranularidade; // usado quando limiteEscopo === "periodo"
+
+  // Resgate — produtos resgatáveis com pontos desta campanha + elegibilidade
+  resgateAtivo: boolean;
+  resgateProdutos: ProdutoResgate[];
+  resgateConversaoPontosPorReal: number; // pontos por R$1 — calcula o custo de cada produto selecionado em massa
+  resgateTiersElegiveis: string[]; // tier de membro (Biblioteca) — vazio = todos
+  resgateSaldoMinimo: string;      // saldo que o membro precisa TER além do custo do produto
+  resgateLimitePorMembro: string;  // vazio = sem limite
+  resgateLimiteEscopo: ResgateLimiteEscopo;
 
   // Output antigo — mantido só pra compatibilidade de dado, não editado no wizard novo
   eixoTipo: EixoTipo;
@@ -136,6 +163,14 @@ export const DEFAULTS: Form = {
   limiteEscopo: "transacao",
   limiteValor: 0,
   limitePeriodoGranularidade: "mes",
+
+  resgateAtivo: false,
+  resgateProdutos: [],
+  resgateConversaoPontosPorReal: 10,
+  resgateTiersElegiveis: [],
+  resgateSaldoMinimo: "0",
+  resgateLimitePorMembro: "",
+  resgateLimiteEscopo: "mes",
 
   eixoTipo: "valor_total",
   tabelaBeneficio: [],
@@ -194,7 +229,7 @@ export function removeCampanha(id: string): Campanha[] {
 }
 
 export function novoIdCampanha(): string {
-  return `CMP-${String(Date.now()).slice(-6)}`;
+  return `CMP-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
 
 // ── Produtos elegíveis (derivado de Gatilho + Elegibilidade) ─────────────────
@@ -246,4 +281,28 @@ export function camposCampanhasAtivasPorProduto(): Map<string, Campanha[]> {
     }
   }
   return mapa;
+}
+
+// ── Produtos de resgate (join com o catálogo) ────────────────────────────────
+// Diferente de Produtos elegíveis (que é calculado por filtro), Resgate guarda
+// uma lista explícita de produtos escolhidos — aqui só junta com o catálogo
+// pra exibir nome/categoria/estoque sem duplicar esse dado na campanha.
+
+export type ProdutoResgateView = ProdutoResgate & { nome: string; categoria: string; estoque: number };
+
+export function produtosResgateDaCampanha(f: Form): ProdutoResgateView[] {
+  const catalogo = getProdutos();
+  return f.resgateProdutos
+    .map((r) => {
+      const p = catalogo.find((x) => x.id === r.produtoId);
+      return p ? { ...r, nome: p.nome, categoria: p.categoria, estoque: p.estoque ?? 0 } : null;
+    })
+    .filter((r): r is ProdutoResgateView => r !== null);
+}
+
+// Todas as recompensas ativas agora, de todas as campanhas ativas — visão
+// agregada usada pelo portal do membro pra saber o que pode ser resgatado.
+export function recompensasAtivas(): { campanha: Campanha; produto: ProdutoResgateView }[] {
+  const ativas = getCampanhas().filter((c) => c.status === "ativa" && c.resgateAtivo);
+  return ativas.flatMap((c) => produtosResgateDaCampanha(c).map((produto) => ({ campanha: c, produto })));
 }
